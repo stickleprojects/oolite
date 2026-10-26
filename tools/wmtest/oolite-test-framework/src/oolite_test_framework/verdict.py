@@ -308,6 +308,10 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
     anyc = lambda word: sum(1 for k in tc if any(outs[k][c][0] == word for c in MAIN_CRITS + ("toggle",)))
     LAST.clear(); LAST.update(tested=len(tc), regressed=len(bad), suspect=anyc("SUSPECT"), still_broken=anyc("STILL BROKEN"),
                               measured=sum(1 for k in tc if outs[k]["cell"][0] not in ("NOT MEASURABLE", "NOT TESTED")))
+    single = len(builds) == 1
+    if single:
+        rs_all = [r for k, v in cells.items() if k[2] == control for r in v]
+        LAST.update(measured=sum(1 for r in rs_all if run_passes(r) is not None), regressed=sum(1 for r in rs_all if run_passes(r) is False))
     L = ["# Window-manager matrix: %s" % name, ""]
     if META["purpose"] is not None or META["builds"]:
         L += ["## Purpose", "", META["purpose"] or "Purpose: not given", ""]
@@ -336,12 +340,12 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
             if not ctl: continue
             f = fails(ctl); bad_c = [c for c in MAIN_CRITS if f[c][0]]
             if bad_c: bro.append("%s %s" % (cell_name(wm, sc, multi), "+".join(bad_c)))
-    HL.append("- %s (control) fails on: %s" % (control, "; ".join(bro) or "nothing measured"))
+    HL.append("- %s%s fails on: %s" % (control, "" if single else " (control)", "; ".join(bro) or "nothing measured"))
     test_failures = {}
     for b in builds:
         test_failures[b] = sum(fails(rs)[c][0] for (wm, sc, build), rs in cells.items() if build == b for c in CRIT)
     HL.append("- Failed measured criteria: " + ", ".join("%s %d" % (b, test_failures[b]) for b in builds))
-    HL.append("- Control failures are baseline results, not candidate failures; pytest's failed count includes tests from both builds.")
+    if not single: HL.append("- Control failures are baseline results, not candidate failures; pytest's failed count includes tests from both builds.")
     tot = {b: [sum(clean_runs(v)[i] for kk, v in cells.items() if kk[2] == b) for i in (0, 1)] for b in builds}
     HL.append("- Runs with every measured criterion passing: " + ", ".join("%s %d/%d" % (b, *tot[b]) for b in builds))
     L += ["## Headline", ""] + HL + [""]
@@ -398,7 +402,8 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
     L += ["", "## Machine-readable outcomes", "", "```"] + vs + ["```", "", "Candidates REGRESSED: %d" % len(bad)]
     open(outp, "w").write("\n".join(L) + "\n")
     print("\n".join(HL))
-    print("FINAL: %d candidate cell(s) REGRESSED" % len(bad))
+    if single: print("FINAL: %d of %d measured run(s) failed (single build, nothing to compare against)" % (LAST["regressed"], LAST["measured"]))
+    else: print("FINAL: %d candidate cell(s) REGRESSED" % len(bad))
     return 1 if bad else 0
 
 

@@ -83,6 +83,22 @@ def test_nothing_measured_is_exit_2(tmp_path, monkeypatch, capsys):
     assert run(tmp_path, "-q") == 2 and "nothing was measured" in capsys.readouterr().err
 
 
+def run_single(tmp_path, monkeypatch, fails_frame):
+    monkeypatch.setattr(hostrun, "docker_state", lambda: (True, ""))
+    monkeypatch.setattr(hostrun.Runner, "docker_cells", lambda self, n, s: [self.add(l) for l in lines("only", 3, fails_frame)])
+    return hostrun.main(["only:%s" % app(tmp_path), "--env", "marco", "--out", str(tmp_path / "res"), "--minruns", "3"])
+
+
+def test_single_build_passes_without_a_candidate(tmp_path, monkeypatch, capsys):
+    assert run_single(tmp_path, monkeypatch, 0) == 0
+    out = capsys.readouterr().out
+    assert "FINAL: 0 of 3 measured run(s) failed" in out and "(control)" not in out
+
+
+def test_single_build_failures_exit_1(tmp_path, monkeypatch):
+    assert run_single(tmp_path, monkeypatch, 2) == 1
+
+
 def test_bad_appimage_is_exit_2_on_stderr_only(tmp_path, capsys):
     assert hostrun.main(["base:/nonexistent.AppImage", "-q", "--out", str(tmp_path)]) == 2
     c = capsys.readouterr(); assert c.out == "" and "not found" in c.err
