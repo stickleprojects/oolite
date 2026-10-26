@@ -191,7 +191,7 @@ class Runner:
         name = "wmtest-helper"; subprocess.run(["docker", "rm", "-f", name], capture_output=True)
         xa = os.environ.get("XAUTHORITY") or os.path.expanduser("~/.Xauthority")
         cmd = ["docker", "run", "-d", "--rm", "--name", name, "--net=host", "-e", "DISPLAY=" + os.environ["DISPLAY"], "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
-               "-v", "%s:/wmtest:ro" % PKG]
+               "-v", "%s:/wmtest:ro" % PKG, "-e", "PYTHONPATH=/wmtest/src"]
         if os.path.exists(xa): cmd += ["-v", xa + ":/tmp/hostxauth:ro", "-e", "XAUTHORITY=/tmp/hostxauth"]
         cmd += [self.images[e.image]["tag"], "sleep", "infinity"]
         return name if subprocess.run(cmd, capture_output=True).returncode == 0 else None
