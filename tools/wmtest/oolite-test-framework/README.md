@@ -87,7 +87,7 @@ environment x build x run with ids like `test_gets_focus[marco-x11-opt1-run3]`; 
 - Read-only checks (frame, focus, centred) take `launched_game`: the game is started ONCE per (env, build, run) and they all inspect that record.
 - A test that changes game state (the F12 toggle) takes `fresh_game`, which launches the game for that test alone (`fresh_game.toggle()`).
 - Tests that need no game (environment up, monitors, AppImage readable) request only `env_session` or `case`; mark them `@pytest.mark.once_per_build`
-  to run for run 1 only. `@pytest.mark.needs_toggle` / `needs_x11` skip with a reason when the data/environment can't support them.
+  to run for run 1 only. `@pytest.mark.needs_toggle` / `needs_x11` / `needs_keys` skip with a reason when the data/environment can't support them.
 
 pytest is the source of truth: **pass / fail per item; `pytest.skip(reason)` means NOT TESTED / NOT MEASURABLE and the reason text is reused in the
 report.** Container runs also write JUnit XML (`<stem>.parts/*.xml`) for CI. The plugin (`src/oolite_test_framework/plugin.py`) writes the raw file (RESULT lines,

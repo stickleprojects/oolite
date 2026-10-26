@@ -157,3 +157,10 @@ def test_a_window_that_stays_black_is_still_reported_black(monkeypatch, tmp_path
     session = types.SimpleNamespace(backend=types.SimpleNamespace(grab=lambda w: black), window_id=lambda: 5)
     out = plugin._render_fields(session, types.SimpleNamespace(dir=str(tmp_path)), {}, types.SimpleNamespace(getoption=lambda n: ""), types.SimpleNamespace(env="e", label="b", run=1))
     assert out["render"] == "black"
+
+
+def test_key_driven_tests_are_not_measurable_where_keys_cannot_arrive(project):
+    pt, args, tmp = project
+    args = [a if a != "marco" else "kwin-xwayland" for a in args] + ["--wmt-toggle"]
+    out = pt.runpytest("-v", "-rs", *args).stdout.str()
+    assert "test_f12_toggle[kwin-xwayland" in out and "NOT MEASURABLE: injected keys do not reach the game in kwin-xwayland" in out

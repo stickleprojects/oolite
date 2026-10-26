@@ -12,12 +12,14 @@ def test_game_renders(launched_game):
     enforce(outcomes.check_renders(launched_game))
 
 
+@pytest.mark.needs_keys
 def test_game_responds_to_keys(fresh_game):
     """Press Down twice on the title menu: the window must change."""
     fresh_game.rec.update(fresh_game.input_responds())
     enforce(outcomes.check_responds_to_keys(fresh_game.finish()))
 
 
+@pytest.mark.needs_keys
 def test_title_menu_shown_and_keys_move_selection(app):
     """The menu is really drawn in the window, has the expected items, starts on the first, and the keyboard can move the highlight to another item."""
     page = app.title_menu.wait_until_displayed()

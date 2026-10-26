@@ -49,6 +49,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "only_wm(*names): run only in the named environments / families (WM-specific tests)")
     config.addinivalue_line("markers", "game: needs a display server and the AppImage")
     config.addinivalue_line("markers", "needs_toggle: run only with --wmt-toggle (reason recorded as NOT TESTED)")
+    config.addinivalue_line("markers", "needs_keys: needs injected keys to reach the game (else NOT MEASURABLE where the environment cannot deliver them)")
     config.addinivalue_line("markers", "needs_x11: needs an X11 probe in the environment (else NOT MEASURABLE)")
     config.addinivalue_line("markers", "once_per_build: run for run 1 only (environment / AppImage sanity checks)")
     try: envs = registry.load(config.getoption("--wmt-registry"))[0]
@@ -84,6 +85,8 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if item.get_closest_marker("needs_toggle") and not config.getoption("--wmt-toggle"):
             item.add_marker(pytest.mark.skip(reason="NOT TESTED: toggle not run in this data (no --wmt-toggle)"))
+        if item.get_closest_marker("needs_keys") and env is not None and env.keys_na:
+            item.add_marker(pytest.mark.skip(reason="NOT MEASURABLE: injected keys do not reach the game in %s" % env.name))
         if item.get_closest_marker("needs_x11") and env is not None and not any(n == "x11" for n, _ in env.probe_specs):
             item.add_marker(pytest.mark.skip(reason="NOT MEASURABLE: no X11 probe for F12 in %s" % env.name))
         if env is not None:

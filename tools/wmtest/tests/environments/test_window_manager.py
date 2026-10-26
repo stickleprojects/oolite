@@ -33,5 +33,6 @@ def test_game_window_centred(launched_game):
 
 @pytest.mark.needs_toggle
 @pytest.mark.needs_x11
+@pytest.mark.needs_keys
 def test_f12_toggle(fresh_game):
     enforce(outcomes.check_f12_toggle(fresh_game.toggle()))
