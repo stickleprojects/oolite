@@ -90,3 +90,30 @@ def test_fake_input_keys_are_tapped_not_held():
     for keys, want in (("xtest", 1.0), ("fakeinput", 0.3)):
         s = Session.__new__(Session); s.env = registry.Environment(name="f", family="f", session="X11", image="arch", kind="x11", start=["x"], keys=keys)
         assert s.hold_time(1.0) == want
+
+
+def test_game_log_is_kept_before_the_run_folder_is_deleted(tmp_path):
+    run = tmp_path / "wmtrun.x"; (run / "GameData" / ".logs").mkdir(parents=True)
+    (run / "GameData" / ".logs" / "Latest.log").write_text("Keydown scancode = 69, unicode = 327\n")
+    g = scenarios.Game("/nonexistent.AppImage", keep_log=str(tmp_path / "logs" / "kwin-run1-fresh.log")); g.dir = str(run)
+    g.stop(sleep=lambda s: None)
+    assert not run.exists()
+    assert "scancode = 69" in (tmp_path / "logs" / "kwin-run1-fresh.log").read_text()
+
+
+def test_toggle_takes_frame_from_a_full_observation_and_shoots_each_stage():
+    """On XWayland only the (not cheap) compositor probe sees the frame: the after-toggle frame must not come from the cheap probes alone."""
+    clk = FakeClock(); win = probes.Obs(framed=0, focused=1, outer=(1280, 180, 1280, 720))
+    s = FakeSession(clk, [(0, win)]); s.toggle = [probes.Obs(framed=0, focused=1, outer=(0, 0, 3840, 1080)), win]
+    full = s.observe; calls = []
+    s.observe = lambda cheap_only=False: (full() if cheap_only else probes.Obs(framed=1, focused=1, outer=win.outer))
+    t = scenarios.run_toggle(s, game(), scenarios.Opts(toggle=True), clk, shoot=calls.append)
+    assert t["t_frame"] == 1 and calls == ["before", "fullscreen", "after"]
+
+
+def test_key_logging_is_added_to_the_run_folder_but_never_overwrites(tmp_path):
+    scenarios.add_key_logging(str(tmp_path))
+    p = tmp_path / "GameData" / "AddOns" / "logcontrol.plist"
+    assert "input.keyMapping.keyPress = yes" in p.read_text()
+    p.write_text("mine"); scenarios.add_key_logging(str(tmp_path))
+    assert p.read_text() == "mine"

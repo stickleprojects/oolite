@@ -1,7 +1,8 @@
 # Oolite game tests
 
-Tests **of the game**, written with [oolite-test-framework](../oolite-test-framework/README.md). They test whatever AppImage they are given.
-They do not compare builds; comparing is a separate step (see issue #1).
+Tests **of the game**, written with [oolite-test-framework](../oolite-test-framework/README.md). Each test checks the AppImage it is given;
+it never knows about other builds. Comparing two builds happens afterwards, in the report, when `wmtest` is given two AppImages
+(see [the wmtest README](../README.md)).
 
 | Folder | What it tests | Needs screenshots? |
 |---|---|---|
@@ -12,9 +13,12 @@ They do not compare builds; comparing is a separate step (see issue #1).
 `conftest.py` loads the framework plugin; `pytest.ini` puts the framework `src/` on the path.
 
 ## Run
-Normally through the framework command, which runs them in a Docker image per environment:
+Through the `wmtest` command, which runs them in a Docker image per environment (from `oolite-test-framework/`):
 
-    ../oolite-test-framework/wmtest base:../appimages/base.AppImage fix:../appimages/fix.AppImage --env marco --quick
+    ./wmtest mine:/path/Oolite.AppImage --env marco --quick --desc "smoke test"
+    ./wmtest mine:/path/Oolite.AppImage --env marco --tests title_menu_shown_and_keys_move_selection --runs 1 --desc "menu test"
+
+[The wmtest README](../README.md) lists the other kinds of run (all window managers, comparing builds, headed, your desktop).
 
 Test names are used by the report, so do not rename a test function without updating `oolite_test_framework/outcomes.py`.
 To add a test, add a function to the folder that fits and use the `launched_game`, `fresh_game`, `app` or `env_session` fixtures (see the framework README, "Add a test").

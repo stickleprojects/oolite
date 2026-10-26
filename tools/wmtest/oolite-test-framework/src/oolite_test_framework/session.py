@@ -109,7 +109,8 @@ class Session:
             if e.session == "XWayland":
                 disp = None
                 for _ in range(20):
-                    xs = sorted(x[1:] for x in os.listdir("/tmp/.X11-unix") if re.fullmatch(r"X\d+", x) and x[1:] != "77") if os.path.isdir("/tmp/.X11-unix") else []
+                    skip = {"77", os.environ.get("WMT_HOST_DISPLAY", "").lstrip(":")}   # headed: the host's socket is mounted here too
+                    xs = sorted(x[1:] for x in os.listdir("/tmp/.X11-unix") if re.fullmatch(r"X\d+", x) and x[1:] not in skip) if os.path.isdir("/tmp/.X11-unix") else []
                     if xs: disp = xs[0]; break
                     self.sleep(0.5)
                 if disp is None: raise SessionError("%s: no XWayland display appeared" % e.name)
@@ -129,7 +130,25 @@ class Session:
             m = re.search(e.version_re, self._run(e.version_cmd + " 2>&1") or "")
             self.version = m[0] if m else ""
         self._make_probes()
+        if e.headed and self.backend is not None:   # the host window manager may resize KWin's window: the output is what XWayland reports
+            self.primary = probes.primary_monitor(self.backend.monitors()) or self.primary
         return self
+
+    def grab_screen(self):
+        """(w, h, rgb) of the whole compositor output including its decorations: KWin's window on the host display (headed only), else None."""
+        host = os.environ.get("WMT_HOST_DISPLAY")
+        if not self.env.headed or not host: return None
+        env = dict(os.environ, DISPLAY=host)
+        if os.environ.get("WMT_HOST_XAUTHORITY"): env["XAUTHORITY"] = os.environ["WMT_HOST_XAUTHORITY"]
+        pid = self._run("pgrep -x kwin_wayland").split()
+        ids = subprocess.run(["xdotool", "search", "--pid", pid[0]], capture_output=True, text=True, env=env).stdout.split() if pid else []
+        if not ids: return None
+        saved = os.environ.get("XAUTHORITY"); os.environ["XAUTHORITY"] = env.get("XAUTHORITY", "")   # python-xlib reads the cookie from os.environ
+        try: return probes.XlibBackend(env).grab(int(ids[0]))
+        except Exception: return None
+        finally:
+            if saved is None: os.environ.pop("XAUTHORITY", None)
+            else: os.environ["XAUTHORITY"] = saved
 
     def _start_cmds(self):
         for c in self.env.start:

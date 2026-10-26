@@ -34,6 +34,7 @@ class Environment:
     focus_na: bool = False
     keys: str = "xtest"            # how keys are injected: xtest (xdotool) | fakeinput (KWin fake-input, for headless kwin)
     keys_na: bool = False          # injected (XTEST) keys never reach X clients, e.g. headless kwin-xwayland
+    headed: bool = False           # the compositor runs as a window on the host X display (GPU passed in); $WMT_HOST_DISPLAY names it
     where: str = "docker"
 
     @property

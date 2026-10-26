@@ -24,7 +24,7 @@ def fake_cells(monkeypatch, base, cand, runs=10):
 
 def run(tmp_path, *extra):
     a = app(tmp_path)
-    return hostrun.main(["base:%s" % a, "new:%s" % a, "--env", "marco", "--out", str(tmp_path / "res"), "--minruns", "10"] + list(extra))
+    return hostrun.main(["base:%s" % a, "new:%s" % a, "--env", "marco", "--out", str(tmp_path / "res"), "--minruns", "10", "--desc", "unit test"] + list(extra))
 
 
 def test_exit_pass(tmp_path, monkeypatch, capsys):
@@ -86,13 +86,13 @@ def test_nothing_measured_is_exit_2(tmp_path, monkeypatch, capsys):
 def run_single(tmp_path, monkeypatch, fails_frame):
     monkeypatch.setattr(hostrun, "docker_state", lambda: (True, ""))
     monkeypatch.setattr(hostrun.Runner, "docker_cells", lambda self, n, s: [self.add(l) for l in lines("only", 3, fails_frame)])
-    return hostrun.main(["only:%s" % app(tmp_path), "--env", "marco", "--out", str(tmp_path / "res"), "--minruns", "3"])
+    return hostrun.main(["only:%s" % app(tmp_path), "--env", "marco", "--out", str(tmp_path / "res"), "--minruns", "3", "--desc", "unit test"])
 
 
 def test_single_build_passes_without_a_candidate(tmp_path, monkeypatch, capsys):
     assert run_single(tmp_path, monkeypatch, 0) == 0
     out = capsys.readouterr().out
-    assert "FINAL: 0 of 3 measured run(s) failed" in out and "(control)" not in out
+    assert "Result: 3 passed" in out and "(control)" not in out
 
 
 def test_single_build_with_a_failing_test_that_is_not_a_criterion_exits_1(tmp_path, monkeypatch, capsys):
@@ -101,7 +101,7 @@ def test_single_build_with_a_failing_test_that_is_not_a_criterion_exits_1(tmp_pa
         self.add("TEST wm=marco build=only run=1 test=test_f12_toggle outcome=failed reason=F12 did not change the window size")
     monkeypatch.setattr(hostrun, "docker_state", lambda: (True, ""))
     monkeypatch.setattr(hostrun.Runner, "docker_cells", cells)
-    assert hostrun.main(["only:%s" % app(tmp_path), "--env", "marco", "--out", str(tmp_path / "res"), "--minruns", "3"]) == 1
+    assert hostrun.main(["only:%s" % app(tmp_path), "--env", "marco", "--out", str(tmp_path / "res"), "--minruns", "3", "--desc", "unit test"]) == 1
     assert "FAILED TESTS: test_f12_toggle (marco)" in capsys.readouterr().out
 
 
@@ -110,7 +110,7 @@ def test_single_build_failures_exit_1(tmp_path, monkeypatch):
 
 
 def test_bad_appimage_is_exit_2_on_stderr_only(tmp_path, capsys):
-    assert hostrun.main(["base:/nonexistent.AppImage", "-q", "--out", str(tmp_path)]) == 2
+    assert hostrun.main(["base:/nonexistent.AppImage", "-q", "--out", str(tmp_path), "--desc", "unit test"]) == 2
     c = capsys.readouterr(); assert c.out == "" and "not found" in c.err
 
 
@@ -132,11 +132,13 @@ def test_purpose_and_build_notes_in_report_raw_and_env(tmp_path, monkeypatch):
     assert re.search(r"\| [0-9a-f]{12} \|", md)
 
 
-def test_purpose_not_given_and_desc_file(tmp_path, monkeypatch):
-    fake_cells(monkeypatch, (0, 0), (0, 0)); run(tmp_path, "-q")
-    assert "Purpose: not given" in next((tmp_path / "res").glob("*.md")).read_text()
+def test_desc_is_required_and_desc_file_works(tmp_path, monkeypatch, capsys):
+    fake_cells(monkeypatch, (0, 0), (0, 0)); a = app(tmp_path)
+    assert hostrun.main(["base:%s" % a, "--env", "marco", "--out", str(tmp_path / "res")]) == 2
+    assert "--desc" in capsys.readouterr().err and not (tmp_path / "res").exists()
+    assert hostrun.main(["base:%s" % a, "--env", "marco", "--out", str(tmp_path / "res"), "--desc", "  "]) == 2
     f = tmp_path / "d.md"; f.write_text("Longer **markdown** purpose\n\n- point")
-    run(tmp_path, "-q", "--desc-file", str(f), "--report", str(tmp_path / "x.md"))
+    hostrun.main(["base:%s" % a, "new:%s" % a, "--env", "marco", "--out", str(tmp_path / "res"), "-q", "--desc-file", str(f), "--report", str(tmp_path / "x.md")])
     assert "Longer **markdown** purpose" in (tmp_path / "x.md").read_text()
 
 
@@ -168,5 +170,14 @@ def test_quick_is_one_run_one_screen_and_two_tests(tmp_path, monkeypatch):
         for ln in lines("base", 1) + lines("new", 1): self.add(ln)
     monkeypatch.setattr(hostrun.Runner, "docker_cells", cells)
     a = app(tmp_path)
-    hostrun.main(["base:%s" % a, "new:%s" % a, "--env", "marco", "--screens", "3840x1080,1920x1080", "--quick", "--out", str(tmp_path / "res")])
+    hostrun.main(["base:%s" % a, "new:%s" % a, "--env", "marco", "--screens", "3840x1080,1920x1080", "--quick", "--out", str(tmp_path / "res"), "--desc", "unit test"])
     assert seen == {"runs": 1, "screens": ["3840x1080"], "tests": hostrun.QUICK_TESTS, "minruns": 1}
+
+
+def test_headed_args_share_only_the_host_x_socket_the_cookie_and_the_gpu():
+    ok = lambda p: True
+    args, why = hostrun.headed_args({"DISPLAY": ":0.0", "XAUTHORITY": "/home/k/.Xauthority"}, exists=ok, hostname=lambda: "box")
+    assert why == "" and args[:4] == ["--device", "/dev/dri", "--hostname", "box"]
+    assert "/tmp/.X11-unix/X0:/tmp/.X11-unix/X0" in args and "WMT_HOST_DISPLAY=:0" in args and "/home/k/.Xauthority:/tmp/hostxauth:ro" in args
+    assert hostrun.headed_args({"DISPLAY": "remote:10.0"}, exists=ok)[1]
+    assert hostrun.headed_args({"DISPLAY": ":0"}, exists=lambda p: p != "/dev/dri")[1]

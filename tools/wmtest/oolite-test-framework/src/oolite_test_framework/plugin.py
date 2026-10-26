@@ -39,6 +39,14 @@ def pytest_addoption(parser):
     g.addoption("--wmt-sample", type=float, default=0.5)
     g.addoption("--wmt-shots", default="", help="save game-window screenshots (PNG) in this directory")
     g.addoption("--wmt-game-arg", action="append", default=[], help="extra argument for the game (repeatable)")
+    g.addoption("--wmt-logs", default="", help="keep each launch's game log (Latest.log) in this directory")
+
+
+def _game(cfg, case, s, what):
+    """A Game for this case; with --wmt-logs its Latest.log is kept as <env>-<screen>-<build>-run<N>-<what>.log."""
+    d = cfg.getoption("--wmt-logs")
+    keep = os.path.join(d, "%s-%s-%s-run%d-%s.log" % (case.env, cfg.getoption("--wmt-screen").replace(":", "_"), case.label, case.run, what)) if d else None
+    return scenarios.Game(case.app, cfg.getoption("--wmt-game-arg"), s.game_env, keep_log=keep)
 
 
 def _slug(s):
@@ -139,7 +147,7 @@ def opts(request):
 def _launch(request, case, session_mgr, opts, with_toggle):
     cfg = request.config; assert os.path.isfile(case.app), "AppImage not found: %s" % case.app
     s = session_mgr.for_build(case.label)
-    game = scenarios.Game(case.app, cfg.getoption("--wmt-game-arg"), s.game_env).start()
+    game = _game(cfg, case, s, "toggle" if with_toggle else "startup").start()
     try:
         rec = scenarios.run_startup(s, game, opts)
         crashed = int(game.proc.poll() not in (None, 0) and rec.get("exited") == 1)
@@ -198,7 +206,7 @@ def launched_game(request, case, session_mgr, opts):
     key = (case.env, case.label, case.run); s = session_mgr.for_build(case.label)
 
     def start():
-        game = scenarios.Game(case.app, cfg.getoption("--wmt-game-arg"), s.game_env).start()
+        game = _game(cfg, case, s, "shared").start()
         rec = scenarios.run_startup(s, game, opts)
         crashed = int(game.proc.poll() not in (None, 0) and rec.get("exited") == 1)
         rec.update(wm=case.env, build=case.label, screen=cfg.getoption("--wmt-screen"), run=case.run, crashed=crashed)
@@ -234,14 +242,27 @@ class FreshGame:
     def __init__(self, request, case, mgr, opts):
         self.request, self.case, self.mgr, self.opts = request, case, mgr, opts
         self.session = mgr.for_build(case.label)
-        self.game = scenarios.Game(case.app, request.config.getoption("--wmt-game-arg"), self.session.game_env).start()
+        self.game = _game(request.config, case, self.session, "fresh").start()
         self.rec = scenarios.run_startup(self.session, self.game, opts)
         self.crashed = int(self.game.proc.poll() not in (None, 0) and self.rec.get("exited") == 1)
 
     def toggle(self):
-        if not self.rec.get("exited"): self.rec.update(scenarios.run_toggle(self.session, self.game, self.opts))
+        if not self.rec.get("exited"): self.rec.update(scenarios.run_toggle(self.session, self.game, self.opts, shoot=self.shoot))
         else: self.rec.update(t_ok=0, t_method="key")
         return self.finish()
+
+    def shoot(self, stage):
+        """With --wmt-shots: <env>-<build>-run<N>-<stage>.png of the whole compositor output (headed), else of the game window."""
+        from . import render
+        d = self.request.config.getoption("--wmt-shots")
+        if not d: return
+        s = self.session; shot = s.grab_screen()
+        if shot is None:
+            grab = getattr(s.backend, "grab", None); w = s.window_id() if s.backend is not None else None
+            shot = grab(w) if grab and w else None
+        if shot:
+            os.makedirs(d, exist_ok=True); c = self.case
+            render.write_png(os.path.join(d, "%s-%s-run%d-%s.png" % (c.env, c.label, c.run, stage)), shot[0], shot[1], shot[2])
 
     def input_responds(self, key="Down", presses=2, settle=2.0):
         """Screenshot, press `key`, screenshot again: {'input_changed': share, 'input_key': key}, or {} when no screenshots are possible."""
@@ -282,7 +303,7 @@ def app(request, case, session_mgr):
     assert os.path.isfile(case.app), "AppImage not found: %s" % case.app
     s = session_mgr.for_build(case.label)
     if getattr(s.backend, "grab", None) is None: pytest.skip("NOT MEASURABLE: no screenshot support in this environment")
-    game = scenarios.Game(case.app, request.config.getoption("--wmt-game-arg"), s.game_env).start()
+    game = _game(request.config, case, s, "app").start()
     try:
         yield appmod.App(s, game, request.config.getoption("--wmt-shots"), "%s-%s-run%d" % (case.env, case.label, case.run), ocr=ocrmod.make_ocr())
     finally:

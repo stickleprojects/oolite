@@ -402,7 +402,9 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
     L += ["", "## Machine-readable outcomes", "", "```"] + vs + ["```", "", "Candidates REGRESSED: %d" % len(bad)]
     open(outp, "w").write("\n".join(L) + "\n")
     print("\n".join(HL))
-    if single: print("FINAL: %d of %d measured run(s) failed (single build, nothing to compare against)" % (LAST["regressed"], LAST["measured"]))
+    if single:
+        n, bad_runs = LAST["measured"], LAST["regressed"]
+        print("Result: %d passed" % (n - bad_runs) + (", %d failed" % bad_runs if bad_runs else ""))   # pytest style: counts, no "X of Y"
     else: print("FINAL: %d candidate cell(s) REGRESSED" % len(bad))
     return 1 if bad else 0
 

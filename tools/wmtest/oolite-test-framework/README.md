@@ -1,8 +1,7 @@
-# wmtest (Python + pytest edition)
+# oolite-test-framework: reference
 
-Tests whether the Oolite window gets a **frame**, **keyboard focus** and a **centred** position under many X11 window managers and Wayland
-compositors, and compares builds statistically. Built for OoliteProject/oolite#773. Successor of the bash harness in `wmtest-share/`
-(same RESULT raw format, so old and new raw files compare and old `results/*.raw` can be re-judged).
+**New here? Start with [the wmtest README](../README.md)**: it explains the kinds of test run and which command to use. This page is the
+reference: every option, the output files, exit codes, adding a window manager or compositor, and how tests use the running game.
 
 Nothing is installed on your machine. The host needs only **python3 (stdlib)** and **Docker**; pytest and python-xlib live inside the
 pinned images. The entry `./wmtest` is stdlib Python in the style of upstream's `tests/launch_snapshot.py`, so it can later be hooked
@@ -13,11 +12,15 @@ into `mk.sh` / their CI.
 - `../tests/` (next to this folder): the tests of the game, split into `app/`, `environments/`, `ui/`.
 
 ## Run
-    ./wmtest base:/path/Oolite-base.AppImage fix:/path/Oolite-pr.AppImage            # default: the X11 window managers
+    ./wmtest mine:/path/Oolite.AppImage                                                # one build, the X11 window managers
+    ./wmtest base:/path/Oolite-base.AppImage fix:/path/Oolite-pr.AppImage            # compare two builds
     ./wmtest base:A fix:B --wayland --host --toggle                                    # + headless Wayland compositors + your live desktop
     ./wmtest base:A fix:B --env marco,mutter --runs 10 --screens 3840x1080,2head
-    ./wmtest --list                                                                    # the registry
-The first label is the control. Images are built on first use (1-2 GB each, minutes; logs in the output dir). AppImages run with
+    ./wmtest --list                                                                    # the environments
+Every run needs `--desc "what this run is for"` (or `--desc-file PATH`); it is left out of the examples here for width.
+`--env kwin-xwayland-headed` runs KWin as a window on your desktop (GPU passed in) so screenshots include KWin's title bars; F12 toggle runs save
+before/fullscreen/after screenshots in `<name>.shots/`. It is not part of `--wayland`; name it with `--env`.
+With two or more builds the first label is the control. Images are built on first use (1-2 GB each, minutes; logs in the output dir). AppImages run with
 `APPIMAGE_EXTRACT_AND_RUN=1`, so FUSE is not needed. No Docker: those cells become "not available: docker missing" rows; `--host` still works.
 `--host` opens real game windows on your desktop (about 17 s per run): do not touch mouse/keyboard; it asks first (`--no-prompt` skips the
 question and waits 5 s, and records unanswerable native-Wayland checks as "not tested").
@@ -28,16 +31,18 @@ question and waits 5 s, and records unanswerable native-Wayland checks as "not t
 `--env` takes one or more environment names. `--tests` takes test names (prefix `test_` optional) and `--quick` is a preset
 (`game_launches,game_renders`, 1 run, `--minruns 1`). A partial run adds a "PARTIAL RUN" line to the report so it is never read as a full pass.
 
-## Read the output (`results/<name>/`)
+## Read the output (`results/<name>.*`)
 `<name>.md` (headline PASS / FAIL / NEEDS MORE RUNS, summary, per-cell counts, verdicts, live-desktop table), `<name>.raw` (one RESULT line per
-run plus WMVER/HOSTENV/SKIP lines), `<name>-env.txt`, `parts/`. NA / not tested is never a failure. Exit status 1 only if a candidate REGRESSED.
+run, one TEST line per test with its outcome and reason, plus WMVER/HOSTENV/SKIP lines), `<name>-env.txt`, `<name>.parts/` (per-container raw
+output and JUnit XML), `<name>.logs/` (the game's Latest.log for every launch), `<name>.shots/` (screenshots).
+The console ends with `Result: N passed, M failed` for one build, or the number of REGRESSED cells when comparing, then `PASS` or `FAIL`. NA / not tested is never a failure. Exit status 1 only if a candidate REGRESSED.
 Because the verdict step re-judges recorded geometry (`outer=`, `mon=` fields), a different tolerance needs no re-run:
 `./wmtest --report-only X.raw --out X.md --tol 60`.
 
 ## Describing a run
     ./wmtest base:A opt1:B --desc "opt1: window created bordered+resizable; checks the splash is centred and the game gets focus" \
         --note base="unmodified 1.93.1-229" --note opt1="opt1 + bordered/resizable window from creation"
-`--desc-file PATH` takes longer markdown. The report starts with a **Purpose** section ("Purpose: not given" if you gave none) and a **Builds**
+`--desc-file PATH` takes longer markdown. The report starts with a **Purpose** section (`--desc` or `--desc-file` is required, so every results file says what it was for) and a **Builds**
 table (label, AppImage file, short sha256, note). The same text is stored in the `.raw` (`PURPOSE` / `BUILD` lines) and `-env.txt`, so a returned
 results file is self-describing; in `--quiet` mode it only goes into the files.
 
@@ -60,8 +65,10 @@ printed at the end in normal mode. **Exit codes (stable):**
 - `src/oolite_test_framework/scenarios.py`: startup sampling and the F12 toggle, written once. They only record. `src/oolite_test_framework/checks.py`: pure frame/focus/centred functions.
 - the game tests in `../tests/` (app/, environments/, ui/) + `src/oolite_test_framework/plugin.py`: one pytest function per behaviour (has_frame, gets_focus, splash_centred, game_window_centred, f12_toggle, ...); see Add a test.
 - `src/oolite_test_framework/verdict.py`: statistics and the report (ported from the bash harness' verdict.py). `src/oolite_test_framework/hostrun.py`: the stdlib orchestrator.
-- Timing is identical to trial.sh: 0.5 s sampling for 14 s, post sample 2 s after the first size change, tolerance 40 px.
-  Changes: one container (Docker rows) per (environment, screen) runs all builds (a fresh session per build, as before); the toggle is skipped on environments without an X11 probe.
+- Timing: 0.5 s sampling for 14 s, post sample 2 s after the first size change, tolerance 40 px. One container per (environment, screen)
+  runs all builds, with a fresh session per build; the toggle is skipped on environments without an X11 probe.
+- Keys: X11 key events (XTEST) by default; `keys = "fakeinput"` in an environment sends them through KWin's fake-input protocol instead,
+  because XTEST keys never reach clients under headless KWin.
 
 ## Add a window manager (one entry, no test changes)
 Add its package to the image Dockerfile, then in `environments.toml`:
@@ -93,7 +100,7 @@ pytest is the source of truth: **pass / fail per item; `pytest.skip(reason)` mea
 report.** Container runs also write JUnit XML (`<stem>.parts/*.xml`) for CI. The plugin (`src/oolite_test_framework/plugin.py`) writes the raw file (RESULT lines,
 RESULT-compatible, plus TEST lines with outcomes and skip reasons, WMVER, HARD) and a k6-style pass-rate summary; the host-side report
 (`src/oolite_test_framework/verdict.py`) compares candidate and control per test (columns of the coverage table are the test names). Old raw files can still be re-reported.
-Offline unit tests: `python3 -m pytest tests/unit` in any venv with pytest (fake launch fixtures, no display).
+Offline unit tests of the framework: `python3 -m pytest tests -q` from this folder (fake launch fixtures, no display, no Docker).
 
 ## Sharing the running game
 Fixtures are opt-in, and `conftest.py` makes them visible to every test below it (`src/oolite_test_framework/plugin.py` is loaded from the root `conftest.py`).
@@ -117,7 +124,8 @@ Fixtures are opt-in, and `conftest.py` makes them visible to every test below it
   global; running tests in parallel would disturb the very thing measured. `-n 2` or more is refused with an error.
 
 ## Requirements, cost
-Docker + python3 >= 3.11. About 17 s per run; default (6 WMs x 2 builds x 10 runs) about 35 min per screen; `--wayland` adds about 50 min.
+Docker + python3 >= 3.11. About 30-70 s per run depending on the tests (startup sampling alone is 14 s); a run is one environment x screen x
+build x `--runs`, so the default comparison (6 window managers x 2 builds x 10 runs) takes several hours per screen size.
 Software GL: do not load the machine meanwhile, the Marco bug is a race.
 
 ## Host mode
@@ -126,9 +134,6 @@ tools (python-xlib, xprop, xdotool, xrandr; `python3 -m oolite_test_framework.xt
 (`--net=host`, X socket, xauth): nothing is installed on the host, and if the host already has the X tools they are used instead
 when Docker is unavailable. Native Wayland rows are measured by KWin D-Bus or sway IPC where available, otherwise 3 y/n questions
 (`--no-prompt`: "not tested"). Under XWayland on KDE, frame/focus are cross-checked with KWin.
-
-## Later
-Upstream's debug-console client could supply game state (e.g. "main menu reached") on builds with the debug console enabled, replacing the fixed 14 s wait.
 
 ## Licence
 GPL-2.0-or-later (Oolite is GPL v2; source headers "or any later version"). It only runs the AppImage as a separate program.

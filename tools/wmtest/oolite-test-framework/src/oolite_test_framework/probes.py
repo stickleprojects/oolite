@@ -113,7 +113,7 @@ class XlibBackend:
     def __init__(self, env=None, cls="oolite"):
         from Xlib import display
         self.env = env; self.cls = cls.lower()
-        self.d = display.Display(); self.root = self.d.screen().root
+        self.d = display.Display((env or {}).get("DISPLAY")); self.root = self.d.screen().root
 
     def _atom(self, n):
         return self.d.intern_atom(n)

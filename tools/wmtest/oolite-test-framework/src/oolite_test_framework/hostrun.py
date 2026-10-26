@@ -6,6 +6,7 @@ import json
 import datetime
 import os
 import shutil
+import socket
 import re
 import subprocess
 import sys
@@ -124,7 +125,7 @@ class Runner:
     def pytest_args(self, env, screen, part, apps, host_dir=None):
         c = ["python3", "-m", "pytest", "-q", "-c", "/gametests/pytest.ini", "/gametests", "--rootdir", "/gametests",
              "--wmt-registry", "/wmtest/environments.toml", "--wmt-env", env, "--wmt-screen", screen, "--wmt-runs", str(self.runs_for(env)),
-             "--wmt-raw", "/out/%s.parts/%s" % (self.name, part), "--junitxml", "/out/%s.parts/%s.xml" % (self.name, part), "--wmt-shots", "/out/%s.shots" % self.name, "--wmt-tol", str(self.a.tol)]
+             "--wmt-raw", "/out/%s.parts/%s" % (self.name, part), "--junitxml", "/out/%s.parts/%s.xml" % (self.name, part), "--wmt-shots", "/out/%s.shots" % self.name, "--wmt-logs", "/out/%s.logs" % self.name, "--wmt-tol", str(self.a.tol)]
         if self.a.toggle: c.append("--wmt-toggle")
         if self.a.tests: c += ["-k", test_selector(self.a.tests)]
         for label, mnt in apps: c += ["--wmt-app", "%s=%s" % (label, mnt)]
@@ -159,8 +160,13 @@ class Runner:
                 if e.kind == "wayland" and not sc[0].isdigit(): sc = "3840x1080"
                 if not self.docker_ok: self.skip(env, sc, "not available: " + self.docker_why); continue
                 if not self.ensure_image(e.image): self.skip(env, sc, "not available: Docker image %s could not be built" % self.images[e.image]["tag"]); continue
+                extra = ()
+                if e.headed:
+                    extra, why = headed_args()
+                    if why: self.skip(env, sc, "not available: " + why); continue
+                    say("WARNING: %s opens a KWin window on THIS desktop; do not touch the mouse or keyboard while it runs." % env)
                 say("== %s %s (%s builds x %d runs) %s" % (env, sc, len(self.builds), self.runs_for(env), time.strftime("%T")))
-                self.run_container(env, sc)
+                self.run_container(env, sc, extra)
 
     def host(self):
         st = os.environ.get("XDG_SESSION_TYPE", "unknown"); h = envinfo.detect_host()
@@ -245,7 +251,7 @@ def build_parser():
     p.add_argument("--minruns", type=int, default=10); p.add_argument("--tol", type=int, default=40); p.add_argument("--equiv", default="")
     p.add_argument("--registry", default=""); p.add_argument("--list", action="store_true", help="list the registry and exit")
     p.add_argument("--report", metavar="PATH", help="markdown report path (raw and env files take the same stem); default results/wmtest-<date>-<candidates>.md")
-    p.add_argument("--desc", default="", help="what this run is for (shown as Purpose at the top of the report)")
+    p.add_argument("--desc", default="", help="REQUIRED (or --desc-file): what this run is for (shown as Purpose at the top of the report)")
     p.add_argument("--desc-file", metavar="PATH", help="same, from a (markdown) file")
     p.add_argument("--note", action="append", default=[], metavar="LABEL=TEXT", help="note for a build, shown in the Builds table (repeatable)")
     p.add_argument("-q", "--quiet", action="store_true", help="print only PASS or FAIL (errors on stderr); the report files are still written")
@@ -253,6 +259,21 @@ def build_parser():
     p.add_argument("--selftest", action="store_true", help="run the verdict self-test and exit")
     p.add_argument("--report-only", metavar="RAW", help="render a report from an existing raw file and exit")
     return p
+
+
+def headed_args(environ=None, exists=os.path.exists, hostname=socket.gethostname):
+    """docker run options for a headed environment: the host X socket (only that one, so the compositor's XWayland display stays
+    inside the container), the X cookie (matched by hostname), the GPU (a nested kwin_wayland needs a render node). -> (args, why-not)."""
+    environ = os.environ if environ is None else environ
+    m = re.fullmatch(r"(?:unix)?:(\d+)(?:\.\d+)?", environ.get("DISPLAY", ""))
+    if not m: return (), "headed needs a local host X display (DISPLAY is %r)" % environ.get("DISPLAY", "")
+    sock = "/tmp/.X11-unix/X" + m[1]
+    if not exists(sock): return (), "headed: no X socket %s" % sock
+    if not exists("/dev/dri"): return (), "headed needs /dev/dri (GPU) on the host"
+    args = ["--device", "/dev/dri", "--hostname", hostname(), "-v", "%s:%s" % (sock, sock), "-e", "WMT_HOST_DISPLAY=:" + m[1]]
+    xa = environ.get("XAUTHORITY") or os.path.expanduser("~/.Xauthority")
+    if exists(xa): args += ["-v", xa + ":/tmp/hostxauth:ro", "-e", "WMT_HOST_XAUTHORITY=/tmp/hostxauth"]
+    return args, ""
 
 
 def failed_tests(raw):
@@ -281,6 +302,9 @@ def main(argv=None):
         for n, e in envs.items(): say("%-18s %-8s %-15s %-8s image=%s" % (n, e.family, e.session, e.kind, e.image))
         return 0
     if not a.builds: build_parser().print_usage(file=sys.stderr); return EXIT_ERROR
+    if not (a.desc.strip() or a.desc_file):
+        print("wmtest: error: --desc TEXT (or --desc-file PATH) is required: say what this run is for, it heads the report", file=sys.stderr)
+        return EXIT_ERROR
     global _QUIET
     _QUIET = a.quiet
     import contextlib, io
