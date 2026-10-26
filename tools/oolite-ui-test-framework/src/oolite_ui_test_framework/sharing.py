@@ -32,8 +32,13 @@ class SharedLaunch(dict):
         self.dirty_by = test; self._warn("state not restored by %s" % test)
         return False
 
+    def suspend(self):
+        """Stop the game so a private launch (fresh_game, app) runs alone; the next test that uses it relaunches it (ensure_clean)."""
+        if self.handle is not None: self._stop(self.handle); self.handle = None
+
     def ensure_clean(self):
-        """Before a test: relaunch if the previous test left the game dirty."""
+        """Before a test: relaunch if the game was suspended or the previous test left it dirty."""
+        if self.handle is None: self.relaunches += 1; self.dirty_by = None; self.launch(); return True
         if self.dirty_by is None: return False
         self._stop(self.handle); self.relaunches += 1; self.dirty_by = None; self.launch()
         return True
@@ -47,7 +52,7 @@ class SharedLaunch(dict):
             restore()
 
     def close(self):
-        self._stop(self.handle)
+        self.suspend()
 
 
 def check_no_xdist(config):

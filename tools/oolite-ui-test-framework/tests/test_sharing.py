@@ -73,3 +73,13 @@ def test_warning_reaches_the_report(tmp_path):
     out = tmp_path / "o.md"; verdict.main([str(raw), str(out), "--control", "base", "--minruns", "3"])
     md = out.read_text()
     assert "## Warnings" in md and "state not restored by test_goes_fullscreen" in md and md.index("## Warnings") < md.index("## Coverage")
+
+
+def test_suspend_stops_the_game_and_the_next_shared_test_relaunches_it():
+    """A private launch suspends the shared game so only one game runs; the next test that uses the shared launch gets it back."""
+    g = FakeGame(); sl = g.make([])
+    sl.suspend()
+    assert sl.handle is None and len(g.stopped) == 1
+    assert sl.ensure_clean() is True and sl.handle is not None and g.launches == 2
+    sl.suspend(); sl.close()
+    assert len(g.stopped) == 2          # close after suspend does not stop twice

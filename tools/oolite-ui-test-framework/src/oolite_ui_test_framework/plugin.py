@@ -147,6 +147,7 @@ def opts(request):
 def _launch(request, case, session_mgr, opts, with_toggle):
     cfg = request.config; assert os.path.isfile(case.app), "AppImage not found: %s" % case.app
     s = session_mgr.for_build(case.label)
+    _only_this_game()
     game = _game(cfg, case, s, "toggle" if with_toggle else "startup").start()
     try:
         rec = scenarios.run_startup(s, game, opts)
@@ -222,8 +223,18 @@ def launched_game(request, case, session_mgr, opts):
 
     sl = sharing.SharedLaunch(start, lambda g: g.stop(), lambda g: s.window_present(g) or g.alive(), state,
                               warn=lambda t: STATE.warnings.append((case.env, case.label, case.run, t)))
+    SHARED.append(sl)
     yield sl
-    sl.close()
+    SHARED.remove(sl); sl.close()
+
+
+SHARED = []   # shared launches that are open; a private launch suspends them so only one game runs at a time
+
+
+def _only_this_game():
+    """Before a private launch: stop any shared game (it relaunches before the next test that uses it). Two games at once compete for the
+    CPU (key presses stall) and for focus, and stopping either one kills both."""
+    for sl in SHARED: sl.suspend()
 
 
 @pytest.fixture(autouse=True)
@@ -242,7 +253,8 @@ class FreshGame:
     def __init__(self, request, case, mgr, opts):
         self.request, self.case, self.mgr, self.opts = request, case, mgr, opts
         self.session = mgr.for_build(case.label)
-        self.game = _game(request.config, case, self.session, "fresh").start()
+        _only_this_game()
+        self.game = _game(request.config, case, self.session, request.node.originalname).start()
         self.rec = scenarios.run_startup(self.session, self.game, opts)
         self.crashed = int(self.game.proc.poll() not in (None, 0) and self.rec.get("exited") == 1)
 
@@ -303,7 +315,8 @@ def app(request, case, session_mgr):
     assert os.path.isfile(case.app), "AppImage not found: %s" % case.app
     s = session_mgr.for_build(case.label)
     if getattr(s.backend, "grab", None) is None: pytest.skip("NOT MEASURABLE: no screenshot support in this environment")
-    game = _game(request.config, case, s, "app").start()
+    _only_this_game()
+    game = _game(request.config, case, s, request.node.originalname).start()
     try:
         yield appmod.App(s, game, request.config.getoption("--wmt-shots"), "%s-%s-run%d" % (case.env, case.label, case.run), ocr=ocrmod.make_ocr())
     finally:
