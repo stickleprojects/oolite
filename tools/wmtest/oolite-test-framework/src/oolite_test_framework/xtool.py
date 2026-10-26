@@ -18,7 +18,9 @@ def main(argv=None):
     elif a[:1] == ["monitors"]: print(json.dumps(b.monitors()))
     elif a[:1] == ["wmname"]: print(b.wm_name())
     elif a[:1] == ["key"] and len(a) >= 2: b.send_key(a[1], int(a[2]) if len(a) > 2 else None)
-    else: print("usage: xtool observe|monitors|wmname|key KEY [WINDOW]", file=sys.stderr); return 2
+    elif a[:1] == ["keydown"] and len(a) == 2: b.key_down(a[1])
+    elif a[:1] == ["keyup"] and len(a) == 2: b.key_up(a[1])
+    else: print("usage: xtool observe|monitors|wmname|key KEY [WINDOW]|keydown KEY|keyup KEY", file=sys.stderr); return 2
     return 0
 
 

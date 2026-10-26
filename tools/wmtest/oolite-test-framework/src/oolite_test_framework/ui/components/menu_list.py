@@ -64,19 +64,34 @@ class MenuList:
 
     # ---- operating
     def move_down(self, times=1):
-        self.app.send_keys(*["Down"] * times); return self
+        for _ in range(times): self._step("Down")
+        return self
 
     def move_up(self, times=1):
-        self.app.send_keys(*["Up"] * times); return self
+        for _ in range(times): self._step("Up")
+        return self
+
+    def _step(self, key, holds=(1.0, 1.5)):
+        """Move the highlight off its row. The key is held (see App.hold_key) and, if the highlight has not moved, held again a bit longer. While
+        a key is held the game repeats it once per frame, so how many rows it moves depends on how fast the game draws: select_index() corrects that."""
+        from ...app import ScenarioFailed       # imported here: app.py imports the pages, which import this module
+        before = self.selected_index
+        for seconds in holds:
+            self.app.hold_key(key, seconds)
+            self.app.clock.sleep(1.0)               # let the frame draw
+            if self.selected_index != before: return
+        raise ScenarioFailed("the highlight did not leave row %s after %s was held for %.1f s" % (before, key, sum(holds)))
 
     def wait_until_selected_index(self, index, timeout=5):
         self.app.wait_until(lambda: self.selected_index == index, "row %d to be the highlighted row (now %s of %d visible)" % (index, self.selected_index, self.visible_count), timeout)
         self.app.screenshot("selected-row-%d" % index)
         return self
 
-    def select_index(self, index, timeout=5):
-        """Navigate with Up/Down from the current highlight to row `index`, then confirm it is highlighted."""
-        cur = self.selected_index
-        if cur is None: raise AssertionError("the list is not visible, cannot select row %d" % index)
-        if index != cur: (self.move_down if index > cur else self.move_up)(abs(index - cur))
+    def select_index(self, index, timeout=5, max_steps=12):
+        """Press Up/Down until row `index` is highlighted, looking at the screen after every press (a press can move more than one row)."""
+        for _ in range(max_steps):
+            cur = self.selected_index
+            if cur is None: raise AssertionError("the list is not visible, cannot select row %d" % index)
+            if cur == index: break
+            (self.move_down if index > cur else self.move_up)()
         return self.wait_until_selected_index(index, timeout)

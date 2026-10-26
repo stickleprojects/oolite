@@ -101,6 +101,12 @@ class XToolsBackend:
     def send_key(self, key, window=None):
         sh(["xdotool", "key"] + (["--window", str(window)] if window else []) + [key], self.env)
 
+    def key_down(self, key):
+        sh(["xdotool", "keydown", key], self.env)
+
+    def key_up(self, key):
+        sh(["xdotool", "keyup", key], self.env)
+
 
 class XlibBackend:
     """python-xlib, one persistent connection. Same interface as XToolsBackend (send_key still uses xdotool)."""
@@ -172,6 +178,12 @@ class XlibBackend:
 
     def send_key(self, key, window=None):
         XToolsBackend(self.env).send_key(key, window)
+
+    def key_down(self, key):
+        XToolsBackend(self.env).key_down(key)
+
+    def key_up(self, key):
+        XToolsBackend(self.env).key_up(key)
 
     def grab(self, w):
         """(width, height, rgb bytes) of window w as drawn on screen (python-xlib get_image), or None."""
@@ -403,6 +415,12 @@ class HelperBackend:
 
     def send_key(self, key, window=None):
         self._x(*(["key", key] + ([window] if window else [])))
+
+    def key_down(self, key):
+        self._x("keydown", key)
+
+    def key_up(self, key):
+        self._x("keyup", key)
 
 
 class HelperX11Probe(Probe):

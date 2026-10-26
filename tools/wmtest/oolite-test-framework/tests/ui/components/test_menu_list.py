@@ -5,11 +5,15 @@ from oolite_test_framework.ui.components import menu_list as components
 
 class FakeApp:
     ocr = None
+    class clock:
+        @staticmethod
+        def sleep(s): pass
     def __init__(self, shot): self.shot = shot; self.after = None; self.keys = []
     def screenshot(self, label=None): return self.shot
     def send_keys(self, *k):
         self.keys += k
-        if self.after is not None: self.shot = self.after
+        if self.after: self.shot = self.after.pop(0) if isinstance(self.after, list) else self.after
+    def hold_key(self, key, seconds): self.send_keys(key)
     def wait_until(self, cond, what, timeout=None):
         if not cond(): raise AssertionError(what)
 
@@ -60,16 +64,16 @@ def test_two_highlighted_rows_is_not_a_valid_selection():
 
 
 def test_select_index_presses_the_right_keys():
-    m = menu(draw(4, 2)); m.app.after = draw(4, 4)
+    m = menu(draw(4, 2)); m.app.after = [draw(4, 3), draw(4, 4)]
     m.select_index(4); assert m.app.keys == ["Down", "Down"]
-    m = menu(draw(4, 3)); m.app.after = draw(4, 1)
+    m = menu(draw(4, 3)); m.app.after = [draw(4, 2), draw(4, 1)]
     m.select_index(1); assert m.app.keys == ["Up", "Up"]
 
 
 def test_select_fails_if_the_highlight_does_not_follow():
     m = menu(draw(4, 1))
     try: m.select_index(3)
-    except AssertionError as e: assert "row 3" in str(e)
+    except AssertionError as e: assert "did not leave" in str(e)
     else: raise AssertionError("expected a failure")
 
 

@@ -19,10 +19,10 @@ def test_game_responds_to_keys(fresh_game):
 
 
 def test_title_menu_shown_and_keys_move_selection(app):
-    """The menu is really drawn in the window, has the expected items, starts on the first, and Down, Down highlights the third."""
+    """The menu is really drawn in the window, has the expected items, starts on the first, and the keyboard can move the highlight to another item."""
     page = app.title_menu.wait_until_displayed()
     ok, why = page.shows_expected_items()
     assert ok, why
     assert page.selected_item == "Start New Commander", "expected the first item selected at first, got %s" % page.selected_item
-    page.menu.move_down(2).wait_until_selected_index(3)
-    assert page.selected_item == "View Ship Library"
+    page.select("Game Options")
+    assert page.selected_item == "Game Options"

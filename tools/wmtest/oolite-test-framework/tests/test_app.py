@@ -29,7 +29,9 @@ class Session:
     after = None
     def send_key(self, k, w=None):
         self.keys.append(k)
-        if self.after: self.backend.frames = self.after
+        if self.after: self.backend.frames = [self.after.pop(0)] if len(self.after) > 1 else self.after   # one screen per key press
+    def key_down(self, k): self.send_key(k)
+    def key_up(self, k): pass
 
 
 class Game:
@@ -78,10 +80,9 @@ def test_game_exit_is_reported_at_once():
 
 def test_frozen_window_does_not_move_selection():
     a = make([with_bar(1280, 720, 1)])
-    m = a.title_menu.wait_until_displayed().menu.move_down(2)
-    assert a.session.keys == ["Down", "Down"]
-    with pytest.raises(appmod.ScenarioFailed, match="row 3"):
-        m.wait_until_selected_index(3, timeout=1)
+    with pytest.raises(appmod.ScenarioFailed, match="highlight did not leave row 1"):
+        a.title_menu.wait_until_displayed().menu.move_down(2)
+    assert a.session.keys == ["Down", "Down"]      # held again once, then gave up
 
 
 def test_no_grab_support_is_not_measurable():
@@ -113,6 +114,6 @@ def test_wrong_number_of_rows_is_reported_and_has_no_selected_item():
 def test_expected_items_ok_and_select_by_name():
     a = make([with_bar(1280, 720, 1)])
     assert a.title_menu.shows_expected_items() == (True, "")
-    a.session.after = [with_bar(1280, 720, 4)]      # what is drawn once a key has been pressed
+    a.session.after = [with_bar(1280, 720, 2), with_bar(1280, 720, 3), with_bar(1280, 720, 4)]      # what is drawn after each key press
     a.title_menu.select("Game Options")
     assert a.session.keys == ["Down", "Down", "Down"]

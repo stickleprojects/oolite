@@ -169,6 +169,12 @@ class Session:
     def send_key(self, key, window=None):
         (self.backend or probes.XToolsBackend(dict(os.environ))).send_key(key, window)
 
+    def key_down(self, key):
+        (self.backend or probes.XToolsBackend(dict(os.environ))).key_down(key)
+
+    def key_up(self, key):
+        (self.backend or probes.XToolsBackend(dict(os.environ))).key_up(key)
+
     def stop(self):
         for p, _ in self.probes: p.close()
         for p in reversed(self.procs):

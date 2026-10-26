@@ -70,6 +70,15 @@ class App:
 
     # ---- driving
     def send_keys(self, *keys, gap=0.3):
-        w = self.session.window_id()
+        # no target window: the key goes through XTEST to whatever has keyboard focus, like a real keypress (a window without focus gets nothing)
         for k in keys:
-            self.session.send_key(k, w); self.clock.sleep(gap)
+            self.session.send_key(k); self.clock.sleep(gap)
+
+    def hold_key(self, key, seconds):
+        """Hold `key` down for `seconds`, then release it. The game reads the keyboard once per frame (slow with software rendering), so a tap
+        shorter than a frame is missed, and holding for too long starts the key repeat (about 1 s is one menu step in the Docker images)."""
+        self.session.key_down(key)
+        try:
+            self.clock.sleep(seconds)
+        finally:
+            self.session.key_up(key)
