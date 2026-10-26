@@ -159,8 +159,8 @@ def test_a_window_that_stays_black_is_still_reported_black(monkeypatch, tmp_path
     assert out["render"] == "black"
 
 
-def test_key_driven_tests_are_not_measurable_where_keys_cannot_arrive(project):
+def test_key_driven_tests_run_on_kwin_xwayland_through_fake_input(project):
     pt, args, tmp = project
     args = [a if a != "marco" else "kwin-xwayland" for a in args] + ["--wmt-toggle"]
     out = pt.runpytest("-v", "-rs", *args).stdout.str()
-    assert "test_f12_toggle[kwin-xwayland" in out and "NOT MEASURABLE: injected keys do not reach the game in kwin-xwayland" in out
+    assert "test_f12_toggle[kwin-xwayland" in out and "NOT MEASURABLE: injected keys" not in out

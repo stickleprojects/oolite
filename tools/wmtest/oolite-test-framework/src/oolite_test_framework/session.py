@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import time
 
-from . import checks, probes
+from . import checks, fakeinput, probes
 
 
 class SessionError(RuntimeError):
@@ -167,12 +167,15 @@ class Session:
         return self.backend.find_window() if self.backend else None
 
     def send_key(self, key, window=None):
+        if self.env.keys == "fakeinput": return fakeinput.tap(key)
         (self.backend or probes.XToolsBackend(dict(os.environ))).send_key(key, window)
 
     def key_down(self, key):
+        if self.env.keys == "fakeinput": return fakeinput.key_down(key)
         (self.backend or probes.XToolsBackend(dict(os.environ))).key_down(key)
 
     def key_up(self, key):
+        if self.env.keys == "fakeinput": return fakeinput.key_up(key)
         (self.backend or probes.XToolsBackend(dict(os.environ))).key_up(key)
 
     def stop(self):

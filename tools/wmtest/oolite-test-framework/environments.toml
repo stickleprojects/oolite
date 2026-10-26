@@ -10,7 +10,7 @@
 #           (e.g. "kwin:framed,focused" = take frame and focus from KWin, geometry from the next probe). Probes: x11 kwin sway ask none
 # optional  version_cmd/version_re (shown in the report), settle (s before readiness polling, default 4), settle_after (default 3),
 #           ready_timeout (default 20), ready_socket (wayland socket to wait for, default wl0), files {path = text}, env {VAR = value},
-#           post_start (commands run once the socket is up), focus_na (true if no keyboard focus can exist, e.g. headless weston), keys_na (true if injected keys never reach the game, e.g. headless kwin-xwayland)
+#           post_start (commands run once the socket is up), focus_na (true if no keyboard focus can exist, e.g. headless weston), keys (xtest, or fakeinput = KWin fake-input protocol, needed on headless kwin), keys_na (true if no way to inject keys exists)
 
 [images.arch]
 dockerfile = "docker/Dockerfile.arch"
@@ -89,11 +89,11 @@ family = "kwin"
 session = "XWayland"
 image = "wayland"
 kind = "wayland"
-start = ["kwin_wayland --virtual --width {w} --height {h} --socket wl0 --xwayland --no-lockscreen"]
+start = ["KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 kwin_wayland --virtual --width {w} --height {h} --socket wl0 --xwayland --no-lockscreen"]
 version_cmd = "kwin_wayland --version"
 version_re = "[0-9][0-9.]+"
 probes = ["kwin:framed,focused", "x11"]
-keys_na = true
+keys = "fakeinput"
 [env.kwin-native]
 family = "kwin"
 session = "Wayland native"

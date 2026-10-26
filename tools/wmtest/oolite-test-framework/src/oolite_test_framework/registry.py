@@ -32,6 +32,7 @@ class Environment:
     env: dict = field(default_factory=dict)
     post_start: list = field(default_factory=list)
     focus_na: bool = False
+    keys: str = "xtest"            # how keys are injected: xtest (xdotool) | fakeinput (KWin fake-input, for headless kwin)
     keys_na: bool = False          # injected (XTEST) keys never reach X clients, e.g. headless kwin-xwayland
     where: str = "docker"
 
