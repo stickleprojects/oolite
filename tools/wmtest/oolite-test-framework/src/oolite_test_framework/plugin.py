@@ -155,6 +155,7 @@ def env_session(case, session_mgr):
 
 
 RENDER_GAP = 3   # seconds between the two screenshots
+RENDER_WAIT = 10   # a compositor (KWin on XWayland) can hand out an all-black window until the first frame is presented: look again for this long
 
 
 def _render_fields(s, game, rec, cfg, case):
@@ -171,6 +172,9 @@ def _render_fields(s, game, rec, cfg, case):
     if first: out["gl_first"] = first
     grab = getattr(s.backend, "grab", None); w = s.window_id() if s.backend is not None else None
     shot = grab(w) if grab and w else None
+    t0 = time.monotonic()
+    while shot and render.analyse(shot[2], shot[0], shot[1])["verdict"] != "ok" and time.monotonic() - t0 < RENDER_WAIT:
+        time.sleep(1); shot = grab(w) or shot
     if shot:
         a = render.analyse(shot[2], shot[0], shot[1]); out.update(render=a["verdict"], render_colours=a["colours"], render_std=a["std"])
         time.sleep(RENDER_GAP)

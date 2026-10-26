@@ -23,6 +23,7 @@ def test_title_menu_shown_and_keys_move_selection(app):
     page = app.title_menu.wait_until_displayed()
     ok, why = page.shows_expected_items()
     assert ok, why
-    assert page.selected_item == "Start New Commander", "expected the first item selected at first, got %s" % page.selected_item
+    first = page.settled_item()
+    assert first == "Start New Commander", "expected the first item selected at first, got %s" % first
     page.select("Game Options")
-    assert page.selected_item == "Game Options"
+    assert page.settled_item() == "Game Options"

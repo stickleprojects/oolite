@@ -37,6 +37,11 @@ class TitleMenuPage(Page):
         i = self.menu.selected_index
         return self.EXPECTED_ITEMS[i - 1] if i is not None and self.menu.visible_count == len(self.EXPECTED_ITEMS) else None
 
+    def settled_item(self):
+        """Like selected_item, but only once the highlight has stopped moving (see MenuList.settled_index)."""
+        i = self.menu.settled_index()
+        return self.EXPECTED_ITEMS[i - 1] if i is not None and self.menu.visible_count == len(self.EXPECTED_ITEMS) else None
+
     def select(self, item, timeout=5):
         self.menu.select_index(self.EXPECTED_ITEMS.index(item) + 1, timeout)
         return self

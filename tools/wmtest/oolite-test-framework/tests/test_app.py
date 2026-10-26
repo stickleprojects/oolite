@@ -117,3 +117,10 @@ def test_expected_items_ok_and_select_by_name():
     a.session.after = [with_bar(1280, 720, 2), with_bar(1280, 720, 3), with_bar(1280, 720, 4)]      # what is drawn after each key press
     a.title_menu.select("Game Options")
     assert a.session.keys == ["Down", "Down", "Down"]
+
+
+def test_settled_item_waits_for_a_highlight_that_is_still_moving():
+    a = make([with_bar(1280, 720, 1)] * 3)
+    assert a.title_menu.wait_until_displayed().settled_item() == "Start New Commander"
+    a = make([with_bar(1280, 720, 2), with_bar(1280, 720, 3)] + [with_bar(1280, 720, 4)] * 12)
+    assert a.title_menu.settled_item() == "Game Options"

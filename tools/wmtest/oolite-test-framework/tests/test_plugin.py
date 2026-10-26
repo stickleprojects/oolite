@@ -130,3 +130,30 @@ def test_outcome_checks_map_to_skip_fail_pass():
     assert outcomes.check_frame({"frame": "0", "exited": "1"})[0] == "failed"
     assert outcomes.check_f12_toggle({"t_ok": "0"})[0] == "failed" and outcomes.check_f12_toggle({})[0] == "skipped"
     assert outcomes.check_f12_toggle({"t_ok": "1", "t_frame": "1", "t_focus": "0", "t_centred": "1"})[1].endswith("focus")
+
+
+def test_a_black_first_screenshot_is_looked_at_again(monkeypatch, tmp_path):
+    """KWin on XWayland can give an all-black window until the first frame is presented: that must not count as 'renders = black'."""
+    import types
+    from oolite_test_framework import plugin
+    black = (64, 64, bytes(64 * 64 * 3))
+    lit = (64, 64, bytes((i * 37) % 256 for i in range(64 * 64 * 3)))
+    shots = iter([black, black, lit, lit, lit])
+    backend = types.SimpleNamespace(grab=lambda w: next(shots))
+    session = types.SimpleNamespace(backend=backend, window_id=lambda: 5)
+    cfg = types.SimpleNamespace(getoption=lambda name: "")
+    monkeypatch.setattr(plugin.time, "sleep", lambda s: None)
+    out = plugin._render_fields(session, types.SimpleNamespace(dir=str(tmp_path)), {}, cfg, types.SimpleNamespace(env="e", label="b", run=1))
+    assert out["render"] == "ok"
+
+
+def test_a_window_that_stays_black_is_still_reported_black(monkeypatch, tmp_path):
+    import types
+    from oolite_test_framework import plugin
+    black = (64, 64, bytes(64 * 64 * 3))
+    clock = iter(range(0, 1000, 3))
+    monkeypatch.setattr(plugin.time, "sleep", lambda s: None)
+    monkeypatch.setattr(plugin.time, "monotonic", lambda: next(clock))
+    session = types.SimpleNamespace(backend=types.SimpleNamespace(grab=lambda w: black), window_id=lambda: 5)
+    out = plugin._render_fields(session, types.SimpleNamespace(dir=str(tmp_path)), {}, types.SimpleNamespace(getoption=lambda n: ""), types.SimpleNamespace(env="e", label="b", run=1))
+    assert out["render"] == "black"
