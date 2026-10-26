@@ -11,7 +11,7 @@ while the window is blank, frozen or transparent fails here. Waits return as soo
 import os
 import time
 
-from . import render, screen
+from . import png, render_check, screen
 from .ui import pages
 
 
@@ -48,14 +48,14 @@ class App:
             self.last = s
             if self.shots_dir and label:
                 os.makedirs(self.shots_dir, exist_ok=True)
-                render.write_png(os.path.join(self.shots_dir, "%s-%s.png" % (self.name, label)), s.w, s.h, s.rgb)
+                png.write_png(os.path.join(self.shots_dir, "%s-%s.png" % (self.name, label)), s.w, s.h, s.rgb)
         return s
 
     def describe(self):
         """What the last screenshot looked like, for failure messages."""
         s = self.last
         if s is None: return "no game window was found"
-        a = render.analyse(s.rgb, s.w, s.h)
+        a = render_check.analyse(s.rgb, s.w, s.h)
         return "the window looks %s (colours=%s, std=%s)" % (a["verdict"], a["colours"], a["std"])
 
     # ---- waiting

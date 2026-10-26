@@ -1,10 +1,10 @@
 """Helpers for writing game tests: enforce() turns an (outcome, reason) check result into pytest pass / fail / skip."""
 import pytest
 
-from . import outcomes
+from . import pass_fail
 
 
 def enforce(result):
     outcome, reason = result
-    if outcome == outcomes.FAILED: pytest.fail(reason, pytrace=False)
-    if outcome == outcomes.SKIPPED: pytest.skip(reason)
+    if outcome == pass_fail.FAILED: pytest.fail(reason, pytrace=False)
+    if outcome == pass_fail.SKIPPED: pytest.skip(reason)

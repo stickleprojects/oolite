@@ -74,5 +74,5 @@ def load(path=None):
 
 
 def display_info(envs):
-    """{name: {family, session, where}} for the report (verdict.py)."""
+    """{name: {family, session, where}} for the report (report.py)."""
     return {n: {"family": e.family, "session": e.session, "where": e.where} for n, e in envs.items()}

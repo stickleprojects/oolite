@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 
-from . import envinfo, rawfmt, registry, scenarios, verdict
+from . import envinfo, raw_results, registry, scenarios, report
 from .session import Session, SessionError
 
 PKG = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))      # the framework folder (holds src/, docker/, environments.toml)
@@ -58,7 +58,7 @@ def docker_state():
 class Runner:
     def __init__(self, a):
         self.a = a; self.envs, self.images = registry.load(a.registry or None)
-        verdict.set_registry(self.envs)
+        report.set_registry(self.envs)
         self.builds = []
         for b in a.builds:
             label, _, path = b.partition(":")
@@ -107,7 +107,7 @@ class Runner:
         with open(self.raw, "a") as f: f.write(line + "\n")
 
     def skip(self, wm, screen, why):
-        for label, _ in self.builds: self.add(rawfmt.format_skip(wm, screen, label, why))
+        for label, _ in self.builds: self.add(raw_results.format_skip(wm, screen, label, why))
         say("  skipped %s (%s): %s" % (wm, screen, why))
 
     def ensure_image(self, image):
@@ -147,7 +147,7 @@ class Runner:
         # copy the parts in; a failed pytest (hard failure) leaves a SKIP row with the reason
         data = open(os.path.join(self.parts, part)).read()
         if data: open(self.raw, "a").write(data)
-        # failing tests are measurements (pytest rc 1); hard failures are HARD lines in the raw file (verdict.py lists them) or an unusable pytest run
+        # failing tests are measurements (pytest rc 1); hard failures are HARD lines in the raw file (report.py lists them) or an unusable pytest run
         if r.returncode not in (0, 1, 5) and "RESULT" not in data and "HARD" not in data:
             self.skip(env, screen, "hard failure: pytest rc=%d: %s" % (r.returncode, (r.stdout.strip().splitlines() or r.stderr.strip().splitlines() or [""])[-1][:160]))
 
@@ -220,7 +220,7 @@ class Runner:
                         if not self.a.no_prompt: say(">> Run %d: the Oolite window is open now. Please look at it (do not close it)." % n)
                         rec = scenarios.record(s, g, env, label, scr, n, opts)
                     finally: g.stop()
-                    self.add(rawfmt.format_result(rec))
+                    self.add(raw_results.format_result(rec))
         finally: s.stop()
 
     def report(self):
@@ -228,7 +228,7 @@ class Runner:
             "build %s: %s\n" % (b[0], b[1]) for b in [(l, os.path.basename(p)) for l, p in self.builds])); md = self.md
         argv = [self.raw, md, "--control", self.control, "--candidates", self.a.candidates, "--minruns", str(self.a.minruns), "--host-minruns", str(self.a.host_runs),
                 "--tol", str(self.a.tol), "--equiv", self.a.equiv, "--header", hdr]
-        rc = verdict.main(argv)
+        rc = report.main(argv)
         say("Report: %s\n(raw: %s, environment: %s; send these files)" % (md, self.raw, hdr)); return rc
 
     def version(self):
@@ -293,9 +293,9 @@ def main(argv=None):
         a.runs, a.host_runs, a.minruns = 1, 1, 1
         a.screens = a.screens.split(",")[0]
         a.tests = a.tests or QUICK_TESTS
-    if a.selftest: return verdict.main(["--selftest"])
+    if a.selftest: return report.main(["--selftest"])
     if a.report_only:
-        return verdict.main([a.report_only, a.out or "report.md", "--control", a.control or "base", "--candidates", a.candidates, "--minruns", str(a.minruns),
+        return report.main([a.report_only, a.out or "report.md", "--control", a.control or "base", "--candidates", a.candidates, "--minruns", str(a.minruns),
                              "--host-minruns", str(a.host_runs), "--tol", str(a.tol), "--registry", a.registry or registry.DEFAULT_PATH])
     if a.list:
         envs, _ = registry.load(a.registry or None)
@@ -320,7 +320,7 @@ def main(argv=None):
         return e.code if isinstance(e.code, int) else EXIT_ERROR
     finally:
         _QUIET = False
-    L = verdict.LAST
+    L = report.LAST
     want_docker = any(n in r.envs and r.envs[n].kind != "host" for n in names)
     if want_docker and not r.docker_ok:
         print("uitest: error: %s (docker environments were requested)" % r.docker_why, file=sys.stderr); rc = EXIT_ERROR

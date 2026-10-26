@@ -1,5 +1,5 @@
 """Optional OCR of a small cropped screenshot (one line of text) using the tesseract command-line tool. Standalone: depends only on
-oolite_ui_test_framework.render (PNG writer) and the standard library. No Python packages are needed.
+oolite_ui_test_framework.png (PNG writer) and the standard library. No Python packages are needed.
 
     ocr = oolite_ui_test_framework.ocr.make_ocr()          # None when tesseract is not installed: callers must SKIP the text check, never fail it
     text = ocr(shot)                  # shot = oolite_ui_test_framework.screen.Shot (w, h, rgb); returns the text read, e.g. "Game Options"
@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import tempfile
 
-from . import render
+from . import png
 from .screen import Shot
 
 SCALE = 3
@@ -67,8 +67,8 @@ def make_ocr(tesseract=None, runner=subprocess.run, which=shutil.which, timeout=
     def ocr(shot):
         p = prepare(shot)
         with tempfile.TemporaryDirectory(prefix="uitest-ocr.") as d:
-            png = os.path.join(d, "line.png"); render.write_png(png, p.w, p.h, p.rgb)
-            r = runner([exe, png, "-", "--psm", "7"], capture_output=True, text=True, timeout=timeout)
+            path = os.path.join(d, "line.png"); png.write_png(path, p.w, p.h, p.rgb)
+            r = runner([exe, path, "-", "--psm", "7"], capture_output=True, text=True, timeout=timeout)
         return (r.stdout or "").strip() if r.returncode == 0 else ""
     return ocr
 

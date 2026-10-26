@@ -4,9 +4,8 @@ import os
 
 import pytest
 
-from oolite_ui_test_framework import ocr, render, screen
+from oolite_ui_test_framework import ocr, png, screen
 from oolite_ui_test_framework.ui import pages
-from oolite_ui_test_framework.ui.components import MenuList
 
 DATA = os.path.join(os.path.dirname(__file__), "fixtures", "title-menu-1280x720.png")
 read = ocr.make_ocr()
@@ -19,7 +18,7 @@ class Still:
     def screenshot(self, label=None): return self.shot
 
 
-def shot(): return screen.Shot(*render.read_png(DATA))
+def shot(): return screen.Shot(*png.read_png(DATA))
 
 
 def title_page():

@@ -111,7 +111,7 @@ check that the file parses.
 ## Add a test
 
 Add a function to a file in [`tests/ui/`](../../tests/ui/) (`app/`, `window/` or `screen/`), plus, if it needs a new rule, a small check
-function in `src/oolite_ui_test_framework/outcomes.py`. It runs for every environment x build x run, with ids like
+function in `src/oolite_ui_test_framework/pass_fail.py`. It runs for every environment x build x run, with ids like
 `test_gets_focus[marco-x11-opt1-run3]`. Select with `-k` or the markers `-m family_kwin`, `-m session_xwayland`, `-m env_marco`;
 `@pytest.mark.only_wm("marco")` limits a test to some environments.
 
@@ -125,7 +125,7 @@ function in `src/oolite_ui_test_framework/outcomes.py`. It runs for every enviro
 - `@pytest.mark.needs_toggle`, `needs_x11` and `needs_keys` skip with a reason when the run or environment cannot support the test.
 
 pytest decides: each test passes or fails; `pytest.skip(reason)` means NOT TESTED / NOT MEASURABLE, and the reason appears in the report.
-The plugin writes the raw file (RESULT, TEST, WMVER, HARD lines) and a pass-rate summary; `verdict.py` makes the report from it.
+The plugin writes the raw file (RESULT, TEST, WMVER, HARD lines) and a pass-rate summary; `report.py` makes the report from it.
 
 **Sharing the running game.**
 - pytest reorders the tests so all tests of one (environment, build, run) share one launch; then the game is stopped and the next starts.
@@ -149,8 +149,8 @@ The plugin writes the raw file (RESULT, TEST, WMVER, HARD lines) and a pass-rate
 - Inside, pytest runs the game tests with the plugin (`plugin.py`). `session.py` starts the display server and window manager and
   waits until it is ready (`_NET_SUPPORTING_WM_CHECK`, or the Wayland socket).
 - `scenarios.py` launches the game, samples the window every 0.5 s for 14 s, takes a final sample 2 s after the first size change,
-  and runs the F12 round trip. It only records; `checks.py` and `outcomes.py` judge.
-- `verdict.py` turns the raw file into the report (one-sided Fisher test between control and candidate).
+  and runs the F12 round trip. It only records; `geometry.py` and `pass_fail.py` judge.
+- `report.py` turns the raw file into the report (one-sided Fisher test between control and candidate).
 - The raw results keep the `wm=` field name (the environment) so that older results stay readable.
 
 ## Host mode

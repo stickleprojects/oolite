@@ -101,6 +101,6 @@ Tests that need screenshots are reported as NOT MEASURABLE where none can be tak
 
 **Adding a test:** add a function to the folder that fits, using the fixtures described under "Add a test" in the
 [framework README](../../tools/oolite-ui-test-framework/README.md#add-a-test). Test names appear in the report, so do not rename a test
-function without updating `oolite_ui_test_framework/outcomes.py`.
+function without updating `oolite_ui_test_framework/pass_fail.py`.
 
 Open work is tracked in the fork's GitHub issues.

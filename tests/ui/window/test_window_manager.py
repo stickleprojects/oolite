@@ -1,9 +1,9 @@
 """Window-manager behaviour (issue 773): does the game window get a title bar, keyboard focus and a centred position in this environment
 (X11 window managers, Wayland compositors, one or two monitors)? One launch is shared by the read-only checks; F12 gets its own launch.
-Each test is one line: pick a check from oolite_ui_test_framework.outcomes and enforce() it."""
+Each test is one line: pick a check from oolite_ui_test_framework.pass_fail and enforce() it."""
 import pytest
 
-from oolite_ui_test_framework import outcomes
+from oolite_ui_test_framework import pass_fail
 from oolite_ui_test_framework.pytest_helpers import enforce
 
 pytestmark = pytest.mark.game
@@ -16,23 +16,23 @@ def test_environment_started(env_session):
 
 
 def test_has_frame(launched_game):
-    enforce(outcomes.check_frame(launched_game))
+    enforce(pass_fail.check_frame(launched_game))
 
 
 def test_gets_focus(launched_game):
-    enforce(outcomes.check_focus(launched_game))
+    enforce(pass_fail.check_focus(launched_game))
 
 
 def test_splash_centred(launched_game):
-    enforce(outcomes.check_splash_centred(launched_game))
+    enforce(pass_fail.check_splash_centred(launched_game))
 
 
 def test_game_window_centred(launched_game):
-    enforce(outcomes.check_window_centred(launched_game))
+    enforce(pass_fail.check_window_centred(launched_game))
 
 
 @pytest.mark.needs_toggle
 @pytest.mark.needs_x11
 @pytest.mark.needs_keys
 def test_f12_toggle(fresh_game):
-    enforce(outcomes.check_f12_toggle(fresh_game.toggle()))
+    enforce(pass_fail.check_f12_toggle(fresh_game.toggle()))

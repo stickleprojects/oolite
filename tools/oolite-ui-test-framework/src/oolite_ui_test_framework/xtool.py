@@ -3,17 +3,17 @@ Used by host mode so the game itself runs on the host. Usage: python3 -m oolite_
 import json
 import sys
 
-from . import probes
+from . import window_probes
 
 
 def observe(backend):
-    o = probes.X11Probe(backend).observe()
+    o = window_probes.X11Probe(backend).observe()
     return None if o is None else {"win": o.win, "framed": o.framed, "focused": o.focused, "outer": o.outer, "client": o.client}
 
 
 def main(argv=None):
     a = sys.argv[1:] if argv is None else argv
-    b = probes.x_backend(None)
+    b = window_probes.x_backend(None)
     if a[:1] == ["observe"]: print(json.dumps(observe(b)))
     elif a[:1] == ["monitors"]: print(json.dumps(b.monitors()))
     elif a[:1] == ["wmname"]: print(b.wm_name())

@@ -4,7 +4,7 @@
 * fixtures: `session_mgr` (display server + WM, restarted when the build changes), `startup_record` (ONE launch per case, shared by the
   read-only tests), `toggle_record` (its own launch, for tests that change game state)
 * collects pytest's outcomes per test and case, writes the raw file (RESULT lines, plus TEST lines with skip reasons, WMVER and HARD lines)
-  and a k6-style summary of pass rates. Statistics and the report are made from that raw file by oolite_ui_test_framework/verdict.py (host side)."""
+  and a k6-style summary of pass rates. Statistics and the report are made from that raw file by oolite_ui_test_framework/report.py (host side)."""
 import collections
 import os
 import re
@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from . import checks, outcomes, rawfmt, registry, scenarios, sharing, session as sessmod
+from . import geometry, pass_fail, raw_results, registry, scenarios, shared_launch, session as sessmod
 
 Case = collections.namedtuple("Case", "env label app run")
 
@@ -65,7 +65,7 @@ def pytest_configure(config):
     for e in envs.values():
         for m in ("env_" + _slug(e.name), "family_" + _slug(e.family), "session_" + _slug(e.session)):
             config.addinivalue_line("markers", "%s: select with -m" % m)
-    sharing.check_no_xdist(config)
+    shared_launch.check_no_xdist(config)
     STATE.__init__(); STATE.screen = config.getoption("--ui-screen")
 
 
@@ -82,7 +82,7 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("case", [pytest.param(None, marks=pytest.mark.skip(reason="no --ui-env / --ui-app given"))], ids=["none"], scope="session")
         return
     cases = [Case(env.name, label, os.path.abspath(path), n) for label, path in apps for n in range(1, cfg.getoption("--ui-runs") + 1)]
-    metafunc.parametrize("case", cases, ids=[outcomes.case_id(c.env, c.label, c.run, env.session) for c in cases], scope="session")
+    metafunc.parametrize("case", cases, ids=[pass_fail.case_id(c.env, c.label, c.run, env.session) for c in cases], scope="session")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -157,7 +157,7 @@ def _launch(request, case, session_mgr, opts, with_toggle):
         game.stop()
     rec.update(wm=case.env, build=case.label, screen=cfg.getoption("--ui-screen"), run=case.run, crashed=crashed)
     rec.setdefault("dx", None); rec.setdefault("dy", None)
-    return checks.apply(rec, opts.tol)
+    return geometry.apply(rec, opts.tol)
 
 
 @pytest.fixture(scope="session")
@@ -172,7 +172,7 @@ RENDER_WAIT = 10   # a compositor (KWin on XWayland) can hand out an all-black w
 
 def _render_fields(s, game, rec, cfg, case):
     """Screenshot of the game window (python-xlib) + scan of the game's logs, taken while the game is still running."""
-    from . import render
+    from . import png, render_check
     out = {"render": None, "gl_errors": 0}
     texts = []
     for root, _, files in os.walk(game.dir):
@@ -180,29 +180,29 @@ def _render_fields(s, game, rec, cfg, case):
             if f in ("out.log", "Latest.log"):
                 try: texts.append((f, open(os.path.join(root, f), errors="replace").read()))
                 except OSError: pass
-    n, first = render.scan_logs(texts); out["gl_errors"] = n
+    n, first = render_check.scan_logs(texts); out["gl_errors"] = n
     if first: out["gl_first"] = first
     grab = getattr(s.backend, "grab", None); w = s.window_id() if s.backend is not None else None
     shot = grab(w) if grab and w else None
     t0 = time.monotonic()
-    while shot and render.analyse(shot[2], shot[0], shot[1])["verdict"] != "ok" and time.monotonic() - t0 < RENDER_WAIT:
+    while shot and render_check.analyse(shot[2], shot[0], shot[1])["verdict"] != "ok" and time.monotonic() - t0 < RENDER_WAIT:
         time.sleep(1); shot = grab(w) or shot
     if shot:
-        a = render.analyse(shot[2], shot[0], shot[1]); out.update(render=a["verdict"], render_colours=a["colours"], render_std=a["std"])
+        a = render_check.analyse(shot[2], shot[0], shot[1]); out.update(render=a["verdict"], render_colours=a["colours"], render_std=a["std"])
         time.sleep(RENDER_GAP)
         shot2 = grab(w)
-        ch = render.changed_share(shot[2], shot2[2]) if shot2 and (shot2[0], shot2[1]) == (shot[0], shot[1]) else None
+        ch = render_check.changed_share(shot[2], shot2[2]) if shot2 and (shot2[0], shot2[1]) == (shot[0], shot[1]) else None
         if ch is not None: out.update(render_changed=ch, render_gap=RENDER_GAP)
         d = cfg.getoption("--ui-shots")
         if d:
-            os.makedirs(d, exist_ok=True); render.write_png(os.path.join(d, "%s-%s-run%d.png" % (case.env, case.label, case.run)), shot[0], shot[1], shot[2])
+            os.makedirs(d, exist_ok=True); png.write_png(os.path.join(d, "%s-%s-run%d.png" % (case.env, case.label, case.run)), shot[0], shot[1], shot[2])
     return out
 
 
 @pytest.fixture(scope="session")
 def launched_game(request, case, session_mgr, opts):
     """Opt-in SHARED launch: ONE game start per (env, build, run), kept running for every test that requests it. The record is a dict
-    (the checks inspect it). Read-only by default; see oolite_ui_test_framework/sharing.py for the restore rules and the dirty check after every test."""
+    (the checks inspect it). Read-only by default; see oolite_ui_test_framework/shared_launch.py for the restore rules and the dirty check after every test."""
     cfg = request.config; assert os.path.isfile(case.app), "AppImage not found: %s" % case.app
     key = (case.env, case.label, case.run); s = session_mgr.for_build(case.label)
 
@@ -213,7 +213,7 @@ def launched_game(request, case, session_mgr, opts):
         rec.update(wm=case.env, build=case.label, screen=cfg.getoption("--ui-screen"), run=case.run, crashed=crashed)
         rec.setdefault("dx", None); rec.setdefault("dy", None)
         rec.update(_render_fields(s, game, rec, cfg, case))
-        rec = checks.apply(rec, opts.tol)
+        rec = geometry.apply(rec, opts.tol)
         STATE.launches.setdefault(key, rec)          # the first launch is the RESULT line; a relaunch only adds a warning
         return game, rec
 
@@ -221,7 +221,7 @@ def launched_game(request, case, session_mgr, opts):
         o = s.observe(cheap_only=True)
         return None if o is None else (o.outer, o.focused, o.framed)
 
-    sl = sharing.SharedLaunch(start, lambda g: g.stop(), lambda g: s.window_present(g) or g.alive(), state,
+    sl = shared_launch.SharedLaunch(start, lambda g: g.stop(), lambda g: s.window_present(g) or g.alive(), state,
                               warn=lambda t: STATE.warnings.append((case.env, case.label, case.run, t)))
     SHARED.append(sl)
     yield sl
@@ -265,7 +265,7 @@ class FreshGame:
 
     def shoot(self, stage):
         """With --ui-shots: <env>-<build>-run<N>-<stage>.png of the whole compositor output (headed), else of the game window."""
-        from . import render
+        from . import png
         d = self.request.config.getoption("--ui-shots")
         if not d: return
         s = self.session; shot = s.grab_screen()
@@ -274,25 +274,25 @@ class FreshGame:
             shot = grab(w) if grab and w else None
         if shot:
             os.makedirs(d, exist_ok=True); c = self.case
-            render.write_png(os.path.join(d, "%s-%s-run%d-%s.png" % (c.env, c.label, c.run, stage)), shot[0], shot[1], shot[2])
+            png.write_png(os.path.join(d, "%s-%s-run%d-%s.png" % (c.env, c.label, c.run, stage)), shot[0], shot[1], shot[2])
 
     def input_responds(self, key="Down", presses=2, settle=2.0):
         """Screenshot, press `key`, screenshot again: {'input_changed': share, 'input_key': key}, or {} when no screenshots are possible."""
-        from . import render
+        from . import render_check
         s = self.session; grab = getattr(s.backend, "grab", None); w = s.window_id() if s.backend is not None else None
         a = grab(w) if grab and w else None
         if not a: return {}
         for _ in range(presses): s.send_key(key, w); time.sleep(0.4)
         time.sleep(settle)
         b = grab(w)
-        ch = render.changed_share(a[2], b[2]) if b and (b[0], b[1]) == (a[0], a[1]) else None
+        ch = render_check.changed_share(a[2], b[2]) if b and (b[0], b[1]) == (a[0], a[1]) else None
         return {} if ch is None else {"input_changed": ch, "input_key": key}
 
     def finish(self):
         cfg = self.request.config; c = self.case
         self.rec.update(wm=c.env, build=c.label, screen=cfg.getoption("--ui-screen"), run=c.run, crashed=self.crashed)
         self.rec.setdefault("dx", None); self.rec.setdefault("dy", None)
-        self.rec = checks.apply(self.rec, self.opts.tol); STATE.toggles[(c.env, c.label, c.run)] = self.rec
+        self.rec = geometry.apply(self.rec, self.opts.tol); STATE.toggles[(c.env, c.label, c.run)] = self.rec
         return self.rec
 
 
@@ -346,12 +346,12 @@ def pytest_runtest_makereport(item, call):
 def pytest_sessionfinish(session, exitstatus):
     path = session.config.getoption("--ui-raw")
     if not path: return
-    lines = [rawfmt.format_kv("WMVER", wm=k, version=v) for k, v in STATE.wmver.items()]
+    lines = [raw_results.format_kv("WMVER", wm=k, version=v) for k, v in STATE.wmver.items()]
     for key in sorted(set(STATE.launches) | set(STATE.toggles) | set(STATE.outcomes), key=lambda k: (k[1], k[2])):
         if key in STATE.launches or key in STATE.toggles:
             rec = dict(STATE.launches.get(key) or STATE.toggles[key])
             if key in STATE.toggles: rec.update({k: v for k, v in STATE.toggles[key].items() if k.startswith("t_")})
-            lines.append(rawfmt.format_result(outcomes.apply_outcomes(rec, STATE.outcomes.get(key, {}))))
+            lines.append(raw_results.format_result(pass_fail.apply_outcomes(rec, STATE.outcomes.get(key, {}))))
         for test, (o, why) in sorted(STATE.outcomes.get(key, {}).items()):
             lines.append("TEST wm=%s build=%s run=%d test=%s outcome=%s reason=%s" % (key[0], key[1], key[2], test, o, why.replace("\n", " ")))
     for env, build, run, text in STATE.warnings: lines.append("WARN wm=%s build=%s run=%d text=%s" % (env, build, run, text))

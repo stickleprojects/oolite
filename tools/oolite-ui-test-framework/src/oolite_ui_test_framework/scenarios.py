@@ -1,5 +1,5 @@
 """Scenarios, written once and run in every environment. They only RECORD raw observations (a dict per run, RESULT fields);
-checks.apply() turns geometry into dx/dy/centred later. Timing is the same as trial.sh: sample every 0.5 s for 14 s,
+geometry.apply() turns geometry into dx/dy/centred later. Timing is the same as trial.sh: sample every 0.5 s for 14 s,
 splash = first sighting, post = first sample 2 s after the window size first changes, end = state at 14 s."""
 import os
 import shutil
@@ -8,8 +8,8 @@ import tempfile
 import time
 from dataclasses import dataclass
 
-from . import checks
-from .probes import Obs
+from . import geometry
+from .window_probes import Obs
 
 
 @dataclass
@@ -17,7 +17,7 @@ class Opts:
     wait: float = 14.0
     sample: float = 0.5
     post_delay: float = 2.0
-    tol: int = checks.DEFAULT_TOL
+    tol: int = geometry.DEFAULT_TOL
     toggle: bool = False
 
 
@@ -101,9 +101,9 @@ def run_startup(session, game, opts=Opts(), clock=Clock):
         return rec
     o = session.observe() or Obs()
     mon = o.mon or session.primary
-    rec.update(frame=o.framed, focus=o.focused, exited=0, outer=checks.fmt_geom(o.outer), mon=checks.fmt_geom(mon),
-               splash_outer=checks.fmt_geom(spl), post_outer=checks.fmt_geom(post), centred=o.centred, source=o.source or None)
-    rec["client"] = checks.fmt_geom(o.client) if o.client else None
+    rec.update(frame=o.framed, focus=o.focused, exited=0, outer=geometry.fmt_geom(o.outer), mon=geometry.fmt_geom(mon),
+               splash_outer=geometry.fmt_geom(spl), post_outer=geometry.fmt_geom(post), centred=o.centred, source=o.source or None)
+    rec["client"] = geometry.fmt_geom(o.client) if o.client else None
     if o.asked: rec["asked"] = ",".join("%s:%s" % (k, v) for k, v in o.asked.items())
     return rec
 
@@ -133,7 +133,7 @@ def run_toggle(session, game, opts=Opts(), clock=Clock, shoot=lambda stage: None
     # a full observation, as after startup: on XWayland only the compositor probe sees the frame (the X11 probe needs reparenting)
     o = session.observe() if ok else None
     if ok and o is not None:
-        t.update(t_frame=o.framed, t_focus=o.focused, t_outer=checks.fmt_geom(o.outer))
+        t.update(t_frame=o.framed, t_focus=o.focused, t_outer=geometry.fmt_geom(o.outer))
     else:
         t.update(t_frame=0, t_focus=0, t_dx=None, t_dy=None, t_centred=0)
     return t
@@ -147,4 +147,4 @@ def record(session, game, wm, build, screen, run, opts=Opts(), clock=Clock):
     rec.update(wm=wm, build=build, screen=screen, run=run)
     rec.setdefault("dx", None); rec.setdefault("dy", None)
     if rec.get("exited"): rec.setdefault("splash_dx", None); rec.setdefault("post_dx", None)
-    return checks.apply(rec, opts.tol)
+    return geometry.apply(rec, opts.tol)

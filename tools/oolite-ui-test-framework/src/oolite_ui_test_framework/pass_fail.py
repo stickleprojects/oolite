@@ -1,6 +1,6 @@
 """Test-level outcomes from a launch record. Pure functions: (outcome, reason) with outcome 'passed' | 'failed' | 'skipped'.
 The game tests (the tests folder next to the framework) are one line each: they call one of these and enforce() the result with pytest."""
-from . import checks
+from . import geometry
 
 PASSED, FAILED, SKIPPED = "passed", "failed", "skipped"
 
@@ -32,7 +32,7 @@ def check_window_centred(rec):
     c = _v(rec, "centred")
     if c is None: return SKIPPED, "NOT MEASURABLE: window position cannot be observed in this environment"
     if c == "1": return PASSED, ""
-    return FAILED, "off centre by dx=%s dy=%s (tolerance %s px)" % (_v(rec, "dx"), _v(rec, "dy"), rec.get("tol", checks.DEFAULT_TOL))
+    return FAILED, "off centre by dx=%s dy=%s (tolerance %s px)" % (_v(rec, "dx"), _v(rec, "dy"), rec.get("tol", geometry.DEFAULT_TOL))
 
 
 def check_splash_centred(rec):
@@ -40,7 +40,7 @@ def check_splash_centred(rec):
     c = _v(rec, "splash_centred")
     if c is None: return SKIPPED, "NOT MEASURABLE: the splash window was not observed"
     if c == "1": return PASSED, ""
-    return FAILED, "splash off centre by dx=%s dy=%s (tolerance %s px)" % (_v(rec, "splash_dx"), _v(rec, "splash_dy"), rec.get("tol", checks.DEFAULT_TOL))
+    return FAILED, "splash off centre by dx=%s dy=%s (tolerance %s px)" % (_v(rec, "splash_dx"), _v(rec, "splash_dy"), rec.get("tol", geometry.DEFAULT_TOL))
 
 
 def check_f12_toggle(rec):

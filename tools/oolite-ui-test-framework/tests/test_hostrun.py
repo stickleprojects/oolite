@@ -1,3 +1,5 @@
+"""hostrun (the `uitest` command): options, test selection, report names and exit codes. Docker is replaced by recorded RESULT lines
+(fake_cells) and monkeypatched helpers; files go to tmp_path. No Docker or game."""
 import re
 
 import pytest

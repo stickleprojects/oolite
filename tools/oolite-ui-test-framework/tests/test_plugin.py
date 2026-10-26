@@ -1,10 +1,9 @@
 """The pytest layer, exercised with pytester: the real game tests (app/ and window/) against FAKE launch fixtures (no display, no game)."""
 import os
-import textwrap
 
 import pytest
 
-from oolite_ui_test_framework import outcomes
+from oolite_ui_test_framework import pass_fail
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GAME_TESTS = os.path.join(os.path.dirname(os.path.dirname(ROOT)), "tests", "ui")
@@ -26,8 +25,8 @@ def _rec(case, **kw):
 @pytest.fixture(scope="module")
 def launched_game(case):
     open(LOG, "a").write("launch %%s %%s\\n" %% (case.label, case.run))
-    from oolite_ui_test_framework import checks, plugin
-    rec = checks.apply(_rec(case)); plugin.STATE.launches[(case.env, case.label, case.run)] = rec
+    from oolite_ui_test_framework import geometry, plugin
+    rec = geometry.apply(_rec(case)); plugin.STATE.launches[(case.env, case.label, case.run)] = rec
     return rec
 
 @pytest.fixture(scope="module")
@@ -38,8 +37,8 @@ class Fresh:
     def __init__(self, case): self.case = case
     def toggle(self):
         open(LOG, "a").write("fresh %%s %%s\\n" %% (self.case.label, self.case.run))
-        from oolite_ui_test_framework import checks, plugin
-        rec = checks.apply(_rec(self.case, t_ok=1, t_method="key", t_frame=1, t_focus=1, t_dx=0, t_dy=0, t_centred=1))
+        from oolite_ui_test_framework import geometry, plugin
+        rec = geometry.apply(_rec(self.case, t_ok=1, t_method="key", t_frame=1, t_focus=1, t_dx=0, t_dy=0, t_centred=1))
         plugin.STATE.toggles[(self.case.env, self.case.label, self.case.run)] = rec
         return rec
 
@@ -108,28 +107,28 @@ def test_markers_and_k_select(project, sel, name, count):
 
 
 def test_report_from_the_raw_file(project):
-    from oolite_ui_test_framework import verdict
+    from oolite_ui_test_framework import report
     pt, args, tmp = project
     pt.runpytest("--ui-toggle", *args)
     md = tmp / "r.md"
-    verdict.main([str(tmp / "out.raw"), str(md), "--control", "base", "--candidates", "new", "--minruns", "2", "--registry", os.path.join(ROOT, "environments.toml")])
+    report.main([str(tmp / "out.raw"), str(md), "--control", "base", "--candidates", "new", "--minruns", "2", "--registry", os.path.join(ROOT, "environments.toml")])
     text = md.read_text()
     assert "has_frame" in text and "gets_focus" in text and "game_window_centred" in text and "f12_toggle" in text   # columns are the test names
 
 
 def test_case_ids():
-    assert outcomes.case_id("marco", "opt1", 3, "X11") == "marco-x11-opt1-run3"
-    assert outcomes.case_id("kwin-xwayland", "base", 1, "XWayland") == "kwin-xwayland-base-run1"
-    assert outcomes.case_id("mutter-native", "base", 1, "Wayland native") == "mutter-native-base-run1"
+    assert pass_fail.case_id("marco", "opt1", 3, "X11") == "marco-x11-opt1-run3"
+    assert pass_fail.case_id("kwin-xwayland", "base", 1, "XWayland") == "kwin-xwayland-base-run1"
+    assert pass_fail.case_id("mutter-native", "base", 1, "Wayland native") == "mutter-native-base-run1"
 
 
 def test_outcome_checks_map_to_skip_fail_pass():
     ok = {"frame": "1", "exited": "0"}
-    assert outcomes.check_frame(ok)[0] == "passed" and outcomes.check_frame({"frame": "0", "exited": "0"})[0] == "failed"
-    assert outcomes.check_frame({"frame": "NA", "exited": "0"}) == ("skipped", "NOT MEASURABLE: the window frame cannot be observed in this environment")
-    assert outcomes.check_frame({"frame": "0", "exited": "1"})[0] == "failed"
-    assert outcomes.check_f12_toggle({"t_ok": "0"})[0] == "failed" and outcomes.check_f12_toggle({})[0] == "skipped"
-    assert outcomes.check_f12_toggle({"t_ok": "1", "t_frame": "1", "t_focus": "0", "t_centred": "1"})[1].endswith("focus")
+    assert pass_fail.check_frame(ok)[0] == "passed" and pass_fail.check_frame({"frame": "0", "exited": "0"})[0] == "failed"
+    assert pass_fail.check_frame({"frame": "NA", "exited": "0"}) == ("skipped", "NOT MEASURABLE: the window frame cannot be observed in this environment")
+    assert pass_fail.check_frame({"frame": "0", "exited": "1"})[0] == "failed"
+    assert pass_fail.check_f12_toggle({"t_ok": "0"})[0] == "failed" and pass_fail.check_f12_toggle({})[0] == "skipped"
+    assert pass_fail.check_f12_toggle({"t_ok": "1", "t_frame": "1", "t_focus": "0", "t_centred": "1"})[1].endswith("focus")
 
 
 def test_a_black_first_screenshot_is_looked_at_again(monkeypatch, tmp_path):
