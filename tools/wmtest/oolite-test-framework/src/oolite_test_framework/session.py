@@ -170,6 +170,11 @@ class Session:
         if self.env.keys == "fakeinput": return fakeinput.tap(key)
         (self.backend or probes.XToolsBackend(dict(os.environ))).send_key(key, window)
 
+    def hold_time(self, seconds):
+        """How long to hold a key. XTEST keys must last a frame of the slow software-GL game; KWin fake-input keys are events that are never
+        missed, and holding one past ~0.6 s starts the key repeat (F12 then toggles about 10 times), so they are only tapped."""
+        return min(seconds, 0.3) if self.env.keys == "fakeinput" else seconds
+
     def key_down(self, key):
         if self.env.keys == "fakeinput": return fakeinput.key_down(key)
         (self.backend or probes.XToolsBackend(dict(os.environ))).key_down(key)

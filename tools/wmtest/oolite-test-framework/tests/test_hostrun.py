@@ -95,6 +95,16 @@ def test_single_build_passes_without_a_candidate(tmp_path, monkeypatch, capsys):
     assert "FINAL: 0 of 3 measured run(s) failed" in out and "(control)" not in out
 
 
+def test_single_build_with_a_failing_test_that_is_not_a_criterion_exits_1(tmp_path, monkeypatch, capsys):
+    def cells(self, n, s):
+        for l in lines("only", 3): self.add(l)
+        self.add("TEST wm=marco build=only run=1 test=test_f12_toggle outcome=failed reason=F12 did not change the window size")
+    monkeypatch.setattr(hostrun, "docker_state", lambda: (True, ""))
+    monkeypatch.setattr(hostrun.Runner, "docker_cells", cells)
+    assert hostrun.main(["only:%s" % app(tmp_path), "--env", "marco", "--out", str(tmp_path / "res"), "--minruns", "3"]) == 1
+    assert "FAILED TESTS: test_f12_toggle (marco)" in capsys.readouterr().out
+
+
 def test_single_build_failures_exit_1(tmp_path, monkeypatch):
     assert run_single(tmp_path, monkeypatch, 2) == 1
 

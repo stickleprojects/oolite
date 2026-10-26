@@ -25,6 +25,7 @@ class FakeSession:
         if self.toggle: self.script.append((self.clock.t, self.toggle.pop(0)))
     def key_down(self, key): self.send_key(key)
     def key_up(self, key): pass
+    def hold_time(self, seconds): return seconds
     toggle = None
 
 
@@ -83,10 +84,9 @@ def test_timing_constants_match_trial_sh():
     assert (o.wait, o.sample, o.post_delay, o.tol) == (14.0, 0.5, 2.0, 40)
 
 
-def test_f12_is_released_as_soon_as_the_window_resizes():
-    """A held key autorepeats and the game toggles on each repeat, so the key must not be held for a fixed time."""
-    clk = FakeClock(); win = probes.Obs(framed=1, focused=1, outer=(1280, 180, 1280, 720))
-    s = FakeSession(clk, [(0, win)]); s.toggle = [probes.Obs(framed=0, focused=1, outer=(0, 0, 3840, 1080)), win]
-    held = []; s.key_up = lambda key: held.append(clk.t)
-    start = clk.t; scenarios.run_toggle(s, game(), scenarios.Opts(toggle=True), clk)
-    assert held[0] - start <= 0.5          # not the old fixed 1 s hold
+def test_fake_input_keys_are_tapped_not_held():
+    """A held fake-input key autorepeats (F12 toggled ~10 times in a 1 s hold), so the hold is capped; XTEST keys keep the full hold."""
+    from oolite_test_framework.session import Session
+    for keys, want in (("xtest", 1.0), ("fakeinput", 0.3)):
+        s = Session.__new__(Session); s.env = registry.Environment(name="f", family="f", session="X11", image="arch", kind="x11", start=["x"], keys=keys)
+        assert s.hold_time(1.0) == want

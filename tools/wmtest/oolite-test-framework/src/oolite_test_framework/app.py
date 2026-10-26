@@ -79,6 +79,6 @@ class App:
         shorter than a frame is missed, and holding for too long starts the key repeat (about 1 s is one menu step in the Docker images)."""
         self.session.key_down(key)
         try:
-            self.clock.sleep(seconds)
+            self.clock.sleep(self.session.hold_time(seconds))
         finally:
             self.session.key_up(key)

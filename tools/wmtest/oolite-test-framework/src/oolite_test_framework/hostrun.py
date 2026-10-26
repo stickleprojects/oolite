@@ -6,6 +6,7 @@ import json
 import datetime
 import os
 import shutil
+import re
 import subprocess
 import sys
 import time
@@ -254,6 +255,17 @@ def build_parser():
     return p
 
 
+def failed_tests(raw):
+    """['test (env)'] for every TEST line of the raw file that failed. The verdict counts only the RESULT criteria, so a single-build run needs this."""
+    out = []
+    try: lines = open(raw).read().splitlines()
+    except OSError: return out
+    for ln in lines:
+        m = re.match(r"TEST wm=(\S+) .*? test=(\S+) outcome=failed", ln)
+        if m: out.append("%s (%s)" % (m[2], m[1]))
+    return out
+
+
 def main(argv=None):
     a = build_parser().parse_args(argv)
     if a.quick:
@@ -292,6 +304,11 @@ def main(argv=None):
         print("wmtest: error: nothing was measured (see %s)" % r.md, file=sys.stderr); rc = EXIT_ERROR
     elif L["regressed"] or (a.strict and (L["suspect"] or L["still_broken"])): rc = EXIT_FAIL
     else: rc = EXIT_PASS
+    if rc == EXIT_PASS and len(a.builds) == 1:
+        failed = failed_tests(r.raw)
+        if failed:
+            rc = EXIT_FAIL
+            if not a.quiet: print("FAILED TESTS: " + "; ".join(failed))
     if a.quiet and rc != EXIT_ERROR: print("PASS" if rc == EXIT_PASS else "FAIL")
     elif not a.quiet: print({EXIT_PASS: "PASS", EXIT_FAIL: "FAIL", EXIT_ERROR: "ERROR (could not run)"}[rc] + "  report: " + r.md)
     return rc
