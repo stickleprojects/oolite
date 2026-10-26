@@ -80,3 +80,51 @@ def test_select_fails_if_the_highlight_does_not_follow():
 def test_texts_need_ocr_and_use_it_when_present():
     m = menu(draw(2, 1)); assert m.texts() is None
     m.app.ocr = lambda crop: "row"; assert m.texts() == ["row", "row"]
+
+
+class RepeatingApp(FakeApp):
+    """A game that keeps working through a held key after it is released: the screen changes by one scripted frame per clock tick."""
+    def __init__(self, shot, frames_after_key):
+        super().__init__(shot); self.script = list(frames_after_key); self.pending = []
+        outer = self
+        class Clock:
+            @staticmethod
+            def sleep(s):
+                if outer.pending: outer.shot = outer.pending.pop(0)
+        self.clock = Clock
+    def hold_key(self, key, seconds):
+        self.keys.append(key); self.pending = list(self.script)
+
+
+def repeating_menu(first, frames):
+    app = RepeatingApp(draw(6, first), frames)
+    return components.MenuList(app, x=(0.1, 0.6), y=(0.2, 0.9), is_highlight=lambda r, g, b: g > 200 and r < 40 and b < 40, is_text=lambda r, g, b: max(r, g, b) > 120)
+
+
+def test_settled_index_waits_for_a_highlight_that_is_still_moving():
+    m = repeating_menu(1, [draw(6, 2), draw(6, 3), draw(6, 4)] + [draw(6, 5)] * 2)
+    m.app.hold_key("Down", 1.0)
+    assert m.settled_index() == 5          # not 1 (before the repeats landed) and not 2 or 3 (on the way)
+
+
+def test_a_redraw_with_no_highlight_does_not_count_as_settled():
+    m = repeating_menu(1, [draw(6, 0)] * 3 + [draw(6, 4)])
+    m.app.hold_key("Down", 1.0)
+    assert m.settled_index() == 4
+
+
+def test_select_index_corrects_an_overshoot():
+    m = repeating_menu(1, [draw(6, 2), draw(6, 3), draw(6, 4)])      # one hold of Down moves three rows: past row 3 to 4
+    m.app.script = [draw(6, 2), draw(6, 3), draw(6, 4)]
+    results = iter([[draw(6, 2), draw(6, 3), draw(6, 4)], [draw(6, 3)]])      # then one Up hold goes back one row
+    app = m.app; orig = app.hold_key
+    def hold_key(key, seconds): app.script = next(results); orig(key, seconds)
+    app.hold_key = hold_key
+    m.select_index(3)
+    assert m.selected_index == 3 and app.keys == ["Down", "Up"]
+
+
+def test_a_highlight_that_never_settles_is_not_selected():
+    m = repeating_menu(1, [draw(6, 2), draw(6, 3)] * 40)
+    m.app.hold_key("Down", 1.0)
+    assert m.settled_index(limit=3.0) is None

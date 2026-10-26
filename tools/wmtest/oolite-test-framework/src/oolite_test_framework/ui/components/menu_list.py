@@ -71,15 +71,26 @@ class MenuList:
         for _ in range(times): self._step("Up")
         return self
 
+    def settled_index(self, quiet=1.5, step=0.25, limit=15.0):
+        """Highlighted row once it has stayed on the same row for `quiet` seconds. A held key keeps repeating after it is released (the game works
+        through it one frame at a time), so the highlight is still moving for a while; a read taken then is not the answer. None if it never settles."""
+        need, seen, last, waited = round(quiet / step), 0, object(), 0.0
+        while waited < limit:
+            cur = self.selected_index
+            seen = seen + 1 if cur is not None and cur == last else 0
+            if seen >= need: return cur
+            last = cur; self.app.clock.sleep(step); waited += step
+        return None
+
     def _step(self, key, holds=(1.0, 1.5)):
-        """Move the highlight off its row. The key is held (see App.hold_key) and, if the highlight has not moved, held again a bit longer. While
-        a key is held the game repeats it once per frame, so how many rows it moves depends on how fast the game draws: select_index() corrects that."""
+        """Move the highlight off its row: hold the key (see App.hold_key), wait for the highlight to settle, and hold longer if it did not move.
+        How many rows a hold moves depends on how fast the game draws, so select_index() looks at where it ended up."""
         from ...app import ScenarioFailed       # imported here: app.py imports the pages, which import this module
-        before = self.selected_index
+        before = self.settled_index()
         for seconds in holds:
             self.app.hold_key(key, seconds)
-            self.app.clock.sleep(1.0)               # let the frame draw
-            if self.selected_index != before: return
+            after = self.settled_index()
+            if after is not None and after != before: return
         raise ScenarioFailed("the highlight did not leave row %s after %s was held for %.1f s" % (before, key, sum(holds)))
 
     def wait_until_selected_index(self, index, timeout=5):
@@ -90,7 +101,7 @@ class MenuList:
     def select_index(self, index, timeout=5, max_steps=12):
         """Press Up/Down until row `index` is highlighted, looking at the screen after every press (a press can move more than one row)."""
         for _ in range(max_steps):
-            cur = self.selected_index
+            cur = self.settled_index()
             if cur is None: raise AssertionError("the list is not visible, cannot select row %d" % index)
             if cur == index: break
             (self.move_down if index > cur else self.move_up)()
