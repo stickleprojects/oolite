@@ -84,18 +84,25 @@ def run_startup(session, game, opts=Opts(), clock=Clock):
     return rec
 
 
+def _hold(session, key, clock, seconds=1.0):
+    """Press `key` and hold it for about one frame of the slow software-GL game (a tap shorter than a frame is never seen by it)."""
+    session.key_down(key); clock.sleep(seconds); session.key_up(key)
+
+
 def run_toggle(session, game, opts=Opts(), clock=Clock):
     """F12 = toggleScreenMode: windowed -> fullscreen -> windowed, then measure again. Returns t_* fields (geometry in t_outer)."""
     ok = 0; method = "key"; t = {}
     win = session.window_id()
     if win is not None:
         s0 = _size(session.observe(cheap_only=True))
-        session.send_key("F12"); clock.sleep(3); s1 = _size(session.observe(cheap_only=True))
+        _hold(session, "F12", clock); clock.sleep(3); s1 = _size(session.observe(cheap_only=True))
         if s1 == s0:
             session.send_key("F12", win); method = "sendevent"; clock.sleep(3); s1 = _size(session.observe(cheap_only=True))
         if s1 != s0:
             ok = 1
-            session.send_key("F12", win if method == "sendevent" else None); clock.sleep(4)
+            if method == "sendevent": session.send_key("F12", win)
+            else: _hold(session, "F12", clock)
+            clock.sleep(4)
     t["t_ok"] = ok; t["t_method"] = method
     o = session.observe(cheap_only=True) if ok else None
     if ok and o is not None:

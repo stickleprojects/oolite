@@ -23,6 +23,8 @@ class FakeSession:
     def send_key(self, key, window=None):
         self.keys.append((key, window))
         if self.toggle: self.script.append((self.clock.t, self.toggle.pop(0)))
+    def key_down(self, key): self.send_key(key)
+    def key_up(self, key): pass
     toggle = None
 
 
