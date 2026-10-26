@@ -1,0 +1,120 @@
+RESULT wm=weston-xwayland build=stock screen=3840x1080 run=1 frame=1 focus=NA dx=230 dy=-40 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-xwayland build=stock screen=3840x1080 run=2 frame=1 focus=NA dx=230 dy=-40 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-xwayland build=stock screen=3840x1080 run=3 frame=1 focus=NA dx=230 dy=-40 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=weston-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=0 centred=0
+CELL wm=weston-xwayland build=stock
+RESULT wm=weston-xwayland build=base screen=3840x1080 run=1 frame=1 focus=NA dx=230 dy=-40 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-xwayland build=base screen=3840x1080 run=2 frame=1 focus=NA dx=230 dy=-40 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-xwayland build=base screen=3840x1080 run=3 frame=1 focus=NA dx=230 dy=-40 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=weston-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=0 centred=0
+CELL wm=weston-xwayland build=base
+RESULT wm=weston-xwayland build=opt1 screen=3840x1080 run=1 frame=1 focus=NA dx=262 dy=-8 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-xwayland build=opt1 screen=3840x1080 run=2 frame=1 focus=NA dx=262 dy=-8 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-xwayland build=opt1 screen=3840x1080 run=3 frame=1 focus=NA dx=262 dy=-8 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=weston-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=0 centred=0
+CELL wm=weston-xwayland build=opt1
+RESULT wm=weston-native build=stock screen=3840x1080 run=1 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-native build=stock screen=3840x1080 run=2 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-native build=stock screen=3840x1080 run=3 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=weston-native runs=3 frame_yes=0 frame_no=0 exited=0 focused=0 centred=0
+CELL wm=weston-native build=stock
+RESULT wm=weston-native build=base screen=3840x1080 run=1 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-native build=base screen=3840x1080 run=2 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-native build=base screen=3840x1080 run=3 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=weston-native runs=3 frame_yes=0 frame_no=0 exited=0 focused=0 centred=0
+CELL wm=weston-native build=base
+RESULT wm=weston-native build=opt1 screen=3840x1080 run=1 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-native build=opt1 screen=3840x1080 run=2 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=weston-native build=opt1 screen=3840x1080 run=3 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=weston-native runs=3 frame_yes=0 frame_no=0 exited=0 focused=0 centred=0
+CELL wm=weston-native build=opt1
+RESULT wm=sway-xwayland build=stock screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=10 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-xwayland build=stock screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=10 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-xwayland build=stock screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=10 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=sway-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=sway-xwayland build=stock
+RESULT wm=sway-xwayland build=base screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=10 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-xwayland build=base screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=10 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-xwayland build=base screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=10 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=sway-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=sway-xwayland build=base
+RESULT wm=sway-xwayland build=opt1 screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-xwayland build=opt1 screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-xwayland build=opt1 screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=sway-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=sway-xwayland build=opt1
+RESULT wm=sway-native build=stock screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=11 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-native build=stock screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=11 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-native build=stock screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=11 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=sway-native runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=sway-native build=stock
+RESULT wm=sway-native build=base screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=11 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-native build=base screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=11 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-native build=base screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=11 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=sway-native runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=sway-native build=base
+RESULT wm=sway-native build=opt1 screen=3840x1080 run=1 frame=1 focus=1 dx=258 dy=-1 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-native build=opt1 screen=3840x1080 run=2 frame=1 focus=1 dx=258 dy=-1 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=sway-native build=opt1 screen=3840x1080 run=3 frame=1 focus=1 dx=258 dy=-1 centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=sway-native runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=0
+CELL wm=sway-native build=opt1
+RESULT wm=kwin-xwayland build=stock screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=36 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-xwayland build=stock screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=36 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-xwayland build=stock screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=36 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=kwin-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=kwin-xwayland build=stock
+RESULT wm=kwin-xwayland build=base screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=36 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-xwayland build=base screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=36 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-xwayland build=base screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=36 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=kwin-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=kwin-xwayland build=base
+RESULT wm=kwin-xwayland build=opt1 screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=36 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-xwayland build=opt1 screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=36 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-xwayland build=opt1 screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=36 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=kwin-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=kwin-xwayland build=opt1
+RESULT wm=kwin-native build=stock screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-native build=stock screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-native build=stock screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=kwin-native runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=kwin-native build=stock
+RESULT wm=kwin-native build=base screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-native build=base screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-native build=base screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=kwin-native runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=kwin-native build=base
+RESULT wm=kwin-native build=opt1 screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-native build=opt1 screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=kwin-native build=opt1 screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=kwin-native runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=kwin-native build=opt1
+RESULT wm=mutter-xwayland build=stock screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=22 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-xwayland build=stock screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=22 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-xwayland build=stock screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=22 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=mutter-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=mutter-xwayland build=stock
+RESULT wm=mutter-xwayland build=base screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=22 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-xwayland build=base screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=22 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-xwayland build=base screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=22 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=mutter-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=3 centred=3
+CELL wm=mutter-xwayland build=base
+RESULT wm=mutter-xwayland build=opt1 screen=3840x1080 run=1 frame=1 focus=0 dx=0 dy=22 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-xwayland build=opt1 screen=3840x1080 run=2 frame=1 focus=0 dx=0 dy=22 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-xwayland build=opt1 screen=3840x1080 run=3 frame=1 focus=0 dx=0 dy=22 centred=1 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=mutter-xwayland runs=3 frame_yes=3 frame_no=0 exited=0 focused=0 centred=3
+CELL wm=mutter-xwayland build=opt1
+RESULT wm=mutter-native build=stock screen=3840x1080 run=1 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-native build=stock screen=3840x1080 run=2 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-native build=stock screen=3840x1080 run=3 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=mutter-native runs=3 frame_yes=0 frame_no=0 exited=0 focused=0 centred=0
+CELL wm=mutter-native build=stock
+RESULT wm=mutter-native build=base screen=3840x1080 run=1 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-native build=base screen=3840x1080 run=2 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-native build=base screen=3840x1080 run=3 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=mutter-native runs=3 frame_yes=0 frame_no=0 exited=0 focused=0 centred=0
+CELL wm=mutter-native build=base
+RESULT wm=mutter-native build=opt1 screen=3840x1080 run=1 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-native build=opt1 screen=3840x1080 run=2 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+RESULT wm=mutter-native build=opt1 screen=3840x1080 run=3 frame=NA focus=NA dx=NA dy=NA centred=0 exited=0 splash_dx=NA splash_dy=NA post_dx=NA post_dy=NA tol=40
+SUMMARY wm=mutter-native runs=3 frame_yes=0 frame_no=0 exited=0 focused=0 centred=0
+CELL wm=mutter-native build=opt1

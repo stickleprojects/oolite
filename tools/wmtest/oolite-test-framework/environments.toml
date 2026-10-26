@@ -1,0 +1,193 @@
+# Registry of test environments. ADDING A WINDOW MANAGER OR COMPOSITOR = ONE [env.<name>] TABLE HERE (plus its package in the image).
+# <name> is the `wm=` field in raw RESULT lines; keep the existing names so old raw files stay comparable.
+#
+# kind      x11      an X server (Xvfb, or Xorg+dummy for --screen 2head) is started, then `start` commands (the window manager)
+#           wayland  a headless compositor from `start`; session XWayland = the game uses its XWayland, Wayland native = SDL wayland
+#           host     the live desktop: nothing is started (see README, host mode)
+# session   X11 | XWayland | Wayland native | live desktop (what the report's "session" column shows)
+# start     shell commands, started in order, kept running ({w} {h} are replaced by the screen size)
+# probes    how the game window is observed; first probe giving a field wins. "name:fields" restricts a probe to some fields
+#           (e.g. "kwin:framed,focused" = take frame and focus from KWin, geometry from the next probe). Probes: x11 kwin sway ask none
+# optional  version_cmd/version_re (shown in the report), settle (s before readiness polling, default 4), settle_after (default 3),
+#           ready_timeout (default 20), ready_socket (wayland socket to wait for, default wl0), files {path = text}, env {VAR = value},
+#           post_start (commands run once the socket is up), focus_na (true if no keyboard focus can exist, e.g. headless weston)
+
+[images.arch]
+dockerfile = "docker/Dockerfile.arch"
+tag = "wmtest-py-arch"
+[images.debian]
+dockerfile = "docker/Dockerfile.debian"
+tag = "wmtest-py-debian"
+[images.wayland]
+dockerfile = "docker/Dockerfile.wayland"
+tag = "wmtest-py-wayland"
+
+# ---------------------------------------------------------------- X11 window managers
+[env.marco]
+family = "marco"
+session = "X11"
+image = "arch"
+kind = "x11"
+start = ["marco --sm-disable"]
+version_cmd = "marco --version"
+version_re = "[0-9][0-9.]+"
+probes = ["x11"]
+
+[env.xfwm4]
+family = "xfwm4"
+session = "X11"
+image = "arch"
+kind = "x11"
+start = ["xfwm4 --compositor=off --sm-client-disable"]
+version_cmd = "xfwm4 --version"
+version_re = "[0-9][0-9.]+"
+probes = ["x11"]
+
+[env.openbox]
+family = "openbox"
+session = "X11"
+image = "arch"
+kind = "x11"
+start = ["openbox"]
+version_cmd = "openbox --version"
+version_re = "[0-9][0-9.]+"
+probes = ["x11"]
+
+[env.muffin]
+family = "muffin"
+session = "X11"
+image = "arch"
+kind = "x11"
+start = ["muffin --sm-disable"]
+version_cmd = "muffin --version"
+version_re = "[0-9][0-9.]+"
+probes = ["x11"]
+
+[env.kwin]
+family = "kwin"
+session = "X11"
+image = "debian"
+kind = "x11"
+start = ["KWIN_COMPOSE=N kwin_x11 --replace"]
+version_cmd = "kwin_x11 --version"
+version_re = "[0-9][0-9.]+"
+probes = ["x11"]
+
+[env.mutter]
+family = "mutter"
+session = "X11"
+image = "debian"
+kind = "x11"
+start = ["mutter --x11 --replace --sm-disable"]
+version_cmd = "mutter --version"
+version_re = "[0-9][0-9.]+"
+probes = ["x11"]
+
+# ---------------------------------------------------------------- Wayland compositors (headless), XWayland and native
+[env.kwin-xwayland]
+family = "kwin"
+session = "XWayland"
+image = "wayland"
+kind = "wayland"
+start = ["kwin_wayland --virtual --width {w} --height {h} --socket wl0 --xwayland --no-lockscreen"]
+version_cmd = "kwin_wayland --version"
+version_re = "[0-9][0-9.]+"
+probes = ["kwin:framed,focused", "x11"]
+[env.kwin-native]
+family = "kwin"
+session = "Wayland native"
+image = "wayland"
+kind = "wayland"
+start = ["kwin_wayland --virtual --width {w} --height {h} --socket wl0 --no-lockscreen"]
+version_cmd = "kwin_wayland --version"
+version_re = "[0-9][0-9.]+"
+probes = ["kwin"]
+
+[env.sway-xwayland]
+family = "sway"
+session = "XWayland"
+image = "wayland"
+kind = "wayland"
+start = ["sway -c /tmp/sway.conf"]
+ready_socket = "wayland-1"
+post_start = ["ln -sf $XDG_RUNTIME_DIR/wayland-1 $XDG_RUNTIME_DIR/wl0"]
+files = { "/tmp/sway.conf" = "output * resolution {w}x{h}\nxwayland enable\n" }
+env = { WLR_BACKENDS = "headless", WLR_RENDERER = "pixman", WLR_LIBINPUT_NO_DEVICES = "1" }
+version_cmd = "sway --version"
+version_re = "[0-9][0-9.]+"
+probes = ["sway:framed,focused", "x11"]
+[env.sway-native]
+family = "sway"
+session = "Wayland native"
+image = "wayland"
+kind = "wayland"
+start = ["sway -c /tmp/sway.conf"]
+ready_socket = "wayland-1"
+post_start = ["ln -sf $XDG_RUNTIME_DIR/wayland-1 $XDG_RUNTIME_DIR/wl0"]
+files = { "/tmp/sway.conf" = "output * resolution {w}x{h}\nxwayland enable\n" }
+env = { WLR_BACKENDS = "headless", WLR_RENDERER = "pixman", WLR_LIBINPUT_NO_DEVICES = "1" }
+version_cmd = "sway --version"
+version_re = "[0-9][0-9.]+"
+probes = ["sway"]
+
+[env.mutter-xwayland]
+family = "mutter"
+session = "XWayland"
+image = "wayland"
+kind = "wayland"
+start = ["mutter --headless --wayland --virtual-monitor {w}x{h} --wayland-display wl0"]
+version_cmd = "mutter --version"
+version_re = "[0-9][0-9.]+"
+probes = ["x11"]
+[env.mutter-native]
+family = "mutter"
+session = "Wayland native"
+image = "wayland"
+kind = "wayland"
+start = ["mutter --headless --wayland --virtual-monitor {w}x{h} --wayland-display wl0"]
+version_cmd = "mutter --version"
+version_re = "[0-9][0-9.]+"
+probes = ["none"]
+
+[env.weston-xwayland]
+family = "weston"
+session = "XWayland"
+image = "wayland"
+kind = "wayland"
+start = ["weston --backend=headless --width={w} --height={h} --socket=wl0 --xwayland"]
+version_cmd = "weston --version"
+version_re = "[0-9][0-9.]+"
+probes = ["x11"]
+focus_na = true
+[env.weston-native]
+family = "weston"
+session = "Wayland native"
+image = "wayland"
+kind = "wayland"
+start = ["weston --backend=headless --width={w} --height={h} --socket=wl0"]
+version_cmd = "weston --version"
+version_re = "[0-9][0-9.]+"
+probes = ["none"]
+
+# ---------------------------------------------------------------- the live desktop (host mode; see README)
+[env.host-x11]
+family = "host"
+session = "X11"
+image = "arch"
+kind = "host"
+where = "host"
+probes = ["x11"]
+[env.host-xwayland]
+family = "host"
+session = "XWayland"
+image = "arch"
+kind = "host"
+where = "host"
+probes = ["kwin:framed,focused", "x11"]
+[env.host-native]
+family = "host"
+session = "Wayland native"
+image = "arch"
+kind = "host"
+where = "host"
+probes = ["kwin", "sway", "ask"]

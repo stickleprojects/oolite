@@ -1,0 +1,36 @@
+RESULT wm=kwin build=stock screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=stock screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=stock screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=stock screen=3840x1080 run=4 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=stock screen=3840x1080 run=5 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+CELL wm=kwin screen=3840x1080 build=stock
+RESULT wm=kwin build=base screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=base screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=base screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=base screen=3840x1080 run=4 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=base screen=3840x1080 run=5 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+CELL wm=kwin screen=3840x1080 build=base
+RESULT wm=kwin build=opt1 screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=opt1 screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=opt1 screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=opt1 screen=3840x1080 run=4 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=kwin build=opt1 screen=3840x1080 run=5 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=0 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+CELL wm=kwin screen=3840x1080 build=opt1
+RESULT wm=mutter build=stock screen=3840x1080 run=1 frame=1 focus=0 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=sendevent t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=stock screen=3840x1080 run=2 frame=1 focus=0 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=sendevent t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=stock screen=3840x1080 run=3 frame=1 focus=0 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=sendevent t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=stock screen=3840x1080 run=4 frame=1 focus=0 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=sendevent t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=stock screen=3840x1080 run=5 frame=1 focus=0 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=sendevent t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+CELL wm=mutter screen=3840x1080 build=stock
+RESULT wm=mutter build=base screen=3840x1080 run=1 frame=1 focus=0 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=sendevent t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=base screen=3840x1080 run=2 frame=1 focus=0 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=sendevent t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=base screen=3840x1080 run=3 frame=1 focus=0 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=sendevent t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=base screen=3840x1080 run=4 frame=1 focus=0 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=sendevent t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=base screen=3840x1080 run=5 frame=1 focus=0 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=sendevent t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+CELL wm=mutter screen=3840x1080 build=base
+RESULT wm=mutter build=opt1 screen=3840x1080 run=1 frame=1 focus=1 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=opt1 screen=3840x1080 run=2 frame=1 focus=1 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=opt1 screen=3840x1080 run=3 frame=1 focus=1 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+RESULT wm=mutter build=opt1 screen=3840x1080 run=4 frame=1 focus=1 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=0 t_centred=1
+RESULT wm=mutter build=opt1 screen=3840x1080 run=5 frame=1 focus=1 dx=0 dy=19 centred=1 exited=0 splash_dx=0 splash_dy=0 post_dx=0 post_dy=19 tol=40 t_ok=1 t_method=key t_frame=1 t_focus=1 t_dx=0 t_dy=19 t_centred=1
+CELL wm=mutter screen=3840x1080 build=opt1

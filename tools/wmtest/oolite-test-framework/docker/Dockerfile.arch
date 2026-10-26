@@ -1,0 +1,4 @@
+FROM archlinux:base-20251019.0.436919
+RUN (pacman -Sy --noconfirm archlinux-keyring && pacman-key --init && pacman-key --populate archlinux && pacman -Su --noconfirm --needed xorg-server-xvfb xorg-server-xephyr xorg-xwininfo xorg-xprop xdotool xorg-xev xorg-xrandr xorg-server xf86-video-dummy libxcvt xorg-xauth weston mesa libglvnd procps-ng dbus python python-pytest python-xlib tesseract tesseract-data-eng python-pillow ttf-dejavu) >/tmp/pacman.log 2>&1 || (tail -25 /tmp/pacman.log; false)
+RUN for p in marco xfwm4 openbox muffin; do pacman -S --noconfirm --needed $p >/dev/null 2>&1 && echo "OK $p" || echo "MISSING $p"; done | tee /wm-packages.txt
+ENV LIBGL_ALWAYS_SOFTWARE=1 PYTHONPATH=/wmtest PYTHONDONTWRITEBYTECODE=1

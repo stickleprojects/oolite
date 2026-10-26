@@ -1,0 +1,48 @@
+"""OCR with the REAL tesseract on a real title-screen screenshot. Skipped where tesseract is not installed, so the normal unit run is unaffected.
+Run it inside any image with: ./docker/run-ocr-tests.sh [image]   (default wmtest-py-debian)"""
+import os
+
+import pytest
+
+from oolite_test_framework import ocr, render, screen
+from oolite_test_framework.ui import pages
+from oolite_test_framework.ui.components import MenuList
+
+DATA = os.path.join(os.path.dirname(__file__), "fixtures", "title-menu-1280x720.png")
+read = ocr.make_ocr()
+pytestmark = pytest.mark.skipif(read is None, reason="tesseract is not installed in this environment")
+
+
+class Still:
+    """just enough of App to let the title page read a saved screenshot"""
+    def __init__(self, shot, ocr): self.shot, self.ocr = shot, ocr
+    def screenshot(self, label=None): return self.shot
+
+
+def shot(): return screen.Shot(*render.read_png(DATA))
+
+
+def title_page():
+    return pages.TitleMenuPage(Still(shot(), read))
+
+
+def test_every_menu_row_is_read_correctly():
+    p = title_page(); texts = p.menu.texts()
+    assert len(texts) == 6
+    bad = [(t, e) for t, e in zip(texts, p.EXPECTED_ITEMS) if not ocr.same_text(t, e)]
+    assert not bad, "misread rows (read, expected): %s" % bad
+
+
+def test_selected_row_black_on_red_is_read_too():
+    p = title_page(); first = p.menu.rows[0]
+    assert ocr.same_text(read(shot().crop_box(first["box"])), "Start New Commander")
+
+
+def test_title_page_accepts_the_real_screen():
+    assert title_page().shows_expected_items() == (True, "")
+
+
+def test_a_wrong_screen_is_rejected_by_the_text():
+    p = title_page(); p.app.ocr = lambda crop: "Credits"
+    ok, why = p.shows_expected_items()
+    assert not ok and "menu text read as" in why

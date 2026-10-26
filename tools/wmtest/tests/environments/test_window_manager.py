@@ -1,0 +1,37 @@
+"""Window-manager behaviour (issue 773): does the game window get a title bar, keyboard focus and a centred position in this environment
+(X11 window managers, Wayland compositors, one or two monitors)? One launch is shared by the read-only checks; F12 gets its own launch.
+Each test is one line: pick a check from oolite_test_framework.outcomes and enforce() it."""
+import pytest
+
+from oolite_test_framework import outcomes
+from oolite_test_framework.pytest_helpers import enforce
+
+pytestmark = pytest.mark.game
+
+
+@pytest.mark.once_per_build
+def test_environment_started(env_session):
+    """The display server and the WM / compositor came up (a failure to start is already a hard error in env_session)."""
+    assert env_session.primary is not None or env_session.env.kind == "host", "no primary monitor reported"
+
+
+def test_has_frame(launched_game):
+    enforce(outcomes.check_frame(launched_game))
+
+
+def test_gets_focus(launched_game):
+    enforce(outcomes.check_focus(launched_game))
+
+
+def test_splash_centred(launched_game):
+    enforce(outcomes.check_splash_centred(launched_game))
+
+
+def test_game_window_centred(launched_game):
+    enforce(outcomes.check_window_centred(launched_game))
+
+
+@pytest.mark.needs_toggle
+@pytest.mark.needs_x11
+def test_f12_toggle(fresh_game):
+    enforce(outcomes.check_f12_toggle(fresh_game.toggle()))
