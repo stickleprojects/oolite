@@ -1,0 +1,143 @@
+# UI tests (tests/ui, tools/oolite-ui-test-framework). Separate from the main build pipeline on purpose: it never blocks a build.
+# - framework-tests: the framework's offline tests, when the framework or the UI tests change.
+# - ui-tests: the game's UI tests, headless in Docker, against the Linux AppImage built by "Build Oolite package for various
+#   platforms": automatically after a successful build of master, or by hand (Actions > UI tests > Run workflow) for any build.
+#   Headed KWin and host mode need a desktop and a GPU, so they cannot run here.
+name: UI tests
+on:
+  push:
+    paths:
+      - 'tools/oolite-ui-test-framework/**'
+      - 'tests/ui/**'
+      - '.github/workflows/ui-tests.yaml'
+  pull_request:
+    paths:
+      - 'tools/oolite-ui-test-framework/**'
+      - 'tests/ui/**'
+      - '.github/workflows/ui-tests.yaml'
+  workflow_run:
+    workflows: ["Build Oolite package for various platforms"]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: 'Run ID of a "Build Oolite package" run to test (empty = latest successful run on this branch)'
+        required: false
+        default: ''
+      flavour:
+        description: 'AppImage flavour'
+        required: false
+        default: 'deployment'
+        type: choice
+        options: [deployment, test, dev]
+      runs:
+        description: 'Runs per environment (1 = smoke; 10 = enough for the statistics)'
+        required: false
+        default: '1'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  framework-tests:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Framework tests (offline, no Docker)
+        working-directory: tools/oolite-ui-test-framework
+        run: |
+          pip install pytest pillow
+          python3 -m pytest tests -q
+
+  ui-tests:
+    # after a successful build of master, or by hand
+    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:     # one job per Docker image, so each job builds (or restores from cache) only its own image
+          - image: arch
+            envs: marco,openbox,xfwm4,muffin
+          - image: debian
+            envs: kwin,mutter
+          - image: wayland
+            envs: kwin-xwayland,sway-xwayland,mutter-xwayland,weston-xwayland
+    env:
+      FLAVOUR: ${{ inputs.flavour || 'deployment' }}
+      RUNS: ${{ inputs.runs || '1' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Free disk space (the Wayland image is about 4 GB)
+        if: matrix.image == 'wayland'
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Find the build to test
+        id: build
+        run: |
+          ID="${{ github.event.workflow_run.id || inputs.build_run_id }}"
+          if [ -z "$ID" ]; then
+            ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build-all.yaml --branch "$GITHUB_REF_NAME" --status success -L 1 --json databaseId --jq '.[0].databaseId')
+          fi
+          [ -n "$ID" ] || { echo "No successful build run found for $GITHUB_REF_NAME" >&2; exit 1; }
+          echo "Testing the AppImage from build run $ID ($FLAVOUR)"
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download the AppImage
+        uses: actions/download-artifact@v7
+        with:
+          name: oolite-linux-appimage-${{ env.FLAVOUR }}
+          run-id: ${{ steps.build.outputs.id }}
+          github-token: ${{ github.token }}
+          path: appimage
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the ${{ matrix.image }} test image (cached between runs)
+        uses: docker/build-push-action@v6
+        with:
+          context: tools/oolite-ui-test-framework
+          file: tools/oolite-ui-test-framework/docker/Dockerfile.${{ matrix.image }}
+          tags: wmtest-py-${{ matrix.image }}
+          load: true
+          cache-from: type=gha,scope=uitest-${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=uitest-${{ matrix.image }}
+
+      - name: Run the UI tests
+        id: run
+        working-directory: tools/oolite-ui-test-framework
+        run: |
+          APP=$(find "$GITHUB_WORKSPACE/appimage" -name '*.AppImage' | head -1)
+          chmod +x "$APP"
+          ./uitest "build:$APP" --env "${{ matrix.envs }}" --runs "$RUNS" --toggle --name "ci-${{ matrix.image }}" \
+              --desc "CI: ${{ matrix.image }} environments, $FLAVOUR AppImage from build run ${{ steps.build.outputs.id }}, $RUNS run(s)"
+
+      - name: Report in the job summary
+        if: always()
+        working-directory: tools/oolite-ui-test-framework
+        run: |
+          [ -f "results/ci-${{ matrix.image }}.md" ] && cat "results/ci-${{ matrix.image }}.md" >> "$GITHUB_STEP_SUMMARY" || echo "No report was written." >> "$GITHUB_STEP_SUMMARY"
+          sudo chown -R "$(id -u):$(id -g)" results || true
+
+      - name: Keep the results (report, raw lines, game logs, screenshots)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ui-test-results-${{ matrix.image }}
+          path: tools/oolite-ui-test-framework/results/
+          retention-days: 14

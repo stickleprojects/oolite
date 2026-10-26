@@ -75,6 +75,19 @@ Everything is in `tools/oolite-ui-test-framework/results/`:
 
 NOT TESTED and NOT MEASURABLE are never failures; the report gives the reason.
 
+## In GitHub Actions
+
+The **UI tests** workflow (`.github/workflows/ui-tests.yaml`) is separate from the main build pipeline and never blocks a build:
+
+- **Framework tests** run on every push or pull request that changes `tests/ui/` or `tools/oolite-ui-test-framework/` (about 1 min).
+- **UI tests** run headless against the Linux AppImage from the main build: automatically after each successful build of `master`
+  (1 run per environment), or by hand under *Actions > UI tests > Run workflow*, where you choose the build, the AppImage flavour and
+  the number of runs. There is one job per Docker image (X11 window managers on Arch, KWin and mutter on Debian, the XWayland
+  compositors); each job's report is in its summary and the full results (raw lines, game logs, screenshots) are kept as an artifact.
+
+Headed KWin and host mode need a desktop and a GPU, so they only run on your machine. CI machines are slower than a desktop and the
+#773 bug is a race, so treat a single CI run as a smoke test; use 10 runs for a real comparison.
+
 ## The tests in this folder
 
 | Folder | What it checks | Needs screenshots? |
