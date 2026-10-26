@@ -46,7 +46,7 @@ def header(version="unknown", sdl=""):
     if shutil.which("glxinfo"):
         m = re.search(r"OpenGL renderer string: (.*)", _run(["glxinfo", "-B"])); rows.append(("gl_renderer", m[1] if m else "unknown"))
     rows += [("sdl_video_driver", sdl or "x11 for X11/XWayland rows, wayland for native rows (set per environment)"),
-             ("docker", _run(["docker", "--version"]).strip() or "not installed"), ("python3", platform.python_version()), ("wmtest_version", version)]
+             ("docker", _run(["docker", "--version"]).strip() or "not installed"), ("python3", platform.python_version()), ("uitest_version", version)]
     return "\n".join("%-16s %s" % r for r in rows) + "\n"
 
 

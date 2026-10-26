@@ -5,7 +5,7 @@ How the parts fit together is described under "How it works" in the [framework R
 | Module | What it does |
 |---|---|
 | `hostrun.py` | behind the `uitest` command: Docker images, containers, the report |
-| `plugin.py` | the pytest plugin: `--wmt-*` options, fixtures (`launched_game`, `fresh_game`, `app`, `env_session`), result recording |
+| `plugin.py` | the pytest plugin: `--ui-*` options, fixtures (`launched_game`, `fresh_game`, `app`, `env_session`), result recording |
 | `registry.py` | reads `../../environments.toml` |
 | `session.py` | starts and stops the display server and window manager or compositor |
 | `probes.py` | observes the game window (X11, KWin, sway, questions) |

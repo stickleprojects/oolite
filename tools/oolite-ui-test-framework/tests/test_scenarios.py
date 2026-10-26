@@ -93,7 +93,7 @@ def test_fake_input_keys_are_tapped_not_held():
 
 
 def test_game_log_is_kept_before_the_run_folder_is_deleted(tmp_path):
-    run = tmp_path / "wmtrun.x"; (run / "GameData" / ".logs").mkdir(parents=True)
+    run = tmp_path / "uitest-run.x"; (run / "GameData" / ".logs").mkdir(parents=True)
     (run / "GameData" / ".logs" / "Latest.log").write_text("Keydown scancode = 69, unicode = 327\n")
     g = scenarios.Game("/nonexistent.AppImage", keep_log=str(tmp_path / "logs" / "kwin-run1-fresh.log")); g.dir = str(run)
     g.stop(sleep=lambda s: None)

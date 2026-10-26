@@ -145,14 +145,13 @@ The plugin writes the raw file (RESULT, TEST, WMVER, HARD lines) and a pass-rate
 ## How it works
 
 - `uitest` calls `hostrun.py`, which builds the images and starts one container per (environment, screen size). The framework is
-  mounted at `/wmtest` and the game tests at `/gametests` (internal names kept so old images and results still work).
+  mounted at `/uitest` and the game tests at `/gametests`.
 - Inside, pytest runs the game tests with the plugin (`plugin.py`). `session.py` starts the display server and window manager and
   waits until it is ready (`_NET_SUPPORTING_WM_CHECK`, or the Wayland socket).
 - `scenarios.py` launches the game, samples the window every 0.5 s for 14 s, takes a final sample 2 s after the first size change,
   and runs the F12 round trip. It only records; `checks.py` and `outcomes.py` judge.
 - `verdict.py` turns the raw file into the report (one-sided Fisher test between control and candidate).
-- Option names (`--wmt-*`), environment variables (`WMT_*`), image tags (`wmtest-py-*`) and the `wm=` field keep their original
-  "wmtest" names so that existing results stay readable.
+- The raw results keep the `wm=` field name (the environment) so that older results stay readable.
 
 ## Host mode
 

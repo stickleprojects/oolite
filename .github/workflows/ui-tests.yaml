@@ -113,7 +113,7 @@ jobs:
         with:
           context: tools/oolite-ui-test-framework
           file: tools/oolite-ui-test-framework/docker/Dockerfile.${{ matrix.image }}
-          tags: wmtest-py-${{ matrix.image }}
+          tags: oolite-uitest-${{ matrix.image }}
           load: true
           cache-from: type=gha,scope=uitest-${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=uitest-${{ matrix.image }}

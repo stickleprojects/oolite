@@ -15,13 +15,13 @@
 
 [images.arch]
 dockerfile = "docker/Dockerfile.arch"
-tag = "wmtest-py-arch"
+tag = "oolite-uitest-arch"
 [images.debian]
 dockerfile = "docker/Dockerfile.debian"
-tag = "wmtest-py-debian"
+tag = "oolite-uitest-debian"
 [images.wayland]
 dockerfile = "docker/Dockerfile.wayland"
-tag = "wmtest-py-wayland"
+tag = "oolite-uitest-wayland"
 
 # ---------------------------------------------------------------- X11 window managers
 [env.marco]
@@ -103,7 +103,7 @@ session = "XWayland"
 image = "wayland"
 kind = "wayland"
 headed = true
-start = ["XAUTHORITY=$WMT_HOST_XAUTHORITY KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 kwin_wayland --x11-display $WMT_HOST_DISPLAY --width {w} --height {h} --socket wl0 --xwayland --no-lockscreen"]
+start = ["XAUTHORITY=$UITEST_HOST_XAUTHORITY KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 kwin_wayland --x11-display $UITEST_HOST_DISPLAY --width {w} --height {h} --socket wl0 --xwayland --no-lockscreen"]
 version_cmd = "kwin_wayland --version"
 version_re = "[0-9][0-9.]+"
 probes = ["kwin:framed,focused", "x11"]

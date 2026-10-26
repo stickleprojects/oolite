@@ -1,5 +1,5 @@
 """OCR with the REAL tesseract on a real title-screen screenshot. Skipped where tesseract is not installed, so the normal unit run is unaffected.
-Run it inside any image with: ./docker/run-ocr-tests.sh [image]   (default wmtest-py-debian)"""
+Run it inside any image with: ./docker/run-ocr-tests.sh [image]   (default oolite-uitest-debian)"""
 import os
 
 import pytest

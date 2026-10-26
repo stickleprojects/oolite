@@ -1,12 +1,12 @@
-"""Keys for compositors where XTEST (xdotool) keys never reach clients, e.g. headless kwin: a `wmtest-fakekey` process holds the key down
+"""Keys for compositors where XTEST (xdotool) keys never reach clients, e.g. headless kwin: a `uitest-fakekey` process holds the key down
 through KWin's fake-input protocol until it is stopped (docker/fakekey.c, built into the wayland image)."""
 import os
 import signal
 import subprocess
 import time
 
-BINARY = "wmtest-fakekey"
-PIDS = "/tmp/wmtest-fakekey-%d.pid"
+BINARY = "uitest-fakekey"
+PIDS = "/tmp/uitest-fakekey-%d.pid"
 
 # xdotool key names -> Linux evdev codes
 CODES = {"Escape": 1, "Return": 28, "space": 57, "Up": 103, "Left": 105, "Right": 106, "Down": 108, "Tab": 15, "BackSpace": 14,

@@ -66,7 +66,7 @@ def make_ocr(tesseract=None, runner=subprocess.run, which=shutil.which, timeout=
 
     def ocr(shot):
         p = prepare(shot)
-        with tempfile.TemporaryDirectory(prefix="wmtocr.") as d:
+        with tempfile.TemporaryDirectory(prefix="uitest-ocr.") as d:
             png = os.path.join(d, "line.png"); render.write_png(png, p.w, p.h, p.rgb)
             r = runner([exe, png, "-", "--psm", "7"], capture_output=True, text=True, timeout=timeout)
         return (r.stdout or "").strip() if r.returncode == 0 else ""

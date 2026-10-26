@@ -124,11 +124,11 @@ class Runner:
 
     def pytest_args(self, env, screen, part, apps, host_dir=None):
         c = ["python3", "-m", "pytest", "-q", "-c", "/gametests/pytest.ini", "/gametests", "--rootdir", "/gametests",
-             "--wmt-registry", "/wmtest/environments.toml", "--wmt-env", env, "--wmt-screen", screen, "--wmt-runs", str(self.runs_for(env)),
-             "--wmt-raw", "/out/%s.parts/%s" % (self.name, part), "--junitxml", "/out/%s.parts/%s.xml" % (self.name, part), "--wmt-shots", "/out/%s.shots" % self.name, "--wmt-logs", "/out/%s.logs" % self.name, "--wmt-tol", str(self.a.tol)]
-        if self.a.toggle: c.append("--wmt-toggle")
+             "--ui-registry", "/uitest/environments.toml", "--ui-env", env, "--ui-screen", screen, "--ui-runs", str(self.runs_for(env)),
+             "--ui-raw", "/out/%s.parts/%s" % (self.name, part), "--junitxml", "/out/%s.parts/%s.xml" % (self.name, part), "--ui-shots", "/out/%s.shots" % self.name, "--ui-logs", "/out/%s.logs" % self.name, "--ui-tol", str(self.a.tol)]
+        if self.a.toggle: c.append("--ui-toggle")
         if self.a.tests: c += ["-k", test_selector(self.a.tests)]
-        for label, mnt in apps: c += ["--wmt-app", "%s=%s" % (label, mnt)]
+        for label, mnt in apps: c += ["--ui-app", "%s=%s" % (label, mnt)]
         return c
 
     def runs_for(self, env):
@@ -137,7 +137,7 @@ class Runner:
     def run_container(self, env, screen, extra=(), user=None):
         e = self.envs[env]; part = "%s-%s.raw" % (env, screen.replace(":", "_"))
         open(os.path.join(self.parts, part), "w").close()
-        mounts = ["-v", "%s:/wmtest:ro" % PKG, "-v", "%s:/gametests:ro" % GAME_TESTS, "-v", "%s:/out" % self.out, "-e", "PYTHONPATH=/wmtest/src"]; apps = []
+        mounts = ["-v", "%s:/uitest:ro" % PKG, "-v", "%s:/gametests:ro" % GAME_TESTS, "-v", "%s:/out" % self.out, "-e", "PYTHONPATH=/uitest/src"]; apps = []
         for i, (label, path) in enumerate(self.builds):
             mounts += ["-v", "%s:/apps/%s:ro" % (os.path.dirname(path), label)]; apps.append((label, "/apps/%s/%s" % (label, os.path.basename(path))))
         cmd = ["docker", "run", "--rm"] + mounts + list(extra) + [self.images[e.image]["tag"], "dbus-run-session", "--"] + self.pytest_args(env, screen, part, apps)
@@ -195,10 +195,10 @@ class Runner:
 
     def start_helper(self, e):
         """Helper container: python-xlib + X tools, sharing the host X display. Only measures; the game runs on the host."""
-        name = "wmtest-helper"; subprocess.run(["docker", "rm", "-f", name], capture_output=True)
+        name = "uitest-helper"; subprocess.run(["docker", "rm", "-f", name], capture_output=True)
         xa = os.environ.get("XAUTHORITY") or os.path.expanduser("~/.Xauthority")
         cmd = ["docker", "run", "-d", "--rm", "--name", name, "--net=host", "-e", "DISPLAY=" + os.environ["DISPLAY"], "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
-               "-v", "%s:/wmtest:ro" % PKG, "-e", "PYTHONPATH=/wmtest/src"]
+               "-v", "%s:/uitest:ro" % PKG, "-e", "PYTHONPATH=/uitest/src"]
         if os.path.exists(xa): cmd += ["-v", xa + ":/tmp/hostxauth:ro", "-e", "XAUTHORITY=/tmp/hostxauth"]
         cmd += [self.images[e.image]["tag"], "sleep", "infinity"]
         return name if subprocess.run(cmd, capture_output=True).returncode == 0 else None
@@ -270,9 +270,9 @@ def headed_args(environ=None, exists=os.path.exists, hostname=socket.gethostname
     sock = "/tmp/.X11-unix/X" + m[1]
     if not exists(sock): return (), "headed: no X socket %s" % sock
     if not exists("/dev/dri"): return (), "headed needs /dev/dri (GPU) on the host"
-    args = ["--device", "/dev/dri", "--hostname", hostname(), "-v", "%s:%s" % (sock, sock), "-e", "WMT_HOST_DISPLAY=:" + m[1]]
+    args = ["--device", "/dev/dri", "--hostname", hostname(), "-v", "%s:%s" % (sock, sock), "-e", "UITEST_HOST_DISPLAY=:" + m[1]]
     xa = environ.get("XAUTHORITY") or os.path.expanduser("~/.Xauthority")
-    if exists(xa): args += ["-v", xa + ":/tmp/hostxauth:ro", "-e", "WMT_HOST_XAUTHORITY=/tmp/hostxauth"]
+    if exists(xa): args += ["-v", xa + ":/tmp/hostxauth:ro", "-e", "UITEST_HOST_XAUTHORITY=/tmp/hostxauth"]
     return args, ""
 
 

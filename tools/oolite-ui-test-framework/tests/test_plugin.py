@@ -55,8 +55,8 @@ def project(pytester, tmp_path):
     src = "".join(open(os.path.join(GAME_TESTS, d, f)).read() + "\n" for d, f in (("app", "test_launch.py"), ("window", "test_window_manager.py")))
     pytester.makepyfile(test_gamecopy=src)
     app = tmp_path / "Oolite.AppImage"; app.write_text("x")
-    args = ["--wmt-env", "marco", "--wmt-runs", "2", "--wmt-app", "base=%s" % app, "--wmt-app", "new=%s" % app, "--wmt-app", "na=%s" % app,
-            "--wmt-raw", str(tmp_path / "out.raw"), "--junitxml", str(tmp_path / "j.xml"), "-p", "no:randomly"]
+    args = ["--ui-env", "marco", "--ui-runs", "2", "--ui-app", "base=%s" % app, "--ui-app", "new=%s" % app, "--ui-app", "na=%s" % app,
+            "--ui-raw", str(tmp_path / "out.raw"), "--junitxml", str(tmp_path / "j.xml"), "-p", "no:randomly"]
     return pytester, args, tmp_path
 
 
@@ -67,7 +67,7 @@ def test_ids_outcomes_and_skip_reasons(project):
     assert "test_gets_focus[marco-x11-base-run1] PASSED" in out
     assert "test_has_frame[marco-x11-new-run2] FAILED" in out
     assert "test_gets_focus[marco-x11-na-run1] SKIPPED" in out and "SKIPPED [2] " in out and "NOT MEASURABLE: keyboard focus cannot be observed" in out
-    assert "test_f12_toggle[marco-x11-base-run1] SKIPPED" in out and "NOT TESTED: toggle not run in this data" in out        # no --wmt-toggle
+    assert "test_f12_toggle[marco-x11-base-run1] SKIPPED" in out and "NOT TESTED: toggle not run in this data" in out        # no --ui-toggle
 
 
 def test_one_launch_per_case_and_once_per_build_checks(project):
@@ -81,14 +81,14 @@ def test_one_launch_per_case_and_once_per_build_checks(project):
 
 def test_toggle_gets_its_own_launch(project):
     pt, args, tmp = project
-    pt.runpytest("--wmt-toggle", *args)
+    pt.runpytest("--ui-toggle", *args)
     log = open(tmp / "launches.log").read().splitlines()
     assert sum(1 for l in log if l.startswith("fresh")) == 6 and sum(1 for l in log if l.startswith("launch")) == 6
 
 
 def test_raw_file_is_result_compatible_and_has_test_lines(project):
     pt, args, tmp = project
-    pt.runpytest("--wmt-toggle", *args)
+    pt.runpytest("--ui-toggle", *args)
     raw = open(tmp / "out.raw").read().splitlines()
     res = [l for l in raw if l.startswith("RESULT")]
     assert len(res) == 6 and any("build=new run=1 screen=3840x1080 frame=0" in l or ("build=new" in l and "frame=0" in l) for l in res)
@@ -110,7 +110,7 @@ def test_markers_and_k_select(project, sel, name, count):
 def test_report_from_the_raw_file(project):
     from oolite_ui_test_framework import verdict
     pt, args, tmp = project
-    pt.runpytest("--wmt-toggle", *args)
+    pt.runpytest("--ui-toggle", *args)
     md = tmp / "r.md"
     verdict.main([str(tmp / "out.raw"), str(md), "--control", "base", "--candidates", "new", "--minruns", "2", "--registry", os.path.join(ROOT, "environments.toml")])
     text = md.read_text()
@@ -161,6 +161,6 @@ def test_a_window_that_stays_black_is_still_reported_black(monkeypatch, tmp_path
 
 def test_key_driven_tests_run_on_kwin_xwayland_through_fake_input(project):
     pt, args, tmp = project
-    args = [a if a != "marco" else "kwin-xwayland" for a in args] + ["--wmt-toggle"]
+    args = [a if a != "marco" else "kwin-xwayland" for a in args] + ["--ui-toggle"]
     out = pt.runpytest("-v", "-rs", *args).stdout.str()
     assert "test_f12_toggle[kwin-xwayland" in out and "NOT MEASURABLE: injected keys" not in out

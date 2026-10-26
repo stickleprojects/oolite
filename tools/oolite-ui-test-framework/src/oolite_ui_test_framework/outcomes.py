@@ -45,7 +45,7 @@ def check_splash_centred(rec):
 
 def check_f12_toggle(rec):
     """windowed -> fullscreen -> windowed with F12: the window changed size, and is framed, focused and centred again."""
-    if _v(rec, "t_ok") is None: return SKIPPED, "NOT TESTED: toggle not run in this data (no --wmt-toggle)"
+    if _v(rec, "t_ok") is None: return SKIPPED, "NOT TESTED: toggle not run in this data (no --ui-toggle)"
     if rec.get("t_ok") in (0, "0"): return FAILED, "F12 did not change the window size (%s)" % rec.get("t_method", "key")
     bad = [n for n, k in (("frame", "t_frame"), ("focus", "t_focus"), ("centred", "t_centred")) if _v(rec, k) == "0"]
     return (FAILED, "after the round trip the window lost: " + ", ".join(bad)) if bad else (PASSED, "")

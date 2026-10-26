@@ -178,6 +178,6 @@ def test_headed_args_share_only_the_host_x_socket_the_cookie_and_the_gpu():
     ok = lambda p: True
     args, why = hostrun.headed_args({"DISPLAY": ":0.0", "XAUTHORITY": "/home/k/.Xauthority"}, exists=ok, hostname=lambda: "box")
     assert why == "" and args[:4] == ["--device", "/dev/dri", "--hostname", "box"]
-    assert "/tmp/.X11-unix/X0:/tmp/.X11-unix/X0" in args and "WMT_HOST_DISPLAY=:0" in args and "/home/k/.Xauthority:/tmp/hostxauth:ro" in args
+    assert "/tmp/.X11-unix/X0:/tmp/.X11-unix/X0" in args and "UITEST_HOST_DISPLAY=:0" in args and "/home/k/.Xauthority:/tmp/hostxauth:ro" in args
     assert hostrun.headed_args({"DISPLAY": "remote:10.0"}, exists=ok)[1]
     assert hostrun.headed_args({"DISPLAY": ":0"}, exists=lambda p: p != "/dev/dri")[1]

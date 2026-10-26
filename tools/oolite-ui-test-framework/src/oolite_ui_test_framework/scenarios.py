@@ -46,7 +46,7 @@ class Game:
         self.app = os.path.realpath(app); self.args = list(args); self.env = env or {}; self.dir = None; self.proc = None; self.keep_log = keep_log
 
     def start(self):
-        self.dir = tempfile.mkdtemp(prefix="wmtrun.", dir="/tmp")
+        self.dir = tempfile.mkdtemp(prefix="uitest-run.", dir="/tmp")
         src = os.path.dirname(self.app)
         for n in os.listdir(src):
             if n.endswith(".AppImage"): continue
@@ -64,7 +64,7 @@ class Game:
         return subprocess.run(["pgrep", "-f", "appimage_extracted"], capture_output=True).returncode == 0
 
     def stop(self, sleep=time.sleep):
-        for pat in ("appimage_extracted", r"/tmp/wmtrun\."): subprocess.run(["pkill", "-f", pat], capture_output=True)
+        for pat in ("appimage_extracted", r"/tmp/uitest-run\."): subprocess.run(["pkill", "-f", pat], capture_output=True)
         sleep(2)
         subprocess.run(["pkill", "-9", "-f", "appimage_extracted"], capture_output=True)
         if self.dir and self.keep_log: self.save_log(self.keep_log)
