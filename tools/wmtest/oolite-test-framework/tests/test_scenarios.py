@@ -81,3 +81,12 @@ def test_toggle_ignored_falls_back_then_fails():
 def test_timing_constants_match_trial_sh():
     o = scenarios.Opts()
     assert (o.wait, o.sample, o.post_delay, o.tol) == (14.0, 0.5, 2.0, 40)
+
+
+def test_f12_is_released_as_soon_as_the_window_resizes():
+    """A held key autorepeats and the game toggles on each repeat, so the key must not be held for a fixed time."""
+    clk = FakeClock(); win = probes.Obs(framed=1, focused=1, outer=(1280, 180, 1280, 720))
+    s = FakeSession(clk, [(0, win)]); s.toggle = [probes.Obs(framed=0, focused=1, outer=(0, 0, 3840, 1080)), win]
+    held = []; s.key_up = lambda key: held.append(clk.t)
+    start = clk.t; scenarios.run_toggle(s, game(), scenarios.Opts(toggle=True), clk)
+    assert held[0] - start <= 0.5          # not the old fixed 1 s hold
