@@ -9,5 +9,5 @@ set by `image =` in `../environments.toml`.
 
     docker build -f docker/Dockerfile.debian -t oolite-uitest-debian .
 
-Also here: `fakekey.c` (sends keys through KWin's fake-input protocol; built into the Wayland image) and `run-ocr-tests.sh [image]`
+Also here: `fakeinput.c` (sends keys and the mouse through KWin's fake-input protocol; built into the Wayland image as `uitest-fakeinput`) and `run-ocr-tests.sh [image]`
 (runs the OCR tests inside an image).

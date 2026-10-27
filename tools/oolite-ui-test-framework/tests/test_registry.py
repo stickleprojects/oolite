@@ -53,4 +53,4 @@ def test_missing_required_key():
 
 def test_mouse_is_not_available_where_keys_need_fake_input():
     envs, _ = registry.load(TOML)
-    assert not envs["marco"].mouse_na and envs["kwin-xwayland"].mouse_na
+    assert not envs["marco"].mouse_na and not envs["kwin-xwayland"].mouse_na   # kwin-xwayland clicks through fake-input

@@ -32,7 +32,7 @@ class Environment:
     env: dict = field(default_factory=dict)
     post_start: list = field(default_factory=list)
     focus_na: bool = False
-    keys: str = "xtest"            # how keys are injected: xtest (xdotool) | fakeinput (KWin fake-input, for headless kwin)
+    keys: str = "xtest"            # how keys and the mouse are injected: xtest (xdotool) | fakeinput (KWin fake-input, for headless kwin)
     keys_na: bool = False          # injected (XTEST) keys never reach X clients, e.g. headless kwin-xwayland
     headed: bool = False           # the compositor runs as a window on the host X display (GPU passed in); $UITEST_HOST_DISPLAY names it
     where: str = "docker"
@@ -48,8 +48,8 @@ class Environment:
 
     @property
     def mouse_na(self):
-        """No way to inject mouse events: they go through XTEST, which does not reach clients where keys need fakeinput (or none at all)."""
-        return self.keys_na or self.keys == "fakeinput"
+        """No way to inject mouse events: the mouse goes the same way as the keys (XTEST, or KWin fake-input)."""
+        return self.keys_na
 
 
 def parse(data):

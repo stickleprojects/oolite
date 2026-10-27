@@ -1,6 +1,5 @@
-"""fakeinput: evdev codes and the start/stop of the key-holding process (no compositor needed)."""
+"""fakeinput: evdev codes and the commands sent to the uitest-fakeinput process (no compositor needed)."""
 import io
-import signal
 
 import pytest
 
@@ -13,17 +12,53 @@ def test_key_names_map_to_evdev_codes():
 
 
 class P:
-    pid = 4242
-    stdout = io.BytesIO(b"down\n")
+    """A uitest-fakeinput that answers every command with `reply`."""
+    def __init__(self, reply="ok\n"):
+        self.stdin = io.StringIO(); self.reply = reply; self.alive = True
+    @property
+    def stdout(self): return io.StringIO(self.reply)
+    def poll(self): return None if self.alive else 0
 
 
-def test_down_starts_the_holder_and_up_stops_it(tmp_path, monkeypatch):
-    monkeypatch.setattr(fakeinput, "PIDS", str(tmp_path / "k%d.pid"))
-    started = []
-    fakeinput.key_down("F12", popen=lambda cmd, **kw: started.append(cmd) or P(), sleep=lambda s: None)
-    assert started == [["uitest-fakekey", "88"]]
-    killed = []
-    fakeinput.key_up("F12", kill=lambda pid, sig: killed.append((pid, sig)))
-    assert killed == [(4242, signal.SIGTERM)]
-    fakeinput.key_up("F12", kill=lambda *a: killed.append("again"))          # already released: nothing to do
-    assert killed == [(4242, signal.SIGTERM)]
+@pytest.fixture
+def started(monkeypatch):
+    monkeypatch.setattr(fakeinput, "_proc", None)
+    calls = []
+    yield calls
+    monkeypatch.setattr(fakeinput, "_proc", None)
+
+
+def test_one_process_takes_keys_and_mouse(started):
+    p = P()
+    popen = lambda cmd, **kw: started.append(cmd) or p
+    fakeinput.key_down("F12", popen=popen); fakeinput.key_up("F12", popen=popen)
+    fakeinput.mouse_move(640.4, 360, popen=popen); fakeinput.mouse_down(popen=popen); fakeinput.mouse_up(popen=popen)
+    assert started == [["uitest-fakeinput"]]                                   # started once, reused
+    assert p.stdin.getvalue().splitlines() == ["press 88", "release 88", "move 640 360", "down 272", "up 272"]
+
+
+def test_a_dead_process_is_restarted(started):
+    first, second = P(), P()
+    procs = iter([first, second])
+    popen = lambda cmd, **kw: started.append(cmd) or next(procs)
+    fakeinput.key_down("Down", popen=popen)
+    first.alive = False
+    fakeinput.key_up("Down", popen=popen)
+    assert len(started) == 2 and second.stdin.getvalue() == "release 108\n"
+
+
+def test_an_error_reply_raises(started):
+    with pytest.raises(RuntimeError, match="no absolute motion"):
+        fakeinput.mouse_move(1, 2, popen=lambda cmd, **kw: P("error fake_input has no absolute motion (needs v2)\n"))
+
+
+def test_session_moves_the_pointer_to_the_window_position_plus_the_point(monkeypatch):
+    import types
+    from oolite_ui_test_framework import session as sessmod
+    s = sessmod.Session.__new__(sessmod.Session)
+    s.env = types.SimpleNamespace(keys="fakeinput")
+    s.backend = types.SimpleNamespace(find_window=lambda: 7, abs_geom=lambda w: (100, 50, 800, 600) if w == 7 else None)
+    sent = []
+    monkeypatch.setattr(fakeinput, "send", lambda c, **kw: sent.append(c))
+    s.mouse_move(10, 20); s.mouse_down(); s.mouse_up()
+    assert sent == ["move 110 70", "down 272", "up 272"]
