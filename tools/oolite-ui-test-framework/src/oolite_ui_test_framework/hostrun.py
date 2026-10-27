@@ -8,6 +8,7 @@ import os
 import shutil
 import socket
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -23,6 +24,13 @@ WAYLAND_ENVS = "kwin-xwayland,kwin-native,sway-xwayland,sway-native,mutter-xwayl
 
 QUICK_TESTS = "game_launches,game_renders"   # --quick: one shared launch per environment, so about 20 s each
 
+
+def give_back_output(name, uid=None, gid=None):
+    """Container command prefix: run the rest under dbus-run-session, then chown this run's output (/out/<name>.*) to the host user,
+    so results/ never holds root-owned files. The containers stay root (window managers and dbus expect it)."""
+    uid = os.getuid() if uid is None else uid; gid = os.getgid() if gid is None else gid
+    script = 'dbus-run-session -- "$@"; rc=$?; chown -R %d:%d /out/%s.* 2>/dev/null; exit $rc' % (uid, gid, shlex.quote(name))
+    return ["sh", "-c", script, "sh"]
 
 def test_selector(names):
     """'has_frame, test_gets_focus' -> pytest -k expression 'test_has_frame or test_gets_focus' ('' = all tests)."""
@@ -140,7 +148,7 @@ class Runner:
         mounts = ["-v", "%s:/uitest:ro" % PKG, "-v", "%s:/gametests:ro" % GAME_TESTS, "-v", "%s:/out" % self.out, "-e", "PYTHONPATH=/uitest/src"]; apps = []
         for i, (label, path) in enumerate(self.builds):
             mounts += ["-v", "%s:/apps/%s:ro" % (os.path.dirname(path), label)]; apps.append((label, "/apps/%s/%s" % (label, os.path.basename(path))))
-        cmd = ["docker", "run", "--rm"] + mounts + list(extra) + [self.images[e.image]["tag"], "dbus-run-session", "--"] + self.pytest_args(env, screen, part, apps)
+        cmd = ["docker", "run", "--rm"] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, apps)
         r = subprocess.run(cmd, capture_output=True, text=True)
         tail = [l for l in r.stdout.splitlines() if l.strip()][-1:] or [r.stderr.strip()[-200:]]
         say("  %s" % tail[0])
