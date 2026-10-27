@@ -1,6 +1,7 @@
 """hostrun (the `uitest` command): options, test selection, report names and exit codes. Docker is replaced by recorded RESULT lines
 (fake_cells) and monkeypatched helpers; files go to tmp_path. No Docker or game."""
 import re
+import subprocess
 
 import pytest
 
@@ -183,3 +184,13 @@ def test_headed_args_share_only_the_host_x_socket_the_cookie_and_the_gpu():
     assert "/tmp/.X11-unix/X0:/tmp/.X11-unix/X0" in args and "UITEST_HOST_DISPLAY=:0" in args and "/home/k/.Xauthority:/tmp/hostxauth:ro" in args
     assert hostrun.headed_args({"DISPLAY": "remote:10.0"}, exists=ok)[1]
     assert hostrun.headed_args({"DISPLAY": ":0"}, exists=lambda p: p != "/dev/dri")[1]
+
+
+def test_container_output_is_given_back_to_the_host_user(tmp_path):
+    cmd = hostrun.give_back_output("my run", uid=1000, gid=1001)
+    assert cmd[:2] == ["sh", "-c"] and cmd[3] == "sh"
+    assert 'dbus-run-session -- "$@"' in cmd[2] and "chown -R 1000:1001 /out/'my run'.*" in cmd[2] and cmd[2].endswith("exit $rc")
+    # the wrapper keeps pytest's exit code and chowns only this run's output
+    out = tmp_path / "out"; out.mkdir(); (out / "my run.logs").mkdir()
+    script = cmd[2].replace("dbus-run-session -- ", "").replace("/out/", str(out) + "/").replace("chown -R 1000:1001", "touch -c")
+    assert subprocess.run(["sh", "-c", script, "sh", "sh", "-c", "exit 1"]).returncode == 1
