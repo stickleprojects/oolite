@@ -2,6 +2,7 @@
 geometry.apply() turns geometry into dx/dy/centred later. Startup samples every 0.5 s: splash = first sighting, post = first sample 2 s
 after the window size first changes, end = the state once it has not changed for `settle` s after post (at most 14 s, as trial.sh)."""
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -40,11 +41,41 @@ def add_key_logging(run_dir):
     with open(path, "w") as f: f.write(KEY_LOGGING_PLIST)
 
 
+WINDOW = (1280, 720)          # the windowed size a test asks for where it fits the screen
+SMALL_WINDOW = (800, 600)     # otherwise
+FRAME_ROOM = (16, 64)         # left on the screen for the window manager's borders and title bar
+OVERSIZE = 256                # how much larger than the screen the 'saved window larger than the screen' case asks for (#10)
+
+
+def window_size_for(screen, oversize=False):
+    """The windowed size a test sets as the game's saved size, so results do not depend on whatever a previous real run saved in
+    GameData/oolite.plist: WINDOW where it fits `screen` (x, y, w, h) with room for a frame, else SMALL_WINDOW. oversize: larger than
+    the screen on purpose, as for a player who saved a window on a bigger screen."""
+    if not screen: return WINDOW
+    sw, sh = screen[2:4]
+    if oversize: return (sw + OVERSIZE, sh + OVERSIZE)
+    fits = WINDOW[0] + FRAME_ROOM[0] <= sw and WINDOW[1] + FRAME_ROOM[1] <= sh
+    return WINDOW if fits else SMALL_WINDOW
+
+
+def set_window_size(run_dir, size):
+    """Write size as the saved window size in the run folder's GameData/oolite.plist (an old-style plist), keeping the other keys."""
+    path = os.path.join(run_dir, "GameData", "oolite.plist")
+    text = open(path).read() if os.path.exists(path) else "{\n}\n"
+    for key, v in (("window_width", size[0]), ("window_height", size[1])):
+        entry = '"%s" = %d;' % (key, v)
+        text, n = re.subn(r'"?%s"?\s*=\s*\d+;' % key, entry, text)
+        if not n: text = text[:text.rindex("}")] + "    %s\n}" % entry + text[text.rindex("}") + 1:]
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f: f.write(text)
+
+
 class Game:
     """The AppImage in a fresh copy of its folder (other AppImages left out), so GameData is per run.
     keep_log: path to copy the game's Latest.log to on stop (the run folder is deleted)."""
-    def __init__(self, app, args=(), env=None, keep_log=None):
+    def __init__(self, app, args=(), env=None, keep_log=None, window=None):
         self.app = os.path.realpath(app); self.args = list(args); self.env = env or {}; self.dir = None; self.proc = None; self.keep_log = keep_log
+        self.window = window   # (w, h) written as the saved window size before the game starts, or None to keep GameData's
 
     def start(self):
         self.dir = tempfile.mkdtemp(prefix="uitest-run.", dir="/tmp")
@@ -55,6 +86,7 @@ class Game:
             shutil.copytree(p, os.path.join(self.dir, n)) if os.path.isdir(p) else shutil.copy2(p, self.dir)
         shutil.copy2(self.app, self.dir)
         add_key_logging(self.dir)
+        if self.window: set_window_size(self.dir, self.window)
         env = dict(os.environ); env.update(self.env); env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
         self.log = open(os.path.join(self.dir, "out.log"), "w")
         self.proc = subprocess.Popen(["./" + os.path.basename(self.app)] + self.args, cwd=self.dir, env=env, stdout=self.log, stderr=subprocess.STDOUT,

@@ -36,3 +36,13 @@ def test_game_window_centred(launched_game):
 @pytest.mark.needs_keys
 def test_f12_toggle(fresh_game):
     enforce(pass_fail.check_f12_toggle(fresh_game.toggle()))
+
+
+@pytest.mark.needs_toggle
+@pytest.mark.needs_x11
+@pytest.mark.needs_keys
+@pytest.mark.saved_window_larger_than_screen
+def test_f12_toggle_with_saved_window_larger_than_screen(fresh_game):
+    """A player whose saved window is larger than the screen (e.g. moved to a smaller monitor): F12 must still toggle. How the window
+    manager fits the oversized window differs between environments (#10: mutter fits it and opt2fix then ignored F12)."""
+    enforce(pass_fail.check_f12_toggle(fresh_game.toggle()))

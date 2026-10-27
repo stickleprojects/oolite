@@ -77,3 +77,25 @@ def test_point_on_screen():
     assert pre.point_on_screen(642, 681, (0, 0, 1280, 720)) is None
     assert "off the 1280x720 screen" in pre.point_on_screen(642, 740, (0, 0, 1280, 720))
     assert pre.point_on_screen(1100, 10, (1024, 0, 1024, 768)) is None                # second head
+
+
+def test_window_size_for_fits_the_screen_or_is_deliberately_larger():
+    from oolite_ui_test_framework import scenarios as sc
+    assert sc.window_size_for((0, 0, 1920, 1080)) == (1280, 720)
+    assert sc.window_size_for((0, 0, 1024, 768)) == (800, 600)                        # 1280x720 does not fit
+    assert sc.window_size_for((0, 0, 1280, 720)) == (800, 600)                        # fits only without a frame
+    assert sc.window_size_for((1024, 0, 1024, 768), oversize=True) == (1280, 1024)
+    assert sc.window_size_for(None) == (1280, 720)
+
+
+def test_set_window_size_rewrites_the_saved_size_and_keeps_the_rest(tmp_path):
+    from oolite_ui_test_framework import scenarios as sc
+    gd = tmp_path / "GameData"; gd.mkdir()
+    (gd / "oolite.plist").write_text('{\n    fullscreen = 0;\n    "volume_control" = "0.5";\n    "window_height" = 720;\n    "window_width" = 1280;\n}')
+    sc.set_window_size(str(tmp_path), (800, 600))
+    t = (gd / "oolite.plist").read_text()
+    assert '"window_width" = 800;' in t and '"window_height" = 600;' in t and "fullscreen = 0;" in t and "1280" not in t
+    fresh = tmp_path / "fresh"; fresh.mkdir()
+    sc.set_window_size(str(fresh), (800, 600))                                          # no plist yet: one is written
+    t = (fresh / "GameData" / "oolite.plist").read_text()
+    assert t.strip().startswith("{") and t.strip().endswith("}") and '"window_width" = 800;' in t

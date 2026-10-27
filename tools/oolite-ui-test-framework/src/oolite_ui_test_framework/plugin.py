@@ -46,11 +46,12 @@ def pytest_addoption(parser):
     g.addoption("--ui-logs", default="", help="keep each launch's game log (Latest.log) in this directory")
 
 
-def _game(cfg, case, s, what):
-    """A Game for this case; with --ui-logs its Latest.log is kept as <env>-<screen>-<build>-run<N>-<what>.log."""
+def _game(cfg, case, s, what, oversize=False):
+    """A Game for this case; with --ui-logs its Latest.log is kept as <env>-<screen>-<build>-run<N>-<what>.log. Its saved window size is
+    set to one that fits the screen (scenarios.window_size_for), or larger than the screen on purpose with oversize."""
     d = cfg.getoption("--ui-logs")
     keep = os.path.join(d, "%s-%s-%s-run%d-%s.log" % (case.env, cfg.getoption("--ui-screen").replace(":", "_"), case.label, case.run, what)) if d else None
-    return scenarios.Game(case.app, cfg.getoption("--ui-game-arg"), s.game_env, keep_log=keep)
+    return scenarios.Game(case.app, cfg.getoption("--ui-game-arg"), s.game_env, keep_log=keep, window=scenarios.window_size_for(s.primary, oversize))
 
 
 def _slug(s):
@@ -65,6 +66,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "needs_keys: needs injected keys to reach the game (else NOT MEASURABLE where the environment cannot deliver them)")
     config.addinivalue_line("markers", "needs_mouse: needs injected mouse clicks to reach the game (else NOT MEASURABLE where the environment cannot deliver them)")
     config.addinivalue_line("markers", "needs_x11: needs an X11 probe in the environment (else NOT MEASURABLE)")
+    config.addinivalue_line("markers", "saved_window_larger_than_screen: start the game (fresh_game) with a saved window size larger than the screen")
     config.addinivalue_line("markers", "once_per_build: run for run 1 only (environment / AppImage sanity checks)")
     try: envs = registry.load(config.getoption("--ui-registry"))[0]
     except Exception: envs = {}
@@ -299,7 +301,8 @@ class FreshGame:
         self.session = mgr.get()
         _require_preconditions(request, self.session)
         _only_this_game()
-        t0 = time.time(); self.game = _game(request.config, case, self.session, request.node.originalname).start()
+        oversize = request.node.get_closest_marker("saved_window_larger_than_screen") is not None
+        t0 = time.time(); self.game = _game(request.config, case, self.session, request.node.originalname, oversize).start()
         self.rec = scenarios.run_startup(self.session, self.game, opts)
         self.rec.update(start=raw_results.stamp(t0), startup_secs=round(time.time() - t0, 1))
         self.crashed = int(self.game.proc.poll() not in (None, 0) and self.rec.get("exited") == 1)
