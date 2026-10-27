@@ -161,8 +161,8 @@ The plugin writes the raw file (RESULT, TEST, WMVER, HARD lines) and a pass-rate
   mounted at `/uitest` and the game tests at `/gametests`.
 - Inside, pytest runs the game tests with the plugin (`plugin.py`). `session.py` starts the display server and window manager and
   waits until it is ready (`_NET_SUPPORTING_WM_CHECK`, or the Wayland socket).
-- `scenarios.py` launches the game, samples the window every 0.5 s for 14 s, takes a final sample 2 s after the first size change,
-  and runs the F12 round trip. It only records; `geometry.py` and `pass_fail.py` judge.
+- `scenarios.py` launches the game, samples the window every 0.5 s, takes a sample 2 s after the first size change, and stops once
+  the window has not changed for 3 s after that (`--ui-settle`, 0 = always 14 s) or at 14 s; then it runs the F12 round trip. It only records; `geometry.py` and `pass_fail.py` judge.
 - `report.py` turns the raw file into the report (one-sided Fisher test between control and candidate).
 - The raw results keep the `wm=` field name (the environment) so that older results stay readable.
 

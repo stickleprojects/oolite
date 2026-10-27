@@ -1,6 +1,6 @@
 """Scenarios, written once and run in every environment. They only RECORD raw observations (a dict per run, RESULT fields);
-geometry.apply() turns geometry into dx/dy/centred later. Timing is the same as trial.sh: sample every 0.5 s for 14 s,
-splash = first sighting, post = first sample 2 s after the window size first changes, end = state at 14 s."""
+geometry.apply() turns geometry into dx/dy/centred later. Startup samples every 0.5 s: splash = first sighting, post = first sample 2 s
+after the window size first changes, end = the state once it has not changed for `settle` s after post (at most 14 s, as trial.sh)."""
 import os
 import shutil
 import subprocess
@@ -17,6 +17,7 @@ class Opts:
     wait: float = 14.0
     sample: float = 0.5
     post_delay: float = 2.0
+    settle: float = 3.0   # stop sampling once post is taken and the window has not changed for this long; 0 = always sample for `wait`
     tol: int = geometry.DEFAULT_TOL
     toggle: bool = False
 
@@ -63,9 +64,12 @@ class Game:
     def alive(self):
         return subprocess.run(["pgrep", "-f", "appimage_extracted"], capture_output=True).returncode == 0
 
-    def stop(self, sleep=time.sleep):
+    def stop(self, sleep=time.sleep, cap=2.0, poll=0.1):
+        """Ask the game to quit, wait until it has gone (at most `cap` seconds), then kill whatever is left."""
         for pat in ("appimage_extracted", r"/tmp/uitest-run\."): subprocess.run(["pkill", "-f", pat], capture_output=True)
-        sleep(2)
+        for _ in range(int(cap / poll)):
+            if not self.alive(): break
+            sleep(poll)
         subprocess.run(["pkill", "-9", "-f", "appimage_extracted"], capture_output=True)
         if self.dir and self.keep_log: self.save_log(self.keep_log)
         if self.dir: shutil.rmtree(self.dir, ignore_errors=True)
@@ -84,12 +88,16 @@ def _size(o):
 
 
 def run_startup(session, game, opts=Opts(), clock=Clock):
-    """Sample for opts.wait seconds, then take the final observation. Returns the raw record (geometry strings; no dx/dy yet)."""
-    t0 = clock.monotonic(); fsize = None; chg = None; spl = None; post = None
+    """Sample until the window has settled (at most opts.wait seconds), then take the final observation. Returns the raw record
+    (geometry strings; no dx/dy yet)."""
+    t0 = clock.monotonic(); fsize = None; chg = None; spl = None; post = None; last = None; since = 0
     while True:
         el = (clock.monotonic() - t0) * 1000
         if el >= opts.wait * 1000: break
         o = session.observe(cheap_only=True)
+        now = None if o is None else (o.outer, o.focused, o.framed)
+        if now != last: last = now; since = el
+        if opts.settle and post is not None and el - since >= opts.settle * 1000: break
         if o is not None and o.outer is not None:
             if spl is None: spl = o.outer; fsize = _size(o)
             if chg is None and _size(o) != fsize: chg = el

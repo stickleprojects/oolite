@@ -40,6 +40,7 @@ def pytest_addoption(parser):
     g.addoption("--ui-tol", type=int, default=40)
     g.addoption("--ui-wait", type=float, default=14.0)
     g.addoption("--ui-sample", type=float, default=0.5)
+    g.addoption("--ui-settle", type=float, default=3.0, help="end startup sampling once the window has not changed for this long (0 = sample for --ui-wait)")
     g.addoption("--ui-shots", default="", help="save game-window screenshots (PNG) in this directory")
     g.addoption("--ui-game-arg", action="append", default=[], help="extra argument for the game (repeatable)")
     g.addoption("--ui-logs", default="", help="keep each launch's game log (Latest.log) in this directory")
@@ -168,7 +169,7 @@ def session_mgr(request):
 @pytest.fixture(scope="session")
 def opts(request):
     c = request.config
-    return scenarios.Opts(wait=c.getoption("--ui-wait"), sample=c.getoption("--ui-sample"), tol=c.getoption("--ui-tol"), toggle=c.getoption("--ui-toggle"))
+    return scenarios.Opts(wait=c.getoption("--ui-wait"), sample=c.getoption("--ui-sample"), settle=c.getoption("--ui-settle"), tol=c.getoption("--ui-tol"), toggle=c.getoption("--ui-toggle"))
 
 
 def _launch(request, case, session_mgr, opts, with_toggle):

@@ -48,7 +48,17 @@ def test_startup_samples_splash_post_end():
     assert rec["post_outer"] == "1300x740+1270+170"        # first sample >= 2 s after the first size change (at 4.0)
     full = geometry.apply(dict(rec, wm="m", build="b", screen="s", run=1))
     assert full["dx"] == "0" and full["centred"] == "1" and full["splash_dx"] == "0"
-    assert clk.t >= 14
+    assert 10 <= clk.t < 11                                 # settled: unchanged for 3 s after the last change (at 7.0), not the 14 s cap
+
+
+def test_startup_samples_the_full_wait_without_settling():
+    """--ui-settle 0, a window that keeps changing, or one whose size never changes (no post sample): sample for the whole 14 s."""
+    final = window_probes.Obs(framed=1, focused=1, outer=(1280, 180, 1280, 720))
+    moving = [(t * 0.5, window_probes.Obs(framed=1, focused=1, outer=(1280 + int(t), 180, 1280, 720))) for t in range(1, 28)]
+    for settle, script in ((0, [(1.0, splash()), (4.0, final)]), (3.0, [(1.0, splash()), (2.0, final)] + moving), (3.0, [(1.0, splash())])):
+        clk = FakeClock(); s = FakeSession(clk, script)
+        scenarios.run_startup(s, game(), scenarios.Opts(settle=settle), clk)
+        assert clk.t >= 14
 
 
 def test_exited_run_fails_all_and_has_no_geometry():
@@ -99,6 +109,15 @@ def test_game_log_is_kept_before_the_run_folder_is_deleted(tmp_path):
     g.stop(sleep=lambda s: None)
     assert not run.exists()
     assert "scancode = 69" in (tmp_path / "logs" / "kwin-run1-fresh.log").read_text()
+
+
+def test_stop_waits_only_until_the_game_has_gone(monkeypatch):
+    """No fixed 2 s sleep: polling stops once the game has exited, and gives up at the cap if it never does."""
+    for left, want in ((3, 3), (None, 20)):
+        g = scenarios.Game("/nonexistent.AppImage"); naps = []
+        monkeypatch.setattr(g, "alive", lambda: left is None or len(naps) < left)
+        g.stop(sleep=naps.append)
+        assert len(naps) == want and all(n == 0.1 for n in naps)
 
 
 def test_toggle_takes_frame_from_a_full_observation_and_shoots_each_stage():
