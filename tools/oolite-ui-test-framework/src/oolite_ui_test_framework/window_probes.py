@@ -18,7 +18,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-from . import checks
+from . import geometry
 
 
 @dataclass
@@ -188,11 +188,11 @@ class XlibBackend:
     def grab(self, w):
         """(width, height, rgb bytes) of window w as drawn on screen (python-xlib get_image), or None."""
         from Xlib import X
-        from . import render
+        from . import png
         try:
             win = self._win(w); g = win.get_geometry()
             img = win.get_image(0, 0, g.width, g.height, X.ZPixmap, 0xFFFFFFFF)
-            return g.width, g.height, render.bgrx_to_rgb(img.data, g.width, g.height)
+            return g.width, g.height, png.bgrx_to_rgb(img.data, g.width, g.height)
         except Exception:
             return None
 
@@ -247,9 +247,9 @@ class X11Probe(Probe):
         client = self.b.abs_geom(w)
         if client is None: return None
         parent = self.b.parent_id(w); root = self.b.root_id()
-        fr = checks.framed(None if parent is None else parent == root)
+        fr = geometry.framed(None if parent is None else parent == root)
         outer = self.b.abs_geom(parent) if fr and parent else client
-        return Obs(framed=fr, focused=checks.focused(self.b.active_id(), self.b.focus_id(), w), outer=outer or client, client=client, win=w, source="x11")
+        return Obs(framed=fr, focused=geometry.focused(self.b.active_id(), self.b.focus_id(), w), outer=outer or client, client=client, win=w, source="x11")
 
     def monitors(self):
         return self.b.monitors()

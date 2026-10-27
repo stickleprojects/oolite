@@ -21,7 +21,7 @@ def test_down_starts_the_holder_and_up_stops_it(tmp_path, monkeypatch):
     monkeypatch.setattr(fakeinput, "PIDS", str(tmp_path / "k%d.pid"))
     started = []
     fakeinput.key_down("F12", popen=lambda cmd, **kw: started.append(cmd) or P(), sleep=lambda s: None)
-    assert started == [["wmtest-fakekey", "88"]]
+    assert started == [["uitest-fakekey", "88"]]
     killed = []
     fakeinput.key_up("F12", kill=lambda pid, sig: killed.append((pid, sig)))
     assert killed == [(4242, signal.SIGTERM)]

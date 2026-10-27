@@ -1,10 +1,8 @@
 """OCR support, tested without tesseract installed: pre-processing is pure; the tesseract call is replaced by a fake runner.
 SAMPLE: how to unit-test a component that reads text (see also components/test_menu_list.py::test_texts_need_ocr_and_use_it_when_present)."""
-import os
-import subprocess
 import types
 
-from oolite_ui_test_framework import ocr, render, screen
+from oolite_ui_test_framework import ocr, screen
 from oolite_ui_test_framework.ui import pages
 from test_app import make, with_bar
 

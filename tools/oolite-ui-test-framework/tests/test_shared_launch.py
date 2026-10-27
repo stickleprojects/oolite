@@ -1,8 +1,10 @@
+"""shared_launch: one game launch shared by several tests, dirty detection, relaunch and the warning in the report. FakeGame stands in
+for the game; no pytest plugin, display or game."""
 import types
 
 import pytest
 
-from oolite_ui_test_framework import sharing, verdict
+from oolite_ui_test_framework import shared_launch, report
 
 
 class FakeGame:
@@ -14,7 +16,7 @@ class FakeGame:
         return h, {"frame": 1, "focus": 1, "launch": h}
 
     def make(self, warns):
-        return sharing.SharedLaunch(self.start, lambda h: self.stopped.append(h), lambda h: self.alive, lambda: self.state, warns.append)
+        return shared_launch.SharedLaunch(self.start, lambda h: self.stopped.append(h), lambda h: self.alive, lambda: self.state, warns.append)
 
 
 def test_clean_test_leaves_launch_alone():
@@ -59,10 +61,10 @@ def test_restored_state_is_not_dirty():
 
 def test_xdist_with_several_workers_is_refused():
     cfg = lambda n: types.SimpleNamespace(option=types.SimpleNamespace(numprocesses=n))
-    sharing.check_no_xdist(cfg(None)); sharing.check_no_xdist(cfg(0)); sharing.check_no_xdist(cfg(1))
+    shared_launch.check_no_xdist(cfg(None)); shared_launch.check_no_xdist(cfg(0)); shared_launch.check_no_xdist(cfg(1))
     for n in (2, 4, "auto"):
         with pytest.raises(pytest.UsageError, match="sequentially"):
-            sharing.check_no_xdist(cfg(n))
+            shared_launch.check_no_xdist(cfg(n))
 
 
 def test_warning_reaches_the_report(tmp_path):
@@ -70,7 +72,7 @@ def test_warning_reaches_the_report(tmp_path):
     raw.write_text("WARN wm=marco build=opt1c run=2 text=state not restored by test_goes_fullscreen\n"
                    + "\n".join("RESULT wm=marco build=%s screen=3840x1080 run=%d frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 tol=40" % (b, i)
                                for b in ("base", "opt1c") for i in range(1, 4)) + "\n")
-    out = tmp_path / "o.md"; verdict.main([str(raw), str(out), "--control", "base", "--minruns", "3"])
+    out = tmp_path / "o.md"; report.main([str(raw), str(out), "--control", "base", "--minruns", "3"])
     md = out.read_text()
     assert "## Warnings" in md and "state not restored by test_goes_fullscreen" in md and md.index("## Warnings") < md.index("## Coverage")
 

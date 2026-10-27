@@ -1,3 +1,5 @@
+"""app.App and the title-menu page object, against a fake session, game, clock and screenshot backend (invented frames plus the
+sample screenshot in fixtures/): waits, key holding, selection and the failures a test should report. No display or game."""
 import pytest
 
 from oolite_ui_test_framework import app as appmod, screen
@@ -101,8 +103,8 @@ def test_title_menu_reads_every_row_at_other_sizes():
 
 def test_real_title_screenshot():
     import os
-    from oolite_ui_test_framework import render
-    a = make([screen.Shot(*render.read_png(os.path.join(os.path.dirname(__file__), "fixtures", "title-menu-1280x720.png")))])
+    from oolite_ui_test_framework import png
+    a = make([screen.Shot(*png.read_png(os.path.join(os.path.dirname(__file__), "fixtures", "title-menu-1280x720.png")))])
     assert a.title_menu.selected_item == "Start New Commander"
 
 

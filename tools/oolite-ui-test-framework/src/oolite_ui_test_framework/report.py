@@ -1,9 +1,9 @@
-"""Statistical verdicts for uitest. Pure python3 stdlib, no AI. Usage: verdict.py RAW OUT.md [options]; verdict.py --selftest
+"""Statistical verdicts for uitest. Pure python3 stdlib, no AI. Usage: report.py RAW OUT.md [options]; report.py --selftest
 Values that are NA / not tested (anything other than 0 or 1) are NOT MEASURED: they are left out of every count and statistic and
 shown as NA in the tables. They are never failures. SKIP lines in the raw file ("not available: ...") are listed in their own table."""
 import sys, argparse, json, re
 
-from . import checks
+from . import geometry
 from math import comb
 
 ALPHA = 0.05
@@ -81,7 +81,7 @@ def set_registry(envs):
     REG.clear()
     for n, e in envs.items(): REG[n] = {"family": e.family, "session": e.session, "where": e.where, "probes": list(e.probes)}
 
-def load(raw, tol=checks.DEFAULT_TOL):
+def load(raw, tol=geometry.DEFAULT_TOL):
     cells, order = {}, []
     global SKIPS
     SKIPS = []; VERS.clear(); HOSTENV.clear()
@@ -112,7 +112,7 @@ def load(raw, tol=checks.DEFAULT_TOL):
             d = dict(kv.split("=", 1) for kv in head.split()[1:] if "=" in kv)
             SKIPS.append((d.get("wm", "-"), d.get("screen", "-"), d.get("build", "-"), why.strip()))
         if line.startswith("RESULT"):
-            d = checks.apply(dict(kv.split("=", 1) for kv in line.split()[1:]), tol)   # re-judge centring from recorded geometry
+            d = geometry.apply(dict(kv.split("=", 1) for kv in line.split()[1:]), tol)   # re-judge centring from recorded geometry
             if "t_frame" in d:
                 global CRIT
                 CRIT = ("frame", "focus", "splash_centred", "centred", "renders", "t_frame", "t_focus", "t_centred")
@@ -275,7 +275,7 @@ def cell_name(wm, sc, multi):
 
 
 def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="", host_minruns=None, brief=False):
-    cells, order = load(raw, int(float(tol)) if str(tol).replace(".", "").isdigit() else checks.DEFAULT_TOL)
+    cells, order = load(raw, int(float(tol)) if str(tol).replace(".", "").isdigit() else geometry.DEFAULT_TOL)
     ran = uniq(k[0] for k in order); scs = uniq(k[1] for k in order); builds = uniq(k[2] for k in order)
     builds = uniq(builds + [s_[2] for s_ in SKIPS if s_[2] not in builds])
     extra = [s_[0] for s_ in SKIPS if s_[0] not in ran]

@@ -1,10 +1,9 @@
 """The pytest layer, exercised with pytester: the real game tests (app/ and window/) against FAKE launch fixtures (no display, no game)."""
 import os
-import textwrap
 
 import pytest
 
-from oolite_ui_test_framework import outcomes
+from oolite_ui_test_framework import pass_fail
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GAME_TESTS = os.path.join(os.path.dirname(os.path.dirname(ROOT)), "tests", "ui")
@@ -26,8 +25,8 @@ def _rec(case, **kw):
 @pytest.fixture(scope="module")
 def launched_game(case):
     open(LOG, "a").write("launch %%s %%s\\n" %% (case.label, case.run))
-    from oolite_ui_test_framework import checks, plugin
-    rec = checks.apply(_rec(case)); plugin.STATE.launches[(case.env, case.label, case.run)] = rec
+    from oolite_ui_test_framework import geometry, plugin
+    rec = geometry.apply(_rec(case)); plugin.STATE.launches[(case.env, case.label, case.run)] = rec
     return rec
 
 @pytest.fixture(scope="module")
@@ -38,8 +37,8 @@ class Fresh:
     def __init__(self, case): self.case = case
     def toggle(self):
         open(LOG, "a").write("fresh %%s %%s\\n" %% (self.case.label, self.case.run))
-        from oolite_ui_test_framework import checks, plugin
-        rec = checks.apply(_rec(self.case, t_ok=1, t_method="key", t_frame=1, t_focus=1, t_dx=0, t_dy=0, t_centred=1))
+        from oolite_ui_test_framework import geometry, plugin
+        rec = geometry.apply(_rec(self.case, t_ok=1, t_method="key", t_frame=1, t_focus=1, t_dx=0, t_dy=0, t_centred=1))
         plugin.STATE.toggles[(self.case.env, self.case.label, self.case.run)] = rec
         return rec
 
@@ -55,8 +54,8 @@ def project(pytester, tmp_path):
     src = "".join(open(os.path.join(GAME_TESTS, d, f)).read() + "\n" for d, f in (("app", "test_launch.py"), ("window", "test_window_manager.py")))
     pytester.makepyfile(test_gamecopy=src)
     app = tmp_path / "Oolite.AppImage"; app.write_text("x")
-    args = ["--wmt-env", "marco", "--wmt-runs", "2", "--wmt-app", "base=%s" % app, "--wmt-app", "new=%s" % app, "--wmt-app", "na=%s" % app,
-            "--wmt-raw", str(tmp_path / "out.raw"), "--junitxml", str(tmp_path / "j.xml"), "-p", "no:randomly"]
+    args = ["--ui-env", "marco", "--ui-runs", "2", "--ui-app", "base=%s" % app, "--ui-app", "new=%s" % app, "--ui-app", "na=%s" % app,
+            "--ui-raw", str(tmp_path / "out.raw"), "--junitxml", str(tmp_path / "j.xml"), "-p", "no:randomly"]
     return pytester, args, tmp_path
 
 
@@ -67,7 +66,7 @@ def test_ids_outcomes_and_skip_reasons(project):
     assert "test_gets_focus[marco-x11-base-run1] PASSED" in out
     assert "test_has_frame[marco-x11-new-run2] FAILED" in out
     assert "test_gets_focus[marco-x11-na-run1] SKIPPED" in out and "SKIPPED [2] " in out and "NOT MEASURABLE: keyboard focus cannot be observed" in out
-    assert "test_f12_toggle[marco-x11-base-run1] SKIPPED" in out and "NOT TESTED: toggle not run in this data" in out        # no --wmt-toggle
+    assert "test_f12_toggle[marco-x11-base-run1] SKIPPED" in out and "NOT TESTED: toggle not run in this data" in out        # no --ui-toggle
 
 
 def test_one_launch_per_case_and_once_per_build_checks(project):
@@ -81,14 +80,14 @@ def test_one_launch_per_case_and_once_per_build_checks(project):
 
 def test_toggle_gets_its_own_launch(project):
     pt, args, tmp = project
-    pt.runpytest("--wmt-toggle", *args)
+    pt.runpytest("--ui-toggle", *args)
     log = open(tmp / "launches.log").read().splitlines()
     assert sum(1 for l in log if l.startswith("fresh")) == 6 and sum(1 for l in log if l.startswith("launch")) == 6
 
 
 def test_raw_file_is_result_compatible_and_has_test_lines(project):
     pt, args, tmp = project
-    pt.runpytest("--wmt-toggle", *args)
+    pt.runpytest("--ui-toggle", *args)
     raw = open(tmp / "out.raw").read().splitlines()
     res = [l for l in raw if l.startswith("RESULT")]
     assert len(res) == 6 and any("build=new run=1 screen=3840x1080 frame=0" in l or ("build=new" in l and "frame=0" in l) for l in res)
@@ -108,28 +107,28 @@ def test_markers_and_k_select(project, sel, name, count):
 
 
 def test_report_from_the_raw_file(project):
-    from oolite_ui_test_framework import verdict
+    from oolite_ui_test_framework import report
     pt, args, tmp = project
-    pt.runpytest("--wmt-toggle", *args)
+    pt.runpytest("--ui-toggle", *args)
     md = tmp / "r.md"
-    verdict.main([str(tmp / "out.raw"), str(md), "--control", "base", "--candidates", "new", "--minruns", "2", "--registry", os.path.join(ROOT, "environments.toml")])
+    report.main([str(tmp / "out.raw"), str(md), "--control", "base", "--candidates", "new", "--minruns", "2", "--registry", os.path.join(ROOT, "environments.toml")])
     text = md.read_text()
     assert "has_frame" in text and "gets_focus" in text and "game_window_centred" in text and "f12_toggle" in text   # columns are the test names
 
 
 def test_case_ids():
-    assert outcomes.case_id("marco", "opt1", 3, "X11") == "marco-x11-opt1-run3"
-    assert outcomes.case_id("kwin-xwayland", "base", 1, "XWayland") == "kwin-xwayland-base-run1"
-    assert outcomes.case_id("mutter-native", "base", 1, "Wayland native") == "mutter-native-base-run1"
+    assert pass_fail.case_id("marco", "opt1", 3, "X11") == "marco-x11-opt1-run3"
+    assert pass_fail.case_id("kwin-xwayland", "base", 1, "XWayland") == "kwin-xwayland-base-run1"
+    assert pass_fail.case_id("mutter-native", "base", 1, "Wayland native") == "mutter-native-base-run1"
 
 
 def test_outcome_checks_map_to_skip_fail_pass():
     ok = {"frame": "1", "exited": "0"}
-    assert outcomes.check_frame(ok)[0] == "passed" and outcomes.check_frame({"frame": "0", "exited": "0"})[0] == "failed"
-    assert outcomes.check_frame({"frame": "NA", "exited": "0"}) == ("skipped", "NOT MEASURABLE: the window frame cannot be observed in this environment")
-    assert outcomes.check_frame({"frame": "0", "exited": "1"})[0] == "failed"
-    assert outcomes.check_f12_toggle({"t_ok": "0"})[0] == "failed" and outcomes.check_f12_toggle({})[0] == "skipped"
-    assert outcomes.check_f12_toggle({"t_ok": "1", "t_frame": "1", "t_focus": "0", "t_centred": "1"})[1].endswith("focus")
+    assert pass_fail.check_frame(ok)[0] == "passed" and pass_fail.check_frame({"frame": "0", "exited": "0"})[0] == "failed"
+    assert pass_fail.check_frame({"frame": "NA", "exited": "0"}) == ("skipped", "NOT MEASURABLE: the window frame cannot be observed in this environment")
+    assert pass_fail.check_frame({"frame": "0", "exited": "1"})[0] == "failed"
+    assert pass_fail.check_f12_toggle({"t_ok": "0"})[0] == "failed" and pass_fail.check_f12_toggle({})[0] == "skipped"
+    assert pass_fail.check_f12_toggle({"t_ok": "1", "t_frame": "1", "t_focus": "0", "t_centred": "1"})[1].endswith("focus")
 
 
 def test_a_black_first_screenshot_is_looked_at_again(monkeypatch, tmp_path):
@@ -161,6 +160,6 @@ def test_a_window_that_stays_black_is_still_reported_black(monkeypatch, tmp_path
 
 def test_key_driven_tests_run_on_kwin_xwayland_through_fake_input(project):
     pt, args, tmp = project
-    args = [a if a != "marco" else "kwin-xwayland" for a in args] + ["--wmt-toggle"]
+    args = [a if a != "marco" else "kwin-xwayland" for a in args] + ["--ui-toggle"]
     out = pt.runpytest("-v", "-rs", *args).stdout.str()
     assert "test_f12_toggle[kwin-xwayland" in out and "NOT MEASURABLE: injected keys" not in out

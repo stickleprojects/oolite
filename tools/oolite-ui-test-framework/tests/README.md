@@ -10,10 +10,8 @@ Run from `tools/oolite-ui-test-framework/`:
 
 | Path | What it holds |
 |---|---|
-| `test_<module>.py` | one file per module of `src/oolite_ui_test_framework/` (`test_verdict.py` tests `verdict.py`, and so on) |
+| `test_<module>.py` | one file per module of `src/oolite_ui_test_framework/` (`test_report.py` tests `report.py`, and so on) |
 | `test_plugin.py` | runs the real game tests against fake launches (pytester) |
 | `ui/components/` | one test file per screen component |
 | `fixtures/` | sample screenshots and raw result files |
 | `ocr_strings.py` | strings used to generate text images for the OCR tests; add more here |
-
-Clearer file names are tracked in the fork's issue #2.

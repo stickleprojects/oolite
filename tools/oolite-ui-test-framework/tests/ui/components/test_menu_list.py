@@ -1,4 +1,4 @@
-"""Unit tests for oolite_ui_test_framework.components.menu_list.MenuList. It is tested on an invented screen (green highlight, white text, different place): it reads what is drawn and knows nothing about the title screen."""
+"""Unit tests for oolite_ui_test_framework.ui.components.menu_list.MenuList. It is tested on an invented screen (green highlight, white text, different place): it reads what is drawn and knows nothing about the title screen."""
 from oolite_ui_test_framework import screen
 from oolite_ui_test_framework.ui.components import menu_list as components
 

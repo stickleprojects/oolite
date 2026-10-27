@@ -1,6 +1,6 @@
-/* wmtest-fakekey: press an evdev key through KWin's org_kde_kwin_fake_input, hold it until SIGTERM/SIGINT, then release it.
+/* uitest-fakekey: press an evdev key through KWin's org_kde_kwin_fake_input, hold it until SIGTERM/SIGINT, then release it.
    Needed because XTEST keys never reach clients on headless kwin (see issue #5). KWin must be started with
-   KWIN_WAYLAND_NO_PERMISSION_CHECKS=1. Usage: wmtest-fakekey EVDEV_CODE */
+   KWIN_WAYLAND_NO_PERMISSION_CHECKS=1. Usage: uitest-fakekey EVDEV_CODE */
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,7 +21,7 @@ static const struct wl_registry_listener rl = { reg, rem };
 static void on_signal(int s) { stop = 1; }
 
 int main(int argc, char **argv) {
-    if (argc != 2) { fprintf(stderr, "usage: wmtest-fakekey EVDEV_CODE\n"); return 2; }
+    if (argc != 2) { fprintf(stderr, "usage: uitest-fakekey EVDEV_CODE\n"); return 2; }
     struct wl_display *d = wl_display_connect(NULL);
     if (!d) { fprintf(stderr, "no wayland display\n"); return 2; }
     struct wl_registry *r = wl_display_get_registry(d);
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     if (!fi) { fprintf(stderr, "no org_kde_kwin_fake_input global\n"); return 3; }
     signal(SIGTERM, on_signal); signal(SIGINT, on_signal);
     int code = atoi(argv[1]);
-    org_kde_kwin_fake_input_authenticate(fi, "wmtest", "key injection for tests");
+    org_kde_kwin_fake_input_authenticate(fi, "uitest", "key injection for tests");
     org_kde_kwin_fake_input_keyboard_key(fi, code, WL_KEYBOARD_KEY_STATE_PRESSED);
     wl_display_roundtrip(d);
     printf("down\n"); fflush(stdout);

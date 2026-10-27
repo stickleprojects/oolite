@@ -1,7 +1,7 @@
 """What the player sees on the title screen, checked on the screenshot (not on what the game reports), driven through page objects."""
 import pytest
 
-from oolite_ui_test_framework import outcomes
+from oolite_ui_test_framework import pass_fail
 from oolite_ui_test_framework.pytest_helpers import enforce
 
 pytestmark = pytest.mark.game
@@ -9,14 +9,14 @@ pytestmark = pytest.mark.game
 
 def test_game_renders(launched_game):
     """After the splash the window shows real content (screenshot heuristic, PNG saved beside the report) and the logs have no GL errors."""
-    enforce(outcomes.check_renders(launched_game))
+    enforce(pass_fail.check_renders(launched_game))
 
 
 @pytest.mark.needs_keys
 def test_game_responds_to_keys(fresh_game):
     """Press Down twice on the title menu: the window must change."""
     fresh_game.rec.update(fresh_game.input_responds())
-    enforce(outcomes.check_responds_to_keys(fresh_game.finish()))
+    enforce(pass_fail.check_responds_to_keys(fresh_game.finish()))
 
 
 @pytest.mark.needs_keys

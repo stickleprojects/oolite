@@ -2,11 +2,10 @@
 import glob
 import os
 import re
-import shutil
 import subprocess
 import time
 
-from . import checks, fakeinput, probes
+from . import fakeinput, window_probes
 
 
 class SessionError(RuntimeError):
@@ -80,7 +79,7 @@ class Session:
             os.environ["XDG_SESSION_TYPE"] = "x11"
             self._start_x_server()
             self._start_cmds()
-            self.backend = probes.x_backend(dict(os.environ))
+            self.backend = window_probes.x_backend(dict(os.environ))
             self.sleep(e.settle)
             chk = None
             for _ in range(e.ready_timeout):
@@ -90,7 +89,7 @@ class Session:
             if not chk: raise SessionError("%s failed to start (no _NET_SUPPORTING_WM_CHECK): %s" % (e.name, self._tail("wm.log")))
             self.sleep(e.settle_after)
             self.game_env = {"SDL_VIDEODRIVER": "x11"}
-            self.primary = probes.primary_monitor(self.backend.monitors())
+            self.primary = window_probes.primary_monitor(self.backend.monitors())
         elif e.kind == "wayland":
             rt = "/tmp/xdg"; os.makedirs(rt, exist_ok=True); os.chmod(rt, 0o700)
             os.environ.update({"XDG_RUNTIME_DIR": rt, "XDG_SESSION_TYPE": "wayland", "WAYLAND_DISPLAY": "wl0"})
@@ -109,7 +108,7 @@ class Session:
             if e.session == "XWayland":
                 disp = None
                 for _ in range(20):
-                    skip = {"77", os.environ.get("WMT_HOST_DISPLAY", "").lstrip(":")}   # headed: the host's socket is mounted here too
+                    skip = {"77", os.environ.get("UITEST_HOST_DISPLAY", "").lstrip(":")}   # headed: the host's socket is mounted here too
                     xs = sorted(x[1:] for x in os.listdir("/tmp/.X11-unix") if re.fullmatch(r"X\d+", x) and x[1:] not in skip) if os.path.isdir("/tmp/.X11-unix") else []
                     if xs: disp = xs[0]; break
                     self.sleep(0.5)
@@ -124,27 +123,27 @@ class Session:
         else:   # host: the live desktop, nothing is started
             self.game_env = {"SDL_VIDEODRIVER": "wayland" if e.session == "Wayland native" else "x11"}
             if os.environ.get("DISPLAY") and e.session != "Wayland native":
-                self.backend = probes.HelperBackend(self.helper) if self.helper else probes.x_backend(dict(os.environ))
-                self.primary = probes.primary_monitor(self.backend.monitors())
+                self.backend = window_probes.HelperBackend(self.helper) if self.helper else window_probes.x_backend(dict(os.environ))
+                self.primary = window_probes.primary_monitor(self.backend.monitors())
         if e.version_cmd:
             m = re.search(e.version_re, self._run(e.version_cmd + " 2>&1") or "")
             self.version = m[0] if m else ""
         self._make_probes()
         if e.headed and self.backend is not None:   # the host window manager may resize KWin's window: the output is what XWayland reports
-            self.primary = probes.primary_monitor(self.backend.monitors()) or self.primary
+            self.primary = window_probes.primary_monitor(self.backend.monitors()) or self.primary
         return self
 
     def grab_screen(self):
         """(w, h, rgb) of the whole compositor output including its decorations: KWin's window on the host display (headed only), else None."""
-        host = os.environ.get("WMT_HOST_DISPLAY")
+        host = os.environ.get("UITEST_HOST_DISPLAY")
         if not self.env.headed or not host: return None
         env = dict(os.environ, DISPLAY=host)
-        if os.environ.get("WMT_HOST_XAUTHORITY"): env["XAUTHORITY"] = os.environ["WMT_HOST_XAUTHORITY"]
+        if os.environ.get("UITEST_HOST_XAUTHORITY"): env["XAUTHORITY"] = os.environ["UITEST_HOST_XAUTHORITY"]
         pid = self._run("pgrep -x kwin_wayland").split()
         ids = subprocess.run(["xdotool", "search", "--pid", pid[0]], capture_output=True, text=True, env=env).stdout.split() if pid else []
         if not ids: return None
         saved = os.environ.get("XAUTHORITY"); os.environ["XAUTHORITY"] = env.get("XAUTHORITY", "")   # python-xlib reads the cookie from os.environ
-        try: return probes.XlibBackend(env).grab(int(ids[0]))
+        try: return window_probes.XlibBackend(env).grab(int(ids[0]))
         except Exception: return None
         finally:
             if saved is None: os.environ.pop("XAUTHORITY", None)
@@ -159,13 +158,13 @@ class Session:
         for name, fields in self.env.probe_specs:
             if name == "x11" and self.backend is None:
                 if not os.environ.get("DISPLAY"): continue
-                self.backend = probes.x_backend(env)
-            self.probes.append((probes.make_probe(name, env, backend=self.backend, **(self.probe_kw if name == "ask" else {})), fields))
+                self.backend = window_probes.x_backend(env)
+            self.probes.append((window_probes.make_probe(name, env, backend=self.backend, **(self.probe_kw if name == "ask" else {})), fields))
 
     # ---- observation
     def observe(self, cheap_only=False):
         """Merge the probes (first non-None field wins, restricted by 'name:fields'). None if the window is not there."""
-        res = probes.Obs(); seen = False
+        res = window_probes.Obs(); seen = False
         for p, fields in self.probes:
             if cheap_only and not p.cheap: continue
             if p.name == "ask":
@@ -187,7 +186,7 @@ class Session:
 
     def send_key(self, key, window=None):
         if self.env.keys == "fakeinput": return fakeinput.tap(key)
-        (self.backend or probes.XToolsBackend(dict(os.environ))).send_key(key, window)
+        (self.backend or window_probes.XToolsBackend(dict(os.environ))).send_key(key, window)
 
     def hold_time(self, seconds):
         """How long to hold a key. XTEST keys must last a frame of the slow software-GL game; KWin fake-input keys are events that are never
@@ -196,11 +195,11 @@ class Session:
 
     def key_down(self, key):
         if self.env.keys == "fakeinput": return fakeinput.key_down(key)
-        (self.backend or probes.XToolsBackend(dict(os.environ))).key_down(key)
+        (self.backend or window_probes.XToolsBackend(dict(os.environ))).key_down(key)
 
     def key_up(self, key):
         if self.env.keys == "fakeinput": return fakeinput.key_up(key)
-        (self.backend or probes.XToolsBackend(dict(os.environ))).key_up(key)
+        (self.backend or window_probes.XToolsBackend(dict(os.environ))).key_up(key)
 
     def stop(self):
         for p, _ in self.probes: p.close()

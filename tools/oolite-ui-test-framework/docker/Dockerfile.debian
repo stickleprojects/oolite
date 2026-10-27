@@ -6,4 +6,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxcvt0 libxcvt-dev xcvt procps dbus dbus-x11 libgl1-mesa-dri libglx-mesa0 libgl1 libegl1 libopenal1 libgnustep-base1.28 ca-certificates \
     tesseract-ocr python3-pil fonts-dejavu-core \
     python3 python3-pytest python3-xlib kwin-x11 mutter openbox xfwm4 marco muffin 2>&1 | tail -3
-ENV LIBGL_ALWAYS_SOFTWARE=1 PYTHONPATH=/wmtest PYTHONDONTWRITEBYTECODE=1
+ENV LIBGL_ALWAYS_SOFTWARE=1 PYTHONPATH=/uitest PYTHONDONTWRITEBYTECODE=1

@@ -1,3 +1,4 @@
+"""registry: reading environments.toml, its validation errors, and a check that the shipped file is consistent with the Dockerfiles."""
 import os
 import tomllib
 

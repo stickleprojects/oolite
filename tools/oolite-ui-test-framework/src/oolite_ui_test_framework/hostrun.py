@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 
-from . import envinfo, rawfmt, registry, scenarios, verdict
+from . import envinfo, raw_results, registry, scenarios, report
 from .session import Session, SessionError
 
 PKG = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))      # the framework folder (holds src/, docker/, environments.toml)
@@ -58,7 +58,7 @@ def docker_state():
 class Runner:
     def __init__(self, a):
         self.a = a; self.envs, self.images = registry.load(a.registry or None)
-        verdict.set_registry(self.envs)
+        report.set_registry(self.envs)
         self.builds = []
         for b in a.builds:
             label, _, path = b.partition(":")
@@ -107,7 +107,7 @@ class Runner:
         with open(self.raw, "a") as f: f.write(line + "\n")
 
     def skip(self, wm, screen, why):
-        for label, _ in self.builds: self.add(rawfmt.format_skip(wm, screen, label, why))
+        for label, _ in self.builds: self.add(raw_results.format_skip(wm, screen, label, why))
         say("  skipped %s (%s): %s" % (wm, screen, why))
 
     def ensure_image(self, image):
@@ -124,11 +124,11 @@ class Runner:
 
     def pytest_args(self, env, screen, part, apps, host_dir=None):
         c = ["python3", "-m", "pytest", "-q", "-c", "/gametests/pytest.ini", "/gametests", "--rootdir", "/gametests",
-             "--wmt-registry", "/wmtest/environments.toml", "--wmt-env", env, "--wmt-screen", screen, "--wmt-runs", str(self.runs_for(env)),
-             "--wmt-raw", "/out/%s.parts/%s" % (self.name, part), "--junitxml", "/out/%s.parts/%s.xml" % (self.name, part), "--wmt-shots", "/out/%s.shots" % self.name, "--wmt-logs", "/out/%s.logs" % self.name, "--wmt-tol", str(self.a.tol)]
-        if self.a.toggle: c.append("--wmt-toggle")
+             "--ui-registry", "/uitest/environments.toml", "--ui-env", env, "--ui-screen", screen, "--ui-runs", str(self.runs_for(env)),
+             "--ui-raw", "/out/%s.parts/%s" % (self.name, part), "--junitxml", "/out/%s.parts/%s.xml" % (self.name, part), "--ui-shots", "/out/%s.shots" % self.name, "--ui-logs", "/out/%s.logs" % self.name, "--ui-tol", str(self.a.tol)]
+        if self.a.toggle: c.append("--ui-toggle")
         if self.a.tests: c += ["-k", test_selector(self.a.tests)]
-        for label, mnt in apps: c += ["--wmt-app", "%s=%s" % (label, mnt)]
+        for label, mnt in apps: c += ["--ui-app", "%s=%s" % (label, mnt)]
         return c
 
     def runs_for(self, env):
@@ -137,7 +137,7 @@ class Runner:
     def run_container(self, env, screen, extra=(), user=None):
         e = self.envs[env]; part = "%s-%s.raw" % (env, screen.replace(":", "_"))
         open(os.path.join(self.parts, part), "w").close()
-        mounts = ["-v", "%s:/wmtest:ro" % PKG, "-v", "%s:/gametests:ro" % GAME_TESTS, "-v", "%s:/out" % self.out, "-e", "PYTHONPATH=/wmtest/src"]; apps = []
+        mounts = ["-v", "%s:/uitest:ro" % PKG, "-v", "%s:/gametests:ro" % GAME_TESTS, "-v", "%s:/out" % self.out, "-e", "PYTHONPATH=/uitest/src"]; apps = []
         for i, (label, path) in enumerate(self.builds):
             mounts += ["-v", "%s:/apps/%s:ro" % (os.path.dirname(path), label)]; apps.append((label, "/apps/%s/%s" % (label, os.path.basename(path))))
         cmd = ["docker", "run", "--rm"] + mounts + list(extra) + [self.images[e.image]["tag"], "dbus-run-session", "--"] + self.pytest_args(env, screen, part, apps)
@@ -147,7 +147,7 @@ class Runner:
         # copy the parts in; a failed pytest (hard failure) leaves a SKIP row with the reason
         data = open(os.path.join(self.parts, part)).read()
         if data: open(self.raw, "a").write(data)
-        # failing tests are measurements (pytest rc 1); hard failures are HARD lines in the raw file (verdict.py lists them) or an unusable pytest run
+        # failing tests are measurements (pytest rc 1); hard failures are HARD lines in the raw file (report.py lists them) or an unusable pytest run
         if r.returncode not in (0, 1, 5) and "RESULT" not in data and "HARD" not in data:
             self.skip(env, screen, "hard failure: pytest rc=%d: %s" % (r.returncode, (r.stdout.strip().splitlines() or r.stderr.strip().splitlines() or [""])[-1][:160]))
 
@@ -195,10 +195,10 @@ class Runner:
 
     def start_helper(self, e):
         """Helper container: python-xlib + X tools, sharing the host X display. Only measures; the game runs on the host."""
-        name = "wmtest-helper"; subprocess.run(["docker", "rm", "-f", name], capture_output=True)
+        name = "uitest-helper"; subprocess.run(["docker", "rm", "-f", name], capture_output=True)
         xa = os.environ.get("XAUTHORITY") or os.path.expanduser("~/.Xauthority")
         cmd = ["docker", "run", "-d", "--rm", "--name", name, "--net=host", "-e", "DISPLAY=" + os.environ["DISPLAY"], "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
-               "-v", "%s:/wmtest:ro" % PKG, "-e", "PYTHONPATH=/wmtest/src"]
+               "-v", "%s:/uitest:ro" % PKG, "-e", "PYTHONPATH=/uitest/src"]
         if os.path.exists(xa): cmd += ["-v", xa + ":/tmp/hostxauth:ro", "-e", "XAUTHORITY=/tmp/hostxauth"]
         cmd += [self.images[e.image]["tag"], "sleep", "infinity"]
         return name if subprocess.run(cmd, capture_output=True).returncode == 0 else None
@@ -220,7 +220,7 @@ class Runner:
                         if not self.a.no_prompt: say(">> Run %d: the Oolite window is open now. Please look at it (do not close it)." % n)
                         rec = scenarios.record(s, g, env, label, scr, n, opts)
                     finally: g.stop()
-                    self.add(rawfmt.format_result(rec))
+                    self.add(raw_results.format_result(rec))
         finally: s.stop()
 
     def report(self):
@@ -228,7 +228,7 @@ class Runner:
             "build %s: %s\n" % (b[0], b[1]) for b in [(l, os.path.basename(p)) for l, p in self.builds])); md = self.md
         argv = [self.raw, md, "--control", self.control, "--candidates", self.a.candidates, "--minruns", str(self.a.minruns), "--host-minruns", str(self.a.host_runs),
                 "--tol", str(self.a.tol), "--equiv", self.a.equiv, "--header", hdr]
-        rc = verdict.main(argv)
+        rc = report.main(argv)
         say("Report: %s\n(raw: %s, environment: %s; send these files)" % (md, self.raw, hdr)); return rc
 
     def version(self):
@@ -270,9 +270,9 @@ def headed_args(environ=None, exists=os.path.exists, hostname=socket.gethostname
     sock = "/tmp/.X11-unix/X" + m[1]
     if not exists(sock): return (), "headed: no X socket %s" % sock
     if not exists("/dev/dri"): return (), "headed needs /dev/dri (GPU) on the host"
-    args = ["--device", "/dev/dri", "--hostname", hostname(), "-v", "%s:%s" % (sock, sock), "-e", "WMT_HOST_DISPLAY=:" + m[1]]
+    args = ["--device", "/dev/dri", "--hostname", hostname(), "-v", "%s:%s" % (sock, sock), "-e", "UITEST_HOST_DISPLAY=:" + m[1]]
     xa = environ.get("XAUTHORITY") or os.path.expanduser("~/.Xauthority")
-    if exists(xa): args += ["-v", xa + ":/tmp/hostxauth:ro", "-e", "WMT_HOST_XAUTHORITY=/tmp/hostxauth"]
+    if exists(xa): args += ["-v", xa + ":/tmp/hostxauth:ro", "-e", "UITEST_HOST_XAUTHORITY=/tmp/hostxauth"]
     return args, ""
 
 
@@ -293,9 +293,9 @@ def main(argv=None):
         a.runs, a.host_runs, a.minruns = 1, 1, 1
         a.screens = a.screens.split(",")[0]
         a.tests = a.tests or QUICK_TESTS
-    if a.selftest: return verdict.main(["--selftest"])
+    if a.selftest: return report.main(["--selftest"])
     if a.report_only:
-        return verdict.main([a.report_only, a.out or "report.md", "--control", a.control or "base", "--candidates", a.candidates, "--minruns", str(a.minruns),
+        return report.main([a.report_only, a.out or "report.md", "--control", a.control or "base", "--candidates", a.candidates, "--minruns", str(a.minruns),
                              "--host-minruns", str(a.host_runs), "--tol", str(a.tol), "--registry", a.registry or registry.DEFAULT_PATH])
     if a.list:
         envs, _ = registry.load(a.registry or None)
@@ -320,7 +320,7 @@ def main(argv=None):
         return e.code if isinstance(e.code, int) else EXIT_ERROR
     finally:
         _QUIET = False
-    L = verdict.LAST
+    L = report.LAST
     want_docker = any(n in r.envs and r.envs[n].kind != "host" for n in names)
     if want_docker and not r.docker_ok:
         print("uitest: error: %s (docker environments were requested)" % r.docker_why, file=sys.stderr); rc = EXIT_ERROR
