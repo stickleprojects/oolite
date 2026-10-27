@@ -6,7 +6,7 @@ the screens live in ui/pages/. A scenario-style handle on a running game: launch
         assert menu.selected_item == "Start New Commander"
         menu.select("View Ship Library")
 
-Driving is by X key events and the check is on what is actually drawn in the window, so a game that believes it is showing a menu
+Driving is by X key and mouse events and the check is on what is actually drawn in the window, so a game that believes it is showing a menu
 while the window is blank, frozen or transparent fails here. Waits return as soon as the condition is true (no fixed sleeps)."""
 import os
 import time
@@ -87,6 +87,26 @@ class App:
                 self.clock.sleep(poll)
         finally:
             self.session.key_up(key)
+
+    def can_click(self):
+        return getattr(self.session, "mouse_ok", lambda: False)()
+
+    def click_until(self, x, y, cond, cap=3.0, settle=0.5, poll=0.02):
+        """Point at (x, y) in window pixels and hold button 1 until cond() is true, then release it; at most `cap` seconds. The game reads the
+        mouse once per frame like the keys, and works out which row is under the pointer when it draws, so the pointer is left there for
+        `settle` seconds before the press. A held click does not repeat (unlike a key), so holding it for several frames is harmless.
+        Returns whether cond() became true."""
+        self.session.mouse_move(x + 1, y); self.session.mouse_move(x, y)     # two moves: the game ignores the first motion after it warps the pointer
+        self.clock.sleep(settle)
+        t0 = self.clock.monotonic()
+        self.session.mouse_down()
+        try:
+            while True:
+                if cond(): return True
+                if self.clock.monotonic() - t0 >= cap: return False
+                self.clock.sleep(poll)
+        finally:
+            self.session.mouse_up()
 
     def keys_received(self, flush=2.5):
         """How many key presses the game has logged so far (scenarios.add_key_logging turns that on), after waiting `flush` seconds: the game

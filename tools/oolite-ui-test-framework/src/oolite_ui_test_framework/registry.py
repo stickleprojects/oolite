@@ -46,6 +46,11 @@ class Environment:
             out.append((n, tuple(f.split(",")) if f else None))
         return out
 
+    @property
+    def mouse_na(self):
+        """No way to inject mouse events: they go through XTEST, which does not reach clients where keys need fakeinput (or none at all)."""
+        return self.keys_na or self.keys == "fakeinput"
+
 
 def parse(data):
     """dict from tomllib -> ({name: Environment}, {image name: {dockerfile, tag}}). Validates every entry."""

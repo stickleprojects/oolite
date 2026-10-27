@@ -205,6 +205,20 @@ class Session:
         if self.env.keys == "fakeinput": return fakeinput.key_up(key)
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).key_up(key)
 
+    # ---- mouse (XTEST through xdotool; there is no fake-input pointer, so none where keys need fakeinput)
+    def mouse_ok(self):
+        return not self.env.mouse_na
+
+    def mouse_move(self, x, y):
+        """Put the pointer at (x, y) in the game window's own pixels, the same coordinates as a screenshot of it."""
+        (self.backend or window_probes.XToolsBackend(dict(os.environ))).mouse_move(self.window_id(), x, y)
+
+    def mouse_down(self):
+        (self.backend or window_probes.XToolsBackend(dict(os.environ))).mouse_down()
+
+    def mouse_up(self):
+        (self.backend or window_probes.XToolsBackend(dict(os.environ))).mouse_up()
+
     def stop(self):
         for p, _ in self.probes: p.close()
         for p in reversed(self.procs):

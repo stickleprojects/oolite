@@ -107,12 +107,21 @@ class XToolsBackend:
     def key_up(self, key):
         sh(["xdotool", "keyup", key], self.env)
 
+    def mouse_move(self, window, x, y):
+        sh(["xdotool", "mousemove", "--window", str(window), str(x), str(y)], self.env)
+
+    def mouse_down(self):
+        sh(["xdotool", "mousedown", "1"], self.env)
+
+    def mouse_up(self):
+        sh(["xdotool", "mouseup", "1"], self.env)
+
     def autorepeat_off(self):
         sh(["xset", "r", "off"], self.env)
 
 
 class XlibBackend:
-    """python-xlib, one persistent connection. Same interface as XToolsBackend (send_key still uses xdotool)."""
+    """python-xlib, one persistent connection. Same interface as XToolsBackend (keys and the mouse still use xdotool)."""
     def __init__(self, env=None, cls="oolite"):
         from Xlib import display
         self.env = env; self.cls = cls.lower()
@@ -191,6 +200,15 @@ class XlibBackend:
 
     def key_up(self, key):
         XToolsBackend(self.env).key_up(key)
+
+    def mouse_move(self, window, x, y):
+        XToolsBackend(self.env).mouse_move(window, x, y)
+
+    def mouse_down(self):
+        XToolsBackend(self.env).mouse_down()
+
+    def mouse_up(self):
+        XToolsBackend(self.env).mouse_up()
 
     def grab(self, w):
         """(width, height, rgb bytes) of window w as drawn on screen (python-xlib get_image), or None."""
@@ -428,6 +446,15 @@ class HelperBackend:
 
     def key_up(self, key):
         self._x("keyup", key)
+
+    def mouse_move(self, window, x, y):
+        self._x("mousemove", window, x, y)
+
+    def mouse_down(self):
+        self._x("mousedown")
+
+    def mouse_up(self):
+        self._x("mouseup")
 
 
 class HelperX11Probe(Probe):

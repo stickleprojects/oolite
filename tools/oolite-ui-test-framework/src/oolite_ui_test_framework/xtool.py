@@ -1,5 +1,5 @@
 """xtool: the measuring tool that runs INSIDE the helper container (python-xlib / X tools) against the host's X display.
-Used by host mode so the game itself runs on the host. Usage: python3 -m oolite_ui_test_framework.xtool observe | monitors | wmname | key KEY [WINDOW]"""
+Used by host mode so the game itself runs on the host. Usage: python3 -m oolite_ui_test_framework.xtool observe | monitors | wmname | key KEY [WINDOW] | mousemove WINDOW X Y | mousedown | mouseup"""
 import json
 import sys
 
@@ -20,7 +20,10 @@ def main(argv=None):
     elif a[:1] == ["key"] and len(a) >= 2: b.send_key(a[1], int(a[2]) if len(a) > 2 else None)
     elif a[:1] == ["keydown"] and len(a) == 2: b.key_down(a[1])
     elif a[:1] == ["keyup"] and len(a) == 2: b.key_up(a[1])
-    else: print("usage: xtool observe|monitors|wmname|key KEY [WINDOW]|keydown KEY|keyup KEY", file=sys.stderr); return 2
+    elif a[:1] == ["mousemove"] and len(a) == 4: b.mouse_move(int(a[1]), int(a[2]), int(a[3]))
+    elif a[:1] == ["mousedown"]: b.mouse_down()
+    elif a[:1] == ["mouseup"]: b.mouse_up()
+    else: print("usage: xtool observe|monitors|wmname|key KEY [WINDOW]|keydown KEY|keyup KEY|mousemove WINDOW X Y|mousedown|mouseup", file=sys.stderr); return 2
     return 0
 
 

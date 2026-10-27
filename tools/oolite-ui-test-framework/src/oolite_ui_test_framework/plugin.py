@@ -63,6 +63,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "game: needs a display server and the AppImage")
     config.addinivalue_line("markers", "needs_toggle: run only with --ui-toggle (reason recorded as NOT TESTED)")
     config.addinivalue_line("markers", "needs_keys: needs injected keys to reach the game (else NOT MEASURABLE where the environment cannot deliver them)")
+    config.addinivalue_line("markers", "needs_mouse: needs injected mouse clicks to reach the game (else NOT MEASURABLE where the environment cannot deliver them)")
     config.addinivalue_line("markers", "needs_x11: needs an X11 probe in the environment (else NOT MEASURABLE)")
     config.addinivalue_line("markers", "once_per_build: run for run 1 only (environment / AppImage sanity checks)")
     try: envs = registry.load(config.getoption("--ui-registry"))[0]
@@ -111,6 +112,8 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.skip(reason="NOT TESTED: toggle not run in this data (no --ui-toggle)"))
         if item.get_closest_marker("needs_keys") and env is not None and env.keys_na:
             item.add_marker(pytest.mark.skip(reason="NOT MEASURABLE: injected keys do not reach the game in %s" % env.name))
+        if item.get_closest_marker("needs_mouse") and env is not None and env.mouse_na:
+            item.add_marker(pytest.mark.skip(reason="NOT MEASURABLE: injected mouse clicks do not reach the game in %s" % env.name))
         if item.get_closest_marker("needs_x11") and env is not None and not any(n == "x11" for n, _ in env.probe_specs):
             item.add_marker(pytest.mark.skip(reason="NOT MEASURABLE: no X11 probe for F12 in %s" % env.name))
         if env is not None:

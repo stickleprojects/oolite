@@ -135,7 +135,7 @@ function in `src/oolite_ui_test_framework/pass_fail.py`. It runs for every envir
 - `app`: a launch of your own as a scenario handle (wait for a screen, look at it, press keys); see `app.py` and `ui/pages/`.
 - `env_session` or `case` alone: no game, for tests such as "the environment started" or "the AppImage is readable". Mark them
   `@pytest.mark.once_per_build` to run once.
-- `@pytest.mark.needs_toggle`, `needs_x11` and `needs_keys` skip with a reason when the run or environment cannot support the test.
+- `@pytest.mark.needs_toggle`, `needs_x11`, `needs_keys` and `needs_mouse` skip with a reason when the run or environment cannot support the test.
 
 pytest decides: each test passes or fails; `pytest.skip(reason)` means NOT TESTED / NOT MEASURABLE, and the reason appears in the report.
 The plugin writes the raw file (RESULT, TEST, WMVER, HARD lines) and a pass-rate summary; `report.py` makes the report from it.

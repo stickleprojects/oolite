@@ -49,3 +49,8 @@ def test_validation_errors(patch, msg):
 def test_missing_required_key():
     with pytest.raises(registry.RegistryError, match="missing 'family'"):
         registry.parse({"images": {"arch": {}}, "env": {"x": {"session": "X11", "image": "arch", "kind": "x11"}}})
+
+
+def test_mouse_is_not_available_where_keys_need_fake_input():
+    envs, _ = registry.load(TOML)
+    assert not envs["marco"].mouse_na and envs["kwin-xwayland"].mouse_na

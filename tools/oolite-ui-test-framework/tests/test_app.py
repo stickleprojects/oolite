@@ -140,6 +140,38 @@ def test_expected_items_ok_and_select_by_name():
     assert a.session.keys == ["Down", "Down", "Down"]
 
 
+class MouseSession(Session):
+    """a session that can click: pressing the button over a row draws that row highlighted (rows found by MenuList on with_bar screens)"""
+    def __init__(self, backend, win=7, works=True):
+        super().__init__(backend, win); self.clicks = []; self.at = None; self.works = works
+    def mouse_ok(self): return True
+    def mouse_move(self, x, y): self.at = (x, y)
+    def mouse_down(self):
+        self.clicks.append(self.at)
+        if self.works: self.backend.frames = [with_bar(1280, 720, round(((self.at[1] / 720) - 0.795) * 30) + 1)]
+    def mouse_up(self): pass
+
+
+def test_select_clicks_the_row_where_the_mouse_works():
+    a = appmod.App(MouseSession(Backend([with_bar(1280, 720, 1)])), Game(), clock=Clock())
+    a.title_menu.select("Game Options")
+    (x, y), = a.session.clicks
+    assert a.session.keys == [] and abs(y - round((0.795 + 3 / 30) * 720)) <= 1 and 0.43 * 1280 < x < 0.57 * 1280   # on row 4, once
+
+
+def test_select_by_keys_still_works_where_the_mouse_works():
+    a = appmod.App(MouseSession(Backend([with_bar(1280, 720, 1)])), Game(), clock=Clock())
+    a.session.after = [with_bar(1280, 720, 2), with_bar(1280, 720, 3), with_bar(1280, 720, 4)]
+    a.title_menu.select("Game Options", by="keys")
+    assert a.session.keys == ["Down", "Down", "Down"] and a.session.clicks == []
+
+
+def test_a_click_that_does_not_move_the_highlight_fails():
+    a = appmod.App(MouseSession(Backend([with_bar(1280, 720, 1)]), works=False), Game(), clock=Clock())
+    with pytest.raises(appmod.ScenarioFailed, match="clicking row 4 left the highlight on row 1"):
+        a.title_menu.select("Game Options")
+
+
 def test_settled_item_waits_for_a_highlight_that_is_still_moving():
     a = make([with_bar(1280, 720, 1)] * 3)
     assert a.title_menu.wait_until_displayed().settled_item() == "Start New Commander"

@@ -95,13 +95,31 @@ class MenuList:
               "; the game logged %d key presses" % n
         raise ScenarioFailed("the highlight did not leave row %s after %s was held for up to %.1f s%s" % (before, key, cap, why))
 
+    def click_index(self, index, cap=3.0):
+        """Click row `index` (1-based) and wait until the highlight is on it. A click lands on one row however slow the frames are, where a
+        held key can move one row too far."""
+        from ...app import ScenarioFailed
+        rows = self.rows
+        if not 1 <= index <= len(rows): raise ScenarioFailed("cannot click row %d: %d rows are drawn" % (index, len(rows)))
+        x0, y0, x1, y1 = rows[index - 1]["box"]
+        self.app.click_until((x0 + x1) // 2, (y0 + y1) // 2, lambda: self.selected_index == index, cap)
+        after = self.settled_index()
+        if after != index: raise ScenarioFailed("clicking row %d left the highlight on row %s" % (index, after))
+        return self
+
     def wait_until_selected_index(self, index, timeout=5):
         self.app.wait_until(lambda: self.selected_index == index, "row %d to be the highlighted row (now %s of %d visible)" % (index, self.selected_index, self.visible_count), timeout)
         self.app.screenshot("selected-row-%d" % index)
         return self
 
-    def select_index(self, index, timeout=5, max_steps=12):
-        """Press Up/Down until row `index` is highlighted, looking at the screen after every press (a press can move more than one row)."""
+    def select_index(self, index, timeout=5, max_steps=12, by=None):
+        """Highlight row `index`: click it (by="mouse", the default where the app can click), else press Up/Down until it is highlighted,
+        looking at the screen after every press (a press can move more than one row)."""
+        if by is None: by = "mouse" if getattr(self.app, "can_click", lambda: False)() else "keys"
+        if by == "mouse":
+            if self.settled_index() is None: raise AssertionError("the list is not visible, cannot select row %d" % index)
+            self.click_index(index)
+            return self.wait_until_selected_index(index, timeout)
         for _ in range(max_steps):
             cur = self.settled_index()
             if cur is None: raise AssertionError("the list is not visible, cannot select row %d" % index)

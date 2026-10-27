@@ -42,6 +42,7 @@ class TitleMenuPage(Page):
         i = self.menu.settled_index()
         return self.EXPECTED_ITEMS[i - 1] if i is not None and self.menu.visible_count == len(self.EXPECTED_ITEMS) else None
 
-    def select(self, item, timeout=5):
-        self.menu.select_index(self.EXPECTED_ITEMS.index(item) + 1, timeout)
+    def select(self, item, timeout=5, by=None):
+        """Highlight `item` with the mouse where the environment can click, else with the keys; by="mouse" or by="keys" chooses."""
+        self.menu.select_index(self.EXPECTED_ITEMS.index(item) + 1, timeout, by=by)
         return self
