@@ -2,6 +2,8 @@ name: Test Oolite package on various platforms
 on:
   workflow_dispatch:
   push:
+    # Feature branches are built by their pull_request run; building them on push as well ran everything twice.
+    branches: [master, '**maintenance', stickleprojects]
   pull_request:
 
 concurrency:

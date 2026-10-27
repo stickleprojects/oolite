@@ -6,6 +6,7 @@
 name: UI tests
 on:
   push:
+    branches: [master, '**maintenance', stickleprojects]
     paths:
       - 'tools/oolite-ui-test-framework/**'
       - 'tests/ui/**'
