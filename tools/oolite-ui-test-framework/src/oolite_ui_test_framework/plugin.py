@@ -57,6 +57,7 @@ def _slug(s):
 
 
 def pytest_configure(config):
+    config.pluginmanager.register(SharedLaunchFirst(), "uitest-shared-launch-first")
     config.addinivalue_line("markers", "only_wm(*names): run only in the named environments / families (WM-specific tests)")
     config.addinivalue_line("markers", "game: needs a display server and the AppImage")
     config.addinivalue_line("markers", "needs_toggle: run only with --ui-toggle (reason recorded as NOT TESTED)")
@@ -118,6 +119,19 @@ def pytest_collection_modifyitems(config, items):
         for m in item.iter_markers("only_wm"):
             if env is None or (env.name not in m.args and env.family not in m.args):
                 item.add_marker(pytest.mark.skip(reason="only for %s" % ", ".join(m.args)))
+
+
+class SharedLaunchFirst:
+    """Within a run, the tests on the shared launch first: a private launch (app, fresh_game) suspends it, so a shared test after one
+    relaunched the game (about 18 s). A plugin of its own so it can run last, after pytest's reordering by parametrised fixture."""
+    @pytest.hookimpl(trylast=True)
+    def pytest_collection_modifyitems(self, items):
+        items.sort(key=lambda i: (_run(i), "launched_game" not in getattr(i, "fixturenames", ())))
+
+
+def _run(item):
+    cs = getattr(item, "callspec", None); c = cs.params.get("case") if cs else None
+    return c.run if c is not None else 0
 
 
 # ---------------------------------------------------------------- fixtures

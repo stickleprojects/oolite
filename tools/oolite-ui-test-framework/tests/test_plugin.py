@@ -127,6 +127,18 @@ def test_every_test_function_gets_the_same_case_object(project):
     assert sorted(by_run) == [1, 2] and all(len(ids) == 1 for ids in by_run.values())
 
 
+def test_shared_launch_tests_run_together_before_private_launches(project):
+    """A private launch suspends the shared one, so in each run every launched_game test comes before the first other test."""
+    pt, args, tmp = project
+    pt.makepyfile(test_private="def test_private_first(case, fresh_game): pass\n")
+    rec = pt.inline_run("--collect-only", *[a for a in args if not a.startswith("--junitxml")])
+    items = rec.getcalls("pytest_collection_finish")[0].session.items   # the final order (inline_genitems gives collection order)
+    for run in (1, 2):
+        shared = ["launched_game" in i.fixturenames for i in items if i.callspec.params["case"].run == run]
+        assert any(shared) and not all(shared) and shared == sorted(shared, reverse=True)
+    assert [i.callspec.params["case"].run for i in items] == sorted(i.callspec.params["case"].run for i in items)
+
+
 @pytest.mark.parametrize("sel,name,count", [(["-m", "family_marco"], "test_has_frame", 2), (["-m", "family_kwin"], "test_has_frame", 0),
                                              (["-m", "session_x11"], "test_has_frame", 2), (["-k", "test_gets_focus and run2"], "test_gets_focus", 1)])
 def test_markers_and_k_select(project, sel, name, count):
