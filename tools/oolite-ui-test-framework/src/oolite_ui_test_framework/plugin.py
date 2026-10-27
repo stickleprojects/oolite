@@ -21,6 +21,7 @@ Case = collections.namedtuple("Case", "env label app run")
 class State:
     def __init__(self):
         self.launches = {}; self.toggles = {}; self.outcomes = collections.defaultdict(dict); self.hard = []; self.wmver = {}; self.screen = ""; self.warnings = []
+        self.timing = {}   # (env, build, run, test) -> [start, seconds over setup + call + teardown]
 
 
 STATE = State()
@@ -215,12 +216,13 @@ def launched_game(request, case, session_mgr, opts):
     key = (case.env, case.label, case.run); s = session_mgr.get()
 
     def start():
-        game = _game(cfg, case, s, "shared").start()
-        rec = scenarios.run_startup(s, game, opts)
+        t0 = time.time(); game = _game(cfg, case, s, "shared").start()
+        rec = scenarios.run_startup(s, game, opts); t1 = time.time()
         crashed = int(game.proc.poll() not in (None, 0) and rec.get("exited") == 1)
         rec.update(wm=case.env, build=case.label, screen=cfg.getoption("--ui-screen"), run=case.run, crashed=crashed)
         rec.setdefault("dx", None); rec.setdefault("dy", None)
         rec.update(_render_fields(s, game, rec, cfg, case))
+        rec.update(start=raw_results.stamp(t0), startup_secs=round(t1 - t0, 1), render_secs=round(time.time() - t1, 1))
         rec = geometry.apply(rec, opts.tol)
         STATE.launches.setdefault(key, rec)          # the first launch is the RESULT line; a relaunch only adds a warning
         return game, rec
@@ -262,8 +264,9 @@ class FreshGame:
         self.request, self.case, self.mgr, self.opts = request, case, mgr, opts
         self.session = mgr.get()
         _only_this_game()
-        self.game = _game(request.config, case, self.session, request.node.originalname).start()
+        t0 = time.time(); self.game = _game(request.config, case, self.session, request.node.originalname).start()
         self.rec = scenarios.run_startup(self.session, self.game, opts)
+        self.rec.update(start=raw_results.stamp(t0), startup_secs=round(time.time() - t0, 1))
         self.crashed = int(self.game.proc.poll() not in (None, 0) and self.rec.get("exited") == 1)
 
     def toggle(self):
@@ -333,6 +336,7 @@ def pytest_runtest_makereport(item, call):
     case = cs.params.get("case") if cs else None
     if case is None: return
     key = (case.env, case.label, case.run); name = item.originalname
+    t = STATE.timing.setdefault(key + (name,), [call.start, 0.0]); t[1] += call.duration
     if rep.when == "call" or (rep.when == "setup" and rep.outcome == "skipped"):
         STATE.outcomes[key][name] = (rep.outcome, _reason(rep) if rep.outcome != "passed" else "")
     elif rep.when == "setup" and rep.outcome == "failed":
@@ -352,7 +356,9 @@ def pytest_sessionfinish(session, exitstatus):
             rec = dict(wm=key[0], build=key[1], screen=STATE.screen, run=key[2], exited=None, dx=None, dy=None)
             lines.append(raw_results.format_result(pass_fail.apply_outcomes(rec, STATE.outcomes[key])))
         for test, (o, why) in sorted(STATE.outcomes.get(key, {}).items()):
-            lines.append("TEST wm=%s build=%s run=%d test=%s outcome=%s reason=%s" % (key[0], key[1], key[2], test, o, why.replace("\n", " ")))
+            start, secs = STATE.timing.get(key + (test,), (None, None))
+            lines.append("TEST wm=%s build=%s run=%d test=%s outcome=%s start=%s secs=%s reason=%s" % (key[0], key[1], key[2], test, o,
+                         raw_results.stamp(start) if start else "NA", "NA" if secs is None else round(secs, 1), why.replace("\n", " ")))
     for env, build, run, text in STATE.warnings: lines.append("WARN wm=%s build=%s run=%d text=%s" % (env, build, run, text))
     for env, screen, build, why in STATE.hard: lines.append("HARD wm=%s screen=%s build=%s reason=%s" % (env, screen, build, why.replace("\n", " ")[:300]))
     with open(path, "a") as f: f.write("\n".join(lines) + "\n")

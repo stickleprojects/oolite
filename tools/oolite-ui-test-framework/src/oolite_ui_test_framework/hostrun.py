@@ -51,7 +51,7 @@ _QUIET = False
 
 
 def say(*a):
-    if not _QUIET: print(*a)
+    if not _QUIET: print(raw_results.stamp(), *a)
 
 
 def _die(msg):

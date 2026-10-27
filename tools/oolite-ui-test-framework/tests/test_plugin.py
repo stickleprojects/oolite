@@ -1,5 +1,6 @@
 """The pytest layer, exercised with pytester: the real game tests (app/ and window/) against FAKE launch fixtures (no display, no game)."""
 import os
+import re
 
 import pytest
 
@@ -100,7 +101,7 @@ def test_raw_file_is_result_compatible_and_has_test_lines(project):
     na = [l for l in res if "build=na" in l][0]
     assert "focus=NA" in na and "t_ok=1" in na
     tests = [l for l in raw if l.startswith("TEST")]
-    assert any("test=test_gets_focus outcome=skipped reason=NOT MEASURABLE" in l for l in tests)
+    assert any(re.search(r"test=test_gets_focus outcome=skipped start=\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ secs=[\d.]+ reason=NOT MEASURABLE", l) for l in tests)
     assert any("test=test_has_frame outcome=failed" in l and "build=new" in l for l in tests)
     assert os.path.exists(tmp / "j.xml")
 

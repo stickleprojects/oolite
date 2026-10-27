@@ -1,6 +1,13 @@
 """RESULT / SKIP / WMVER / HOSTENV raw lines. The key=value fields of RESULT are the same as the bash harness wrote, plus extras at the end."""
+import time
+
 ORDER = ["wm", "build", "screen", "run", "frame", "focus", "dx", "dy", "centred", "exited", "splash_dx", "splash_dy", "post_dx", "post_dy", "tol",
          "t_ok", "t_method", "t_frame", "t_focus", "t_dx", "t_dy", "t_centred"]
+
+
+def stamp(t=None):
+    """UTC timestamp for raw lines and progress output: 2026-10-27T05:40:12Z."""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t))
 
 
 def fmt(v):
