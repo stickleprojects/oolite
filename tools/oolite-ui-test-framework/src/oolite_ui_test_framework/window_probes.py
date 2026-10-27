@@ -107,6 +107,9 @@ class XToolsBackend:
     def key_up(self, key):
         sh(["xdotool", "keyup", key], self.env)
 
+    def autorepeat_off(self):
+        sh(["xset", "r", "off"], self.env)
+
 
 class XlibBackend:
     """python-xlib, one persistent connection. Same interface as XToolsBackend (send_key still uses xdotool)."""
@@ -117,6 +120,10 @@ class XlibBackend:
 
     def _atom(self, n):
         return self.d.intern_atom(n)
+
+    def autorepeat_off(self):
+        from Xlib import X
+        self.d.change_keyboard_control(auto_repeat_mode=X.AutoRepeatModeOff); self.d.sync()
 
     def root_id(self):
         return self.root.id

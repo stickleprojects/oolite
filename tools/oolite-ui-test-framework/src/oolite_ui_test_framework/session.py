@@ -88,6 +88,10 @@ class Session:
                 self.sleep(1)
             if not chk: raise SessionError("%s failed to start (no _NET_SUPPORTING_WM_CHECK): %s" % (e.name, self._tail("wm.log")))
             self.sleep(e.settle_after)
+            # A held key is then ONE press. With autorepeat each repeat is a release + press pair: the game takes every pair as a new
+            # press (its own 0.2 s repeat never applies), and pairs queued during a slow frame move the menu after the key is released.
+            # Set after the WM is up, which may apply its own repeat settings.
+            self.backend.autorepeat_off()
             self.game_env = {"SDL_VIDEODRIVER": "x11"}
             self.primary = window_probes.primary_monitor(self.backend.monitors())
         elif e.kind == "wayland":
