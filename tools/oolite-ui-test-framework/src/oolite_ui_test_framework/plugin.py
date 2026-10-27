@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from . import geometry, pass_fail, raw_results, registry, scenarios, shared_launch, session as sessmod
+from . import geometry, pass_fail, preconditions, raw_results, registry, scenarios, shared_launch, session as sessmod
 
 Case = collections.namedtuple("Case", "env label app run")
 
@@ -212,6 +212,8 @@ def _render_fields(s, game, rec, cfg, case):
                 try: texts.append((f, open(os.path.join(root, f), errors="replace").read()))
                 except OSError: pass
     n, first = render_check.scan_logs(texts); out["gl_errors"] = n
+    req = next((r for r in (preconditions.requested_window(t) for f, t in texts if f == "Latest.log") if r), None)
+    if req: out["requested_w"], out["requested_h"] = req
     if first: out["gl_first"] = first
     grab = getattr(s.backend, "grab", None); w = s.window_id() if s.backend is not None else None
     shot = grab(w) if grab and w else None
@@ -280,11 +282,22 @@ def _share_guard(request):
     if hasattr(lg, "verify"): lg.verify(request.node.originalname)
 
 
+def _require_preconditions(request, s):
+    """Check what a game test's markers rely on (oolite_ui_test_framework/preconditions.py) before its game starts, so a broken environment
+    fails as PRECONDITION <name> rather than as the test's own assertion. Called by the real launch fixtures, which have a session."""
+    marks = {m for m in ("needs_keys", "needs_mouse") if request.node.get_closest_marker(m)}
+    if not marks: return
+    preconditions.require("input_tool", preconditions.input_tool(s.env))
+    preconditions.require("fake_input_offered", preconditions.fake_input_offered(s.env))
+    if "needs_keys" in marks: preconditions.require("key_repeat_off", preconditions.key_repeat_off(s))
+
+
 class FreshGame:
     """A launch of its own for tests that change game state. .rec is the startup record; .toggle() runs F12 and returns the record with t_* fields."""
     def __init__(self, request, case, mgr, opts):
         self.request, self.case, self.mgr, self.opts = request, case, mgr, opts
         self.session = mgr.get()
+        _require_preconditions(request, self.session)
         _only_this_game()
         t0 = time.time(); self.game = _game(request.config, case, self.session, request.node.originalname).start()
         self.rec = scenarios.run_startup(self.session, self.game, opts)
@@ -335,6 +348,8 @@ def app(request, case, session_mgr):
     from . import app as appmod, ocr as ocrmod
     assert os.path.isfile(case.app), "AppImage not found: %s" % case.app
     s = session_mgr.get()
+    _require_preconditions(request, s)
+    preconditions.require("screenshot_support", preconditions.screenshot_support(s))
     if getattr(s.backend, "grab", None) is None: pytest.skip("NOT MEASURABLE: no screenshot support in this environment")
     _only_this_game()
     game = _game(request.config, case, s, request.node.originalname).start()
@@ -361,6 +376,8 @@ def pytest_runtest_makereport(item, call):
     t = STATE.timing.setdefault(key + (name,), [call.start, 0.0]); t[1] += call.duration
     if rep.when == "call" or (rep.when == "setup" and rep.outcome == "skipped"):
         STATE.outcomes[key][name] = (rep.outcome, _reason(rep) if rep.outcome != "passed" else "")
+    elif rep.when == "setup" and rep.outcome == "failed" and _reason(rep).startswith("PRECONDITION"):
+        STATE.outcomes[key][name] = ("failed", _reason(rep))
     elif rep.when == "setup" and rep.outcome == "failed":
         STATE.hard.append((case.env, STATE.screen, case.label, _reason(rep) or "setup failed"))
 

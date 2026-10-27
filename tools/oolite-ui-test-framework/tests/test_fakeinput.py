@@ -58,6 +58,7 @@ def test_session_moves_the_pointer_to_the_window_position_plus_the_point(monkeyp
     s = sessmod.Session.__new__(sessmod.Session)
     s.env = types.SimpleNamespace(keys="fakeinput")
     s.backend = types.SimpleNamespace(find_window=lambda: 7, abs_geom=lambda w: (100, 50, 800, 600) if w == 7 else None)
+    s.primary = (0, 0, 1280, 720)
     sent = []
     monkeypatch.setattr(fakeinput, "send", lambda c, **kw: sent.append(c))
     s.mouse_move(10, 20); s.mouse_down(); s.mouse_up()

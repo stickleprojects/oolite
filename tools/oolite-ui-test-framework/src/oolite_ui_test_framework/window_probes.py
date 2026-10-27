@@ -119,6 +119,11 @@ class XToolsBackend:
     def autorepeat_off(self):
         sh(["xset", "r", "off"], self.env)
 
+    def autorepeat_on(self):
+        """True / False, or None if xset could not tell."""
+        m = re.search(r"auto repeat:\s+(on|off)", sh(["xset", "q"], self.env))
+        return None if not m else m[1] == "on"
+
 
 class XlibBackend:
     """python-xlib, one persistent connection. Same interface as XToolsBackend (keys and the mouse still use xdotool)."""
@@ -133,6 +138,10 @@ class XlibBackend:
     def autorepeat_off(self):
         from Xlib import X
         self.d.change_keyboard_control(auto_repeat_mode=X.AutoRepeatModeOff); self.d.sync()
+
+    def autorepeat_on(self):
+        try: return bool(self.d.get_keyboard_control().global_auto_repeat)
+        except Exception: return None
 
     def root_id(self):
         return self.root.id

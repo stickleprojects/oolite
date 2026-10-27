@@ -5,7 +5,7 @@ import re
 import subprocess
 import time
 
-from . import fakeinput, window_probes
+from . import fakeinput, preconditions, window_probes
 
 
 class SessionError(RuntimeError):
@@ -208,10 +208,12 @@ class Session:
         return not self.env.mouse_na
 
     def mouse_move(self, x, y):
-        """Put the pointer at (x, y) in the game window's own pixels, the same coordinates as a screenshot of it."""
+        """Put the pointer at (x, y) in the game window's own pixels, the same coordinates as a screenshot of it. Fails as a
+        PRECONDITION if that point is off the screen (a window larger than the screen) or, for fake-input, the window cannot be found."""
+        g = self.backend.abs_geom(self.window_id()) if self.backend is not None and hasattr(self.backend, "abs_geom") else None
+        if g: preconditions.check("point_on_screen", preconditions.point_on_screen(g[0] + x, g[1] + y, self.primary))
         if self.env.keys == "fakeinput":   # fake-input takes output coordinates: the window's position on the output plus (x, y)
-            g = self.backend.abs_geom(self.window_id()) if self.backend else None
-            if not g: raise SessionError("fake input: cannot find the game window's position for a mouse move")
+            preconditions.check("window_position_known", None if g else "cannot find the game window's position on the screen, which fake-input clicks need")
             return fakeinput.mouse_move(g[0] + x, g[1] + y)
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).mouse_move(self.window_id(), x, y)
 
