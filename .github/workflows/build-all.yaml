@@ -85,6 +85,8 @@ jobs:
 
   build-flatpak:
     needs: clang-format-check
+    # Only the release job uses the Flatpak, and that runs only in OoliteProject/oolite; forks can still build it by hand.
+    if: github.repository == 'OoliteProject/oolite' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
