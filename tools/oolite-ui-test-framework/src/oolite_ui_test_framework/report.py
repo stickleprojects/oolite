@@ -217,7 +217,7 @@ WARNINGS = []
 LAST = {}   # counts from the last report() call, for exit codes
 OUT_ORDER = ["REGRESSED", "SUSPECT", "STILL BROKEN", "FIXED", "NEEDS MORE RUNS", "WORKS", "NOT MEASURABLE"]
 MAIN_CRITS = ("frame", "focus", "splash_centred", "centred", "renders")
-TEST_NAMES = {"frame": "has_frame", "focus": "gets_focus", "splash_centred": "splash_centred", "centred": "game_window_centred", "renders": "game_renders", "toggle": "f12_toggle"}
+TEST_NAMES = {"frame": "has_frame", "focus": "gets_focus", "splash_centred": "splash_centred", "centred": "game_window_centred", "renders": "title_menu_is_displayed", "toggle": "f12_toggle"}
 TOGGLE_CRITS = ("t_frame", "t_focus", "t_centred")
 
 

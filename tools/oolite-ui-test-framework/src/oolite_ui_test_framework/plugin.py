@@ -276,18 +276,6 @@ class FreshGame:
             os.makedirs(d, exist_ok=True); c = self.case
             png.write_png(os.path.join(d, "%s-%s-run%d-%s.png" % (c.env, c.label, c.run, stage)), shot[0], shot[1], shot[2])
 
-    def input_responds(self, key="Down", presses=2, settle=2.0):
-        """Screenshot, press `key`, screenshot again: {'input_changed': share, 'input_key': key}, or {} when no screenshots are possible."""
-        from . import render_check
-        s = self.session; grab = getattr(s.backend, "grab", None); w = s.window_id() if s.backend is not None else None
-        a = grab(w) if grab and w else None
-        if not a: return {}
-        for _ in range(presses): s.send_key(key, w); time.sleep(0.4)
-        time.sleep(settle)
-        b = grab(w)
-        ch = render_check.changed_share(a[2], b[2]) if b and (b[0], b[1]) == (a[0], a[1]) else None
-        return {} if ch is None else {"input_changed": ch, "input_key": key}
-
     def finish(self):
         cfg = self.request.config; c = self.case
         self.rec.update(wm=c.env, build=c.label, screen=cfg.getoption("--ui-screen"), run=c.run, crashed=self.crashed)
@@ -352,6 +340,9 @@ def pytest_sessionfinish(session, exitstatus):
             rec = dict(STATE.launches.get(key) or STATE.toggles[key])
             if key in STATE.toggles: rec.update({k: v for k, v in STATE.toggles[key].items() if k.startswith("t_")})
             lines.append(raw_results.format_result(pass_fail.apply_outcomes(rec, STATE.outcomes.get(key, {}))))
+        else:   # only `app` tests ran for this case: a RESULT line with just their criteria, so the report counts them
+            rec = dict(wm=key[0], build=key[1], screen=STATE.screen, run=key[2], exited=None, dx=None, dy=None)
+            lines.append(raw_results.format_result(pass_fail.apply_outcomes(rec, STATE.outcomes[key])))
         for test, (o, why) in sorted(STATE.outcomes.get(key, {}).items()):
             lines.append("TEST wm=%s build=%s run=%d test=%s outcome=%s reason=%s" % (key[0], key[1], key[2], test, o, why.replace("\n", " ")))
     for env, build, run, text in STATE.warnings: lines.append("WARN wm=%s build=%s run=%d text=%s" % (env, build, run, text))

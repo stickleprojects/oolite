@@ -99,6 +99,16 @@ def test_raw_file_is_result_compatible_and_has_test_lines(project):
     assert os.path.exists(tmp / "j.xml")
 
 
+def test_app_only_runs_still_get_a_result_line(project):
+    """A run of only `app` tests (no shared launch) still writes RESULT lines, with the title-menu outcome as the renders criterion."""
+    pt, args, tmp = project
+    pt.makepyfile(test_gamecopy="def test_title_menu_is_displayed(case):\n    assert case.label != 'new'\n")
+    pt.runpytest(*args)
+    res = [l for l in open(tmp / "out.raw").read().splitlines() if l.startswith("RESULT")]
+    assert len(res) == 6 and all("exited=NA" in l for l in res)
+    assert all(("renders=0" in l) == ("build=new" in l) for l in res)
+
+
 @pytest.mark.parametrize("sel,name,count", [(["-m", "family_marco"], "test_has_frame", 6), (["-m", "family_kwin"], "test_has_frame", 0),
                                              (["-m", "session_x11"], "test_has_frame", 6), (["-k", "test_gets_focus and new"], "test_gets_focus", 2)])
 def test_markers_and_k_select(project, sel, name, count):

@@ -41,7 +41,7 @@ Each build is `label:path`. Every run needs `--desc`; it is left out of the exam
 | `--host` | also your own desktop (see [Host mode](#host-mode)); `--env ""` runs only that |
 | `--toggle` | also run the F12 fullscreen round trip |
 | `--tests a,b` | only these tests (the `test_` prefix is optional); the report then says PARTIAL RUN |
-| `--quick` | smoke preset: 1 run, first screen size, only `game_launches,game_renders` unless `--tests` is given |
+| `--quick` | smoke preset: 1 run, first screen size, only `game_launches,title_menu_is_displayed` unless `--tests` is given |
 | `--runs N` | runs per environment and build (default 10); `--host-runs N` for your desktop (default 5) |
 | `--screens WxH,2head` | screen sizes (default `3840x1080`; `2head` = two 1920x1080 monitors) |
 | `-q` | print only `PASS` or `FAIL`; errors go to stderr; the report files are still written |

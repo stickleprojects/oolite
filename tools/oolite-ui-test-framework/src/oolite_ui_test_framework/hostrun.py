@@ -21,7 +21,7 @@ DEFAULT_ENVS = "marco,openbox,xfwm4,muffin,kwin,mutter"
 WAYLAND_ENVS = "kwin-xwayland,kwin-native,sway-xwayland,sway-native,mutter-xwayland,mutter-native,weston-xwayland,weston-native"
 
 
-QUICK_TESTS = "game_launches,game_renders"   # --quick: one shared launch per environment, so about 20 s each
+QUICK_TESTS = "game_launches,title_menu_is_displayed"   # --quick: the shared launch plus one title-menu launch per environment
 
 
 def test_selector(names):

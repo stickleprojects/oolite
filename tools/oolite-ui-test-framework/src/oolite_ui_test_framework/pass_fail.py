@@ -51,24 +51,6 @@ def check_f12_toggle(rec):
     return (FAILED, "after the round trip the window lost: " + ", ".join(bad)) if bad else (PASSED, "")
 
 
-def check_renders(rec):
-    """after the splash the window shows real content (not blank / black / uniform), it keeps changing (the title screen animates), and the logs have no GL errors"""
-    if _v(rec, "exited") == "1": return FAILED, "the game window was gone (game exited)"
-    if _v(rec, "gl_errors") not in (None, "0"): return FAILED, "GL problem in the logs: %s" % rec.get("gl_first", "")
-    if _v(rec, "render_changed") == "0.0": return FAILED, "the window did not change between two screenshots %s s apart: frames are not reaching it (frozen)" % rec.get("render_gap", "?")
-    r = _v(rec, "render")
-    if r is None: return SKIPPED, "NOT MEASURABLE: no screenshot support in this environment"
-    return (PASSED, "") if r == "ok" else (FAILED, "the window looks %s (colours=%s std=%s)" % (r, rec.get("render_colours"), rec.get("render_std")))
-
-
-def check_responds_to_keys(rec):
-    """the game redraws in response to keyboard input (menu selection moves): catches a window that shows a picture but is not live"""
-    if _v(rec, "exited") == "1": return FAILED, "the game exited"
-    c = _v(rec, "input_changed")
-    if c is None: return SKIPPED, "NOT MEASURABLE: no screenshot support in this environment"
-    return (PASSED, "") if float(c) > 0 else (FAILED, "the window did not change after %s key presses: it is not responding to input" % rec.get("input_key", "?"))
-
-
 TESTS = {"test_has_frame": check_frame, "test_gets_focus": check_focus, "test_splash_centred": check_splash_centred,
          "test_game_window_centred": check_window_centred, "test_f12_toggle": check_f12_toggle}
 
@@ -83,7 +65,7 @@ def case_id(env, label, run, session=""):
 def apply_outcomes(rec, outcomes):
     """RESULT-compatible record from a launch record and the pytest outcomes {test: (outcome, reason)}: skipped = NA, failed = 0, passed = 1."""
     out = dict(rec)
-    for test, key in (("test_has_frame", "frame"), ("test_gets_focus", "focus"), ("test_game_window_centred", "centred"), ("test_game_renders", "renders")):
+    for test, key in (("test_has_frame", "frame"), ("test_gets_focus", "focus"), ("test_game_window_centred", "centred"), ("test_title_menu_is_displayed", "renders")):
         if test in outcomes:
             o = outcomes[test][0]; out[key] = 1 if o == PASSED else 0 if o == FAILED else None
     return out
