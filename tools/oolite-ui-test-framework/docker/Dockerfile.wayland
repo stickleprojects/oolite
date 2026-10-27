@@ -2,7 +2,7 @@ FROM archlinux:base-20251019.0.436919
 RUN (pacman -Sy --noconfirm archlinux-keyring && pacman-key --init && pacman-key --populate archlinux && pacman -Su --noconfirm --needed xorg-xwayland xorg-xwininfo xorg-xprop xdotool xorg-xrandr procps-ng libcap xorg-xauth mesa libglvnd dbus weston sway grim jq wayland-utils wlr-randr python python-pytest python-xlib tesseract tesseract-data-eng python-pillow ttf-dejavu) >/tmp/pacman.log 2>&1 || (tail -25 /tmp/pacman.log; false)
 RUN for p in kwin mutter; do pacman -S --noconfirm --needed $p >/dev/null 2>&1 && echo "OK $p" || echo "MISSING $p"; done | tee /wl-packages.txt
 ENV LIBGL_ALWAYS_SOFTWARE=1 PYTHONPATH=/uitest PYTHONDONTWRITEBYTECODE=1
-COPY fakekey.c /tmp/fakekey.c
+COPY docker/fakekey.c /tmp/fakekey.c
 RUN pacman -S --noconfirm --needed gcc pkgconf wayland-protocols plasma-wayland-protocols >/dev/null && cd /tmp \
  && wayland-scanner client-header /usr/share/plasma-wayland-protocols/fake-input.xml fake-input-client-protocol.h \
  && wayland-scanner private-code /usr/share/plasma-wayland-protocols/fake-input.xml fake-input-protocol.c \
