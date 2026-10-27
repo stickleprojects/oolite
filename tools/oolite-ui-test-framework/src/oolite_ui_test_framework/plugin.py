@@ -85,7 +85,11 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("case", [pytest.param(None, marks=pytest.mark.skip(reason="no --ui-env / --ui-app given"))], ids=["none"], scope="session")
         return
     label = build_label(cfg)
-    cases = [Case(env.name, label, os.path.abspath(app), n) for n in range(1, cfg.getoption("--ui-runs") + 1)]
+    # The same Case objects for every test function: pytest 7 (Debian image) reuses a session fixture only for the identical param
+    # (`is`), so new but equal Cases tore launched_game down and relaunched the game before every test.
+    if not hasattr(cfg, "_uitest_cases"):
+        cfg._uitest_cases = [Case(env.name, label, os.path.abspath(app), n) for n in range(1, cfg.getoption("--ui-runs") + 1)]
+    cases = cfg._uitest_cases
     metafunc.parametrize("case", cases, ids=[pass_fail.case_id(c.env, c.run, env.session) for c in cases], scope="session")
 
 

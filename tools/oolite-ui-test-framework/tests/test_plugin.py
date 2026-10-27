@@ -116,6 +116,17 @@ def test_app_only_runs_still_get_a_result_line(project):
     assert all(("renders=0" in l) == ("build=new" in l) for l in res)
 
 
+def test_every_test_function_gets_the_same_case_object(project):
+    """pytest 7 reuses a session fixture only for the identical param (`is`): equal but new Case objects per test function relaunched the
+    shared game before every test on the Debian image."""
+    pt, args, tmp = project
+    items, _ = pt.inline_genitems(*[a for a in args if not a.startswith("--junitxml")])
+    by_run = {}
+    for i in items:
+        c = i.callspec.params["case"]; by_run.setdefault(c.run, set()).add(id(c))
+    assert sorted(by_run) == [1, 2] and all(len(ids) == 1 for ids in by_run.values())
+
+
 @pytest.mark.parametrize("sel,name,count", [(["-m", "family_marco"], "test_has_frame", 2), (["-m", "family_kwin"], "test_has_frame", 0),
                                              (["-m", "session_x11"], "test_has_frame", 2), (["-k", "test_gets_focus and run2"], "test_gets_focus", 1)])
 def test_markers_and_k_select(project, sel, name, count):
