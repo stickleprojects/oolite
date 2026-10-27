@@ -31,3 +31,12 @@ tools-make/
 
 # Debug output
 /core
+
+# Local working files of the UI-test framework: builds under test, patches, notes, old harness, results (not part of the project)
+/tools/oolite-ui-test-framework/work/
+/tools/oolite-ui-test-framework/appimages/
+/tools/oolite-ui-test-framework/patches/
+/tools/oolite-ui-test-framework/GameData-hw/
+/tools/oolite-ui-test-framework/wmtest/
+/tools/oolite-ui-test-framework/wmtest-share/
+/tools/oolite-ui-test-framework/results/
