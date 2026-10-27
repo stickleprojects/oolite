@@ -81,6 +81,17 @@ def test_toggle_round_trip_ok():
     assert t["t_ok"] == 1 and t["t_method"] == "key" and t["t_outer"] == "1280x720+1280+180" and [k for k, _ in s.keys] == ["F12", "F12"]
 
 
+def test_toggle_of_a_maximised_window_is_judged_on_the_client_area():
+    """#10: a maximised window's frame already covers the 1024x768 screen; fullscreen only drops the title bar, so only the client grows.
+    Judged on the frame, the first F12 looked ignored and the sendevent fallback toggled the game back."""
+    clk = FakeClock()
+    maxed = window_probes.Obs(framed=1, focused=1, outer=(0, 0, 1024, 768), client=(0, 37, 1024, 731))
+    full = window_probes.Obs(framed=0, focused=1, outer=(0, 0, 1024, 768), client=(0, 0, 1024, 768))
+    s = FakeSession(clk, [(0, maxed)]); s.primary = (0, 0, 1024, 768); s.toggle = [full, maxed]
+    t = scenarios.run_toggle(s, game(), scenarios.Opts(toggle=True), clk)
+    assert t["t_ok"] == 1 and t["t_method"] == "key" and [k for k, _ in s.keys] == ["F12", "F12"]
+
+
 def test_toggle_ignored_falls_back_then_fails():
     clk = FakeClock(); win = window_probes.Obs(framed=0, focused=0, outer=(0, 0, 768, 768))
     s = FakeSession(clk, [(0, win)]); s.toggle = []

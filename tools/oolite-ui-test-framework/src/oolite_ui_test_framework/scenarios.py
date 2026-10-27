@@ -121,6 +121,14 @@ def _size(o):
     return None if o is None or o.outer is None else (o.outer[2], o.outer[3])
 
 
+def _toggle_size(o):
+    """Size of the game's own (client) area where the probe reports it, else of the outer window. F12 must be judged on the client: a
+    maximised window's frame already covers the screen, so going fullscreen only drops the title bar and the outer size stays the same
+    (opt2fix with a saved window larger than the screen, #10)."""
+    g = None if o is None else (o.client or o.outer)
+    return None if g is None else (g[2], g[3])
+
+
 def run_startup(session, game, opts=Opts(), clock=Clock):
     """Sample until the window has settled (at most opts.wait seconds), then take the final observation. Returns the raw record
     (geometry strings; no dx/dy yet)."""
@@ -161,10 +169,10 @@ def run_toggle(session, game, opts=Opts(), clock=Clock, shoot=lambda stage: None
     ok = 0; method = "key"; t = {}
     win = session.window_id()
     if win is not None:
-        s0 = _size(session.observe(cheap_only=True)); shoot("before")
-        _hold(session, "F12", clock); clock.sleep(3); s1 = _size(session.observe(cheap_only=True))
+        s0 = _toggle_size(session.observe(cheap_only=True)); shoot("before")
+        _hold(session, "F12", clock); clock.sleep(3); s1 = _toggle_size(session.observe(cheap_only=True))
         if s1 == s0:
-            session.send_key("F12", win); method = "sendevent"; clock.sleep(3); s1 = _size(session.observe(cheap_only=True))
+            session.send_key("F12", win); method = "sendevent"; clock.sleep(3); s1 = _toggle_size(session.observe(cheap_only=True))
         if s1 != s0:
             ok = 1; shoot("fullscreen")
             if method == "sendevent": session.send_key("F12", win)
