@@ -120,6 +120,16 @@ def test_stop_waits_only_until_the_game_has_gone(monkeypatch):
         assert len(naps) == want and all(n == 0.1 for n in naps)
 
 
+def test_stop_also_waits_for_the_appimage_runtime(monkeypatch):
+    """The game has gone but our child (the AppImage runtime) is still deleting its extracted copy: keep waiting for it."""
+    import types
+    g = scenarios.Game("/nonexistent.AppImage"); naps = []
+    g.proc = types.SimpleNamespace(poll=lambda: 0 if len(naps) >= 5 else None)
+    monkeypatch.setattr(g, "alive", lambda: False)
+    g.stop(sleep=naps.append)
+    assert len(naps) == 5
+
+
 def test_toggle_takes_frame_from_a_full_observation_and_shoots_each_stage():
     """On XWayland only the (not cheap) compositor probe sees the frame: the after-toggle frame must not come from the cheap probes alone."""
     clk = FakeClock(); win = window_probes.Obs(framed=0, focused=1, outer=(1280, 180, 1280, 720))

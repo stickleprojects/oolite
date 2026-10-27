@@ -65,10 +65,12 @@ class Game:
         return subprocess.run(["pgrep", "-f", "appimage_extracted"], capture_output=True).returncode == 0
 
     def stop(self, sleep=time.sleep, cap=2.0, poll=0.1):
-        """Ask the game to quit, wait until it has gone (at most `cap` seconds), then kill whatever is left."""
+        """Ask the game to quit, wait until it has gone (at most `cap` seconds), then kill whatever is left. Gone means the game AND our
+        child, the AppImage runtime, which deletes its extracted copy after the game exits: a game started during that clean-up got its
+        keys late (title-menu tests failed)."""
         for pat in ("appimage_extracted", r"/tmp/uitest-run\."): subprocess.run(["pkill", "-f", pat], capture_output=True)
         for _ in range(int(cap / poll)):
-            if not self.alive(): break
+            if (self.proc is None or self.proc.poll() is not None) and not self.alive(): break
             sleep(poll)
         subprocess.run(["pkill", "-9", "-f", "appimage_extracted"], capture_output=True)
         if self.dir and self.keep_log: self.save_log(self.keep_log)
