@@ -25,7 +25,6 @@ class FakeSession:
         if self.toggle: self.script.append((self.clock.t, self.toggle.pop(0)))
     def key_down(self, key): self.send_key(key)
     def key_up(self, key): pass
-    def hold_time(self, seconds): return seconds
     toggle = None
 
 
@@ -92,14 +91,6 @@ def test_toggle_ignored_falls_back_then_fails():
 def test_timing_constants_match_trial_sh():
     o = scenarios.Opts()
     assert (o.wait, o.sample, o.post_delay, o.tol) == (14.0, 0.5, 2.0, 40)
-
-
-def test_fake_input_keys_are_tapped_not_held():
-    """A held fake-input key autorepeats (F12 toggled ~10 times in a 1 s hold), so the hold is capped; XTEST keys keep the full hold."""
-    from oolite_ui_test_framework.session import Session
-    for keys, want in (("xtest", 1.0), ("fakeinput", 0.3)):
-        s = Session.__new__(Session); s.env = registry.Environment(name="f", family="f", session="X11", image="arch", kind="x11", start=["x"], keys=keys)
-        assert s.hold_time(1.0) == want
 
 
 def test_game_log_is_kept_before_the_run_folder_is_deleted(tmp_path):

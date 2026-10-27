@@ -133,6 +133,9 @@ class Session:
             m = re.search(e.version_re, self._run(e.version_cmd + " 2>&1") or "")
             self.version = m[0] if m else ""
         self._make_probes()
+        if e.session == "XWayland" and self.backend is not None:
+            # XWayland generates the key repeat itself (from KWin's fake-input keys too), as release + press pairs: off, as in the X11 sessions
+            self.backend.autorepeat_off()
         if e.headed and self.backend is not None:   # the host window manager may resize KWin's window: the output is what XWayland reports
             self.primary = window_probes.primary_monitor(self.backend.monitors()) or self.primary
         return self
@@ -191,11 +194,6 @@ class Session:
     def send_key(self, key, window=None):
         if self.env.keys == "fakeinput": return fakeinput.tap(key)
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).send_key(key, window)
-
-    def hold_time(self, seconds):
-        """How long to hold a key. XTEST keys must last a frame of the slow software-GL game; KWin fake-input keys are events that are never
-        missed, and holding one past ~0.6 s starts the key repeat (F12 then toggles about 10 times), so they are only tapped."""
-        return min(seconds, 0.3) if self.env.keys == "fakeinput" else seconds
 
     def key_down(self, key):
         if self.env.keys == "fakeinput": return fakeinput.key_down(key)

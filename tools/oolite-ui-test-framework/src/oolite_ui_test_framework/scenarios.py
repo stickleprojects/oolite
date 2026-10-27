@@ -120,7 +120,7 @@ def run_startup(session, game, opts=Opts(), clock=Clock):
 
 def _hold(session, key, clock, seconds=1.0):
     """Press `key` and hold it for about one frame of the slow software-GL game (a tap shorter than a frame is never seen by it)."""
-    session.key_down(key); clock.sleep(session.hold_time(seconds)); session.key_up(key)
+    session.key_down(key); clock.sleep(seconds); session.key_up(key)
 
 
 def run_toggle(session, game, opts=Opts(), clock=Clock, shoot=lambda stage: None):

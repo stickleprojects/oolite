@@ -33,7 +33,6 @@ class Session:
         self.keys.append(k)
         if self.after: self.backend.frames = [self.after.pop(0)] if len(self.after) > 1 else self.after   # one screen per key press
     def key_down(self, k): self.send_key(k)
-    def hold_time(self, s): return s
     def key_up(self, k): pass
 
 

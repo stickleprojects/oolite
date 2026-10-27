@@ -78,7 +78,7 @@ class App:
         """Hold `key` down until cond() is true, looking while it is down, then release it at once; at most `cap` seconds. The game moves a
         menu once per frame while a key is down (its own repeat is 0.2 s, shorter than a software-rendered frame), so a fixed hold moved
         0 rows or several depending on the frame rate. Returns whether cond() became true."""
-        t0 = self.clock.monotonic(); limit = self.session.hold_time(cap)
+        t0 = self.clock.monotonic(); limit = cap
         self.session.key_down(key)
         try:
             while True:
