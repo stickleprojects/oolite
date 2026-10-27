@@ -54,40 +54,46 @@ def project(pytester, tmp_path):
     src = "".join(open(os.path.join(GAME_TESTS, d, f)).read() + "\n" for d, f in (("app", "test_launch.py"), ("window", "test_window_manager.py")))
     pytester.makepyfile(test_gamecopy=src)
     app = tmp_path / "Oolite.AppImage"; app.write_text("x")
-    args = ["--ui-env", "marco", "--ui-runs", "2", "--ui-app", "base=%s" % app, "--ui-app", "new=%s" % app, "--ui-app", "na=%s" % app,
-            "--ui-raw", str(tmp_path / "out.raw"), "--junitxml", str(tmp_path / "j.xml"), "-p", "no:randomly"]
+    args = ["--ui-env", "marco", "--ui-runs", "2", "--ui-app=%s" % app,
+            "--ui-raw=%s" % (tmp_path / "out.raw"), "--junitxml=%s" % (tmp_path / "j.xml"), "-p", "no:randomly"]
     return pytester, args, tmp_path
+
+
+BUILDS = ("base", "new", "na")
+
+
+def run_builds(pt, *args):
+    """One pytest invocation per build (the plugin tests one AppImage at a time), all appending to the same raw file: -> joined stdout."""
+    return "".join(pt.runpytest(*args, "--ui-label", b).stdout.str() for b in BUILDS)
 
 
 def test_ids_outcomes_and_skip_reasons(project):
     pt, args, tmp = project
-    r = pt.runpytest("-v", "-rs", *args)
-    out = r.stdout.str()
-    assert "test_gets_focus[marco-x11-base-run1] PASSED" in out
-    assert "test_has_frame[marco-x11-new-run2] FAILED" in out
-    assert "test_gets_focus[marco-x11-na-run1] SKIPPED" in out and "SKIPPED [2] " in out and "NOT MEASURABLE: keyboard focus cannot be observed" in out
-    assert "test_f12_toggle[marco-x11-base-run1] SKIPPED" in out and "NOT TESTED: toggle not run in this data" in out        # no --ui-toggle
+    base, new, na = (pt.runpytest("-v", "-rs", *args, "--ui-label", b).stdout.str() for b in BUILDS)
+    assert "test_gets_focus[marco-x11-run1] PASSED" in base
+    assert "test_has_frame[marco-x11-run2] FAILED" in new
+    assert "test_gets_focus[marco-x11-run1] SKIPPED" in na and "SKIPPED [2] " in na and "NOT MEASURABLE: keyboard focus cannot be observed" in na
+    assert "test_f12_toggle[marco-x11-run1] SKIPPED" in base and "NOT TESTED: toggle not run in this data" in base        # no --ui-toggle
 
 
 def test_one_launch_per_case_and_once_per_build_checks(project):
     pt, args, tmp = project
-    r = pt.runpytest("-v", *args)
+    out = run_builds(pt, "-v", *args)
     launches = open(tmp / "launches.log").read().splitlines()
     assert len(launches) == 6 and len(set(launches)) == 6            # 3 builds x 2 runs: shared by 5 read-only tests each
-    out = r.stdout.str()
-    assert "test_environment_started[marco-x11-base-run1]" in out and "test_environment_started[marco-x11-base-run2]" not in out
+    assert out.count("test_environment_started[marco-x11-run1]") == 3 and "test_environment_started[marco-x11-run2]" not in out
 
 
 def test_toggle_gets_its_own_launch(project):
     pt, args, tmp = project
-    pt.runpytest("--ui-toggle", *args)
+    run_builds(pt, "--ui-toggle", *args)
     log = open(tmp / "launches.log").read().splitlines()
     assert sum(1 for l in log if l.startswith("fresh")) == 6 and sum(1 for l in log if l.startswith("launch")) == 6
 
 
 def test_raw_file_is_result_compatible_and_has_test_lines(project):
     pt, args, tmp = project
-    pt.runpytest("--ui-toggle", *args)
+    run_builds(pt, "--ui-toggle", *args)
     raw = open(tmp / "out.raw").read().splitlines()
     res = [l for l in raw if l.startswith("RESULT")]
     assert len(res) == 6 and any("build=new run=1 screen=3840x1080 frame=0" in l or ("build=new" in l and "frame=0" in l) for l in res)
@@ -103,14 +109,14 @@ def test_app_only_runs_still_get_a_result_line(project):
     """A run of only `app` tests (no shared launch) still writes RESULT lines, with the title-menu outcome as the renders criterion."""
     pt, args, tmp = project
     pt.makepyfile(test_gamecopy="def test_title_menu_is_displayed(case):\n    assert case.label != 'new'\n")
-    pt.runpytest(*args)
+    run_builds(pt, *args)
     res = [l for l in open(tmp / "out.raw").read().splitlines() if l.startswith("RESULT")]
     assert len(res) == 6 and all("exited=NA" in l for l in res)
     assert all(("renders=0" in l) == ("build=new" in l) for l in res)
 
 
-@pytest.mark.parametrize("sel,name,count", [(["-m", "family_marco"], "test_has_frame", 6), (["-m", "family_kwin"], "test_has_frame", 0),
-                                             (["-m", "session_x11"], "test_has_frame", 6), (["-k", "test_gets_focus and new"], "test_gets_focus", 2)])
+@pytest.mark.parametrize("sel,name,count", [(["-m", "family_marco"], "test_has_frame", 2), (["-m", "family_kwin"], "test_has_frame", 0),
+                                             (["-m", "session_x11"], "test_has_frame", 2), (["-k", "test_gets_focus and run2"], "test_gets_focus", 1)])
 def test_markers_and_k_select(project, sel, name, count):
     pt, args, tmp = project
     assert pt.runpytest(*sel, "--collect-only", "-q", *args).stdout.str().count(name + "[") == count
@@ -119,7 +125,7 @@ def test_markers_and_k_select(project, sel, name, count):
 def test_report_from_the_raw_file(project):
     from oolite_ui_test_framework import report
     pt, args, tmp = project
-    pt.runpytest("--ui-toggle", *args)
+    run_builds(pt, "--ui-toggle", *args)
     md = tmp / "r.md"
     report.main([str(tmp / "out.raw"), str(md), "--control", "base", "--candidates", "new", "--minruns", "2", "--registry", os.path.join(ROOT, "environments.toml")])
     text = md.read_text()
@@ -127,9 +133,17 @@ def test_report_from_the_raw_file(project):
 
 
 def test_case_ids():
-    assert pass_fail.case_id("marco", "opt1", 3, "X11") == "marco-x11-opt1-run3"
-    assert pass_fail.case_id("kwin-xwayland", "base", 1, "XWayland") == "kwin-xwayland-base-run1"
-    assert pass_fail.case_id("mutter-native", "base", 1, "Wayland native") == "mutter-native-base-run1"
+    assert pass_fail.case_id("marco", 3, "X11") == "marco-x11-run3"
+    assert pass_fail.case_id("kwin-xwayland", 1, "XWayland") == "kwin-xwayland-run1"
+    assert pass_fail.case_id("mutter-native", 1, "Wayland native") == "mutter-native-run1"
+
+
+def test_one_build_per_invocation_and_its_label(project):
+    """The plugin knows one build only: the label comes from --ui-label, else from the AppImage's file name."""
+    pt, args, tmp = project
+    pt.runpytest(*args)
+    res = [l for l in open(tmp / "out.raw").read().splitlines() if l.startswith("RESULT")]
+    assert len(res) == 2 and all(" build=Oolite " in " %s " % l or "build=Oolite " in l for l in res)
 
 
 def test_outcome_checks_map_to_skip_fail_pass():

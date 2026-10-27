@@ -55,10 +55,10 @@ TESTS = {"test_has_frame": check_frame, "test_gets_focus": check_focus, "test_sp
          "test_game_window_centred": check_window_centred, "test_f12_toggle": check_f12_toggle}
 
 
-def case_id(env, label, run, session=""):
-    """readable test id, e.g. 'marco-x11-opt1c-run3' (the session slug is left out when the env name already ends with it)"""
+def case_id(env, run, session=""):
+    """readable test id, e.g. 'marco-x11-run3' (the session slug is left out when the env name already ends with it)"""
     slug = {"wayland native": "native"}.get(session.lower(), session.lower().replace(" ", "-")) if session else ""
-    parts = [env] + ([slug] if slug and not env.endswith(slug) else []) + [label, "run%d" % run]
+    parts = [env] + ([slug] if slug and not env.endswith(slug) else []) + ["run%d" % run]
     return "-".join(parts)
 
 
