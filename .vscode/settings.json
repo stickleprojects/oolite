@@ -1,0 +1,22 @@
+{
+  // Workspace colour so this window is recognisable at a glance (crimson and gold = oolite)
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#9B2335",
+    "titleBar.activeForeground": "#FFFFFF",
+    "titleBar.inactiveBackground": "#6A1524",
+    "titleBar.inactiveForeground": "#FFFFFFAA",
+    "activityBar.background": "#6A1524",
+    "activityBar.foreground": "#F7C948",
+    "activityBar.inactiveForeground": "#FFFFFF99",
+    "activityBarBadge.background": "#F7C948",
+    "activityBarBadge.foreground": "#000000",
+    "statusBar.background": "#9B2335",
+    "statusBar.foreground": "#FFFFFF",
+    "statusBarItem.remoteBackground": "#F7C948",
+    "statusBarItem.remoteForeground": "#000000",
+    "tab.activeBorderTop": "#F7C948"
+  },
+  "window.title": "🪐 oolite — ${activeEditorShort}",
+  "C_Cpp.default.compileCommands": "/mnt/NTFSData/code/oolite/builddir/compile_commands.json",
+  "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild"
+}
