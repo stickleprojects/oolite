@@ -399,6 +399,8 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
         if equiv_label and b == equiv_label and o in ("FIXED", "REGRESSED", "SUSPECT"): o = "DIFFERS"
         L.append("| %s | %s | %s | %s | %s | %s | %s |" % (disp, where(wm), sess, sc, b, o, d)); vs.append("%s | %s | %s | %s | %s = %s" % (disp, where(wm), sess, sc, b, o))
     L += host_section(cells, host_minruns)
+    if single and SKIPS:   # a single-build set has no comparison table, so say here what was not tested and why
+        L += ["", "## Not tested", ""] + ["- %s %s: **NOT TESTED** (%s)" % (w_, sc_, why) for w_, sc_, b_, why in SKIPS if not w_.startswith("host")]
     L += ["", "## Machine-readable outcomes", "", "```"] + vs + ["```", "", "Candidates REGRESSED: %d" % len(bad)]
     open(outp, "w").write("\n".join(L) + "\n")
     print("\n".join(HL))

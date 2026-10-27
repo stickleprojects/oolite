@@ -1,8 +1,9 @@
 """pytest plugin: the uitest test layer.
 
-* options (--ui-*), the registry-driven `case` parameter (env x build x run, ids like marco-x11-opt1c-run3), markers per env / family / session
-* fixtures: `session_mgr` (display server + WM, restarted when the build changes), `startup_record` (ONE launch per case, shared by the
-  read-only tests), `toggle_record` (its own launch, for tests that change game state)
+* tests ONE AppImage (--ui-app, named by --ui-label) in ONE environment; comparing builds is done later from the raw files (uitest compare)
+* options (--ui-*), the registry-driven `case` parameter (env x run, ids like marco-x11-run3), markers per env / family / session
+* fixtures: `session_mgr` (display server + WM, started once), `launched_game` (ONE launch per case, shared by the read-only tests),
+  `fresh_game` and `app` (a launch of their own, for tests that change game state or drive screens)
 * collects pytest's outcomes per test and case, writes the raw file (RESULT lines, plus TEST lines with skip reasons, WMVER and HARD lines)
   and a k6-style summary of pass rates. Statistics and the report are made from that raw file by oolite_ui_test_framework/report.py (host side)."""
 import collections
@@ -30,7 +31,8 @@ def pytest_addoption(parser):
     g.addoption("--ui-registry", default=registry.DEFAULT_PATH, help="environments.toml")
     g.addoption("--ui-env", default="", help="environment name from the registry")
     g.addoption("--ui-screen", default="3840x1080", help="WxH or 2head")
-    g.addoption("--ui-app", action="append", default=[], help="label=path/to/Oolite.AppImage (repeatable)")
+    g.addoption("--ui-app", default="", help="path/to/Oolite.AppImage: the one build these tests run against")
+    g.addoption("--ui-label", default="", help="the build's name in the raw file and the report (default: the AppImage's file name)")
     g.addoption("--ui-runs", type=int, default=10)
     g.addoption("--ui-raw", default="", help="write RESULT/TEST/WMVER/HARD lines to this file")
     g.addoption("--ui-toggle", action="store_true", help="also run test_f12_toggle (fullscreen round trip)")
@@ -77,12 +79,19 @@ def _env(config):
 
 def pytest_generate_tests(metafunc):
     if "case" not in metafunc.fixturenames: return
-    cfg = metafunc.config; env = _env(cfg); apps = [a.split("=", 1) for a in cfg.getoption("--ui-app")]
-    if env is None or not apps:
+    cfg = metafunc.config; env = _env(cfg); app = cfg.getoption("--ui-app")
+    if env is None or not app:
         metafunc.parametrize("case", [pytest.param(None, marks=pytest.mark.skip(reason="no --ui-env / --ui-app given"))], ids=["none"], scope="session")
         return
-    cases = [Case(env.name, label, os.path.abspath(path), n) for label, path in apps for n in range(1, cfg.getoption("--ui-runs") + 1)]
-    metafunc.parametrize("case", cases, ids=[pass_fail.case_id(c.env, c.label, c.run, env.session) for c in cases], scope="session")
+    label = build_label(cfg)
+    cases = [Case(env.name, label, os.path.abspath(app), n) for n in range(1, cfg.getoption("--ui-runs") + 1)]
+    metafunc.parametrize("case", cases, ids=[pass_fail.case_id(c.env, c.run, env.session) for c in cases], scope="session")
+
+
+def build_label(cfg):
+    """--ui-label, else the AppImage's file name without .AppImage (e.g. 'opt2fix')."""
+    name = cfg.getoption("--ui-label") or os.path.basename(cfg.getoption("--ui-app"))
+    return re.sub(r"\.AppImage$", "", name, flags=re.I) or "app"
 
 
 def pytest_collection_modifyitems(config, items):
@@ -108,32 +117,31 @@ def pytest_collection_modifyitems(config, items):
 
 # ---------------------------------------------------------------- fixtures
 class SessionManager:
-    def __init__(self, env, screen):
-        self.env = env; self.screen = screen; self.label = None; self.session = None
+    def __init__(self, env, screen, label):
+        self.env = env; self.screen = screen; self.label = label; self.session = None
 
-    def for_build(self, label):
-        """A started environment for this build. Restarted when the build changes (as the bash harness did per cell)."""
-        if self.session is not None and label == self.label: return self.session
-        self.stop()
+    def get(self):
+        """The started environment, started on first use and kept for the whole pytest session."""
+        if self.session is not None: return self.session
         s = sessmod.Session(self.env, self.screen)
         try: s.start()
         except sessmod.SessionError as e:
-            s.stop(); STATE.hard.append((self.env.name, self.screen, label, str(e)))
+            s.stop(); STATE.hard.append((self.env.name, self.screen, self.label, str(e)))
             pytest.fail("environment %s did not start: %s" % (self.env.name, e), pytrace=False)
-        self.session, self.label = s, label
+        self.session = s
         if s.version: STATE.wmver[self.env.name] = s.version
         return s
 
     def stop(self):
         if self.session is not None: self.session.stop()
-        self.session = None; self.label = None
+        self.session = None
 
 
 @pytest.fixture(scope="session")
 def session_mgr(request):
     env = _env(request.config)
     if env is None: pytest.skip("no --ui-env given")
-    m = SessionManager(env, request.config.getoption("--ui-screen"))
+    m = SessionManager(env, request.config.getoption("--ui-screen"), build_label(request.config))
     yield m
     m.stop()
 
@@ -146,7 +154,7 @@ def opts(request):
 
 def _launch(request, case, session_mgr, opts, with_toggle):
     cfg = request.config; assert os.path.isfile(case.app), "AppImage not found: %s" % case.app
-    s = session_mgr.for_build(case.label)
+    s = session_mgr.get()
     _only_this_game()
     game = _game(cfg, case, s, "toggle" if with_toggle else "startup").start()
     try:
@@ -162,8 +170,8 @@ def _launch(request, case, session_mgr, opts, with_toggle):
 
 @pytest.fixture(scope="session")
 def env_session(case, session_mgr):
-    """The started environment (display server + WM / compositor) for this case's build. Request this alone for tests that need no game."""
-    return session_mgr.for_build(case.label)
+    """The started environment (display server + WM / compositor). Request this alone for tests that need no game."""
+    return session_mgr.get()
 
 
 RENDER_GAP = 3   # seconds between the two screenshots
@@ -204,7 +212,7 @@ def launched_game(request, case, session_mgr, opts):
     """Opt-in SHARED launch: ONE game start per (env, build, run), kept running for every test that requests it. The record is a dict
     (the checks inspect it). Read-only by default; see oolite_ui_test_framework/shared_launch.py for the restore rules and the dirty check after every test."""
     cfg = request.config; assert os.path.isfile(case.app), "AppImage not found: %s" % case.app
-    key = (case.env, case.label, case.run); s = session_mgr.for_build(case.label)
+    key = (case.env, case.label, case.run); s = session_mgr.get()
 
     def start():
         game = _game(cfg, case, s, "shared").start()
@@ -252,7 +260,7 @@ class FreshGame:
     """A launch of its own for tests that change game state. .rec is the startup record; .toggle() runs F12 and returns the record with t_* fields."""
     def __init__(self, request, case, mgr, opts):
         self.request, self.case, self.mgr, self.opts = request, case, mgr, opts
-        self.session = mgr.for_build(case.label)
+        self.session = mgr.get()
         _only_this_game()
         self.game = _game(request.config, case, self.session, request.node.originalname).start()
         self.rec = scenarios.run_startup(self.session, self.game, opts)
@@ -301,7 +309,7 @@ def app(request, case, session_mgr):
     it cares about. Skips (NOT MEASURABLE) where window contents cannot be grabbed."""
     from . import app as appmod, ocr as ocrmod
     assert os.path.isfile(case.app), "AppImage not found: %s" % case.app
-    s = session_mgr.for_build(case.label)
+    s = session_mgr.get()
     if getattr(s.backend, "grab", None) is None: pytest.skip("NOT MEASURABLE: no screenshot support in this environment")
     _only_this_game()
     game = _game(request.config, case, s, request.node.originalname).start()

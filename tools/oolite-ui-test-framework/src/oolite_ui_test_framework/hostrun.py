@@ -1,7 +1,13 @@
-"""Host side of uitest: needs only python3 stdlib and docker. Builds images, runs pytest inside the right containers, collects the raw
-files, renders the report. Host mode (--host) runs pytest in a helper container against the live X display; native Wayland runs here."""
+"""Host side of uitest: needs only python3 stdlib and docker. Three layers, each usable alone:
+  tests      pytest + the plugin, against ONE AppImage in ONE environment (run inside the containers);
+  run        `uitest run LABEL:APPIMAGE`: the coordinator. Builds images, runs the tests in each environment x screen, collects one result
+             set (<name>.raw with a SET header, .md, -env.txt, .shots/, .logs/). It never compares;
+  compare    `uitest compare --control SET --candidate SET`: verdicts (FIXED / REGRESSED ...) from result sets made by separate runs.
+`uitest A:path B:path` (several builds) still works: it runs each build, then compares them. Host mode (--host) runs pytest in a helper container against the live X display; native Wayland runs here."""
 import argparse
+import contextlib
 import hashlib
+import io
 import json
 import datetime
 import os
@@ -63,59 +69,84 @@ def docker_state():
     return True, ""
 
 
+def parse_build(b):
+    """'label:path' -> (label, realpath), or exit 2."""
+    label, _, path = b.partition(":")
+    if not label or not path or not os.path.isfile(path): _die("AppImage not found or bad label:path '%s'" % b)
+    return label, os.path.realpath(path)
+
+
+def parse_notes(a, labels):
+    notes = {}
+    for n in a.note:
+        k, _, v = n.partition("=")
+        if not v: _die("--note needs LABEL=TEXT, got '%s'" % n)
+        if k not in labels: _die("--note for unknown label '%s'" % k)
+        notes[k] = v
+    return notes
+
+
+def safe_name(name):
+    return "".join(c if c.isalnum() or c in "+-_." else "_" for c in name)
+
+
+def output_stem(a, default):
+    """(out dir, name) from --report PATH, else --out / --name, else results/<default>."""
+    if a.report:
+        md = os.path.abspath(a.report); return os.path.dirname(md), safe_name(os.path.basename(md)[:-3] if md.endswith(".md") else os.path.basename(md))
+    return os.path.abspath(a.out or os.path.join(PKG, "results")), safe_name(a.name or default)
+
+
+def stamp():
+    return datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
+
+def purpose_of(a):
+    if a.desc_file:
+        try: return open(a.desc_file, encoding="utf-8").read().strip()
+        except OSError as e: _die("cannot read --desc-file: %s" % e)
+    text = (a.desc or "").strip()
+    if a.tests:   # a partial run must never be read as a full pass
+        text = (text + "\n\n" if text else "") + "PARTIAL RUN: only these tests ran: %s%s" % (test_selector(a.tests).replace(" or ", ", "), " (--quick)" if a.quick else "")
+    return text
+
+
+
 class Runner:
-    def __init__(self, a):
+    """The coordinator for ONE AppImage: every requested environment x screen, one result set. It never compares."""
+    def __init__(self, a, build, name=None, note=""):
         self.a = a; self.envs, self.images = registry.load(a.registry or None)
         report.set_registry(self.envs)
-        self.builds = []
-        for b in a.builds:
-            label, _, path = b.partition(":")
-            if not path or not os.path.isfile(path): _die("AppImage not found or bad label:path '%s'" % b)
-            self.builds.append((label, os.path.realpath(path)))
-        self.control = a.control or self.builds[0][0]
-        cands = [l for l, _ in self.builds if l != self.control] or [self.control]
-        if a.report:
-            md = os.path.abspath(a.report); self.out = os.path.dirname(md); self.name = os.path.basename(md)[:-3] if md.endswith(".md") else os.path.basename(md)
-        else:
-            self.out = os.path.abspath(a.out or os.path.join(PKG, "results"))
-            self.name = a.name or "uitest-%s-%s" % (datetime.datetime.now().strftime("%Y%m%d-%H%M%S"), "+".join(cands))
-        self.name = "".join(c if c.isalnum() or c in "+-_." else "_" for c in self.name)
+        self.label, self.path = build
+        self.out, self.name = output_stem(a, "uitest-%s-%s" % (stamp(), self.label))
+        if name: self.name = safe_name(name)
         self.stem = os.path.join(self.out, self.name); self.md = self.stem + ".md"; self.parts = self.stem + ".parts"
         os.makedirs(self.parts, exist_ok=True)
         self.raw = self.stem + ".raw"; open(self.raw, "w").close()
         self.purpose = self.read_purpose()
-        notes = {}
-        for n in a.note:
-            k, _, v = n.partition("=")
-            if not v: _die("--note needs LABEL=TEXT, got '%s'" % n)
-            notes[k] = v
-        for k in notes:
-            if k not in [l for l, _ in self.builds]: _die("--note for unknown label '%s'" % k)
+        h = hashlib.sha256()
+        with open(self.path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""): h.update(chunk)
+        sha = h.hexdigest()[:12]
+        envs = [x for x in a.env.split(",") if x] + (WAYLAND_ENVS.split(",") if a.wayland else []) + (["host"] if a.host else [])
+        self.add("SET " + json.dumps({"name": self.name, "label": self.label, "app": self.path, "file": os.path.basename(self.path), "sha256": sha,
+                                      "built": datetime.datetime.fromtimestamp(os.path.getmtime(self.path)).isoformat(timespec="seconds"),
+                                      "envs": envs, "screens": a.screens.split(","), "runs": a.runs, "toggle": bool(a.toggle),
+                                      "tests": a.tests, "uitest_version": self.version(), "made": datetime.datetime.now().isoformat(timespec="seconds")}))
         self.add("PURPOSE " + json.dumps(self.purpose))
-        for label, path in self.builds:
-            h = hashlib.sha256()
-            with open(path, "rb") as f:
-                for chunk in iter(lambda: f.read(1 << 20), b""): h.update(chunk)
-            self.add("BUILD " + json.dumps({"label": label, "file": os.path.basename(path), "sha256": h.hexdigest()[:12], "note": notes.get(label, "")}))
+        self.add("BUILD " + json.dumps({"label": self.label, "file": os.path.basename(self.path), "sha256": sha, "note": note}))
         self.docker_ok, self.docker_why = docker_state()
         self.img_ok = {}
         if not self.docker_ok: say("NOTE: Docker parts will be skipped: " + self.docker_why)
 
     def read_purpose(self):
-        a = self.a
-        if a.desc_file:
-            try: return open(a.desc_file, encoding="utf-8").read().strip()
-            except OSError as e: _die("cannot read --desc-file: %s" % e)
-        text = (a.desc or "").strip()
-        if a.tests:   # a partial run must never be read as a full pass
-            text = (text + "\n\n" if text else "") + "PARTIAL RUN: only these tests ran: %s%s" % (test_selector(a.tests).replace(" or ", ", "), " (--quick)" if a.quick else "")
-        return text
+        return purpose_of(self.a)
 
     def add(self, line):
         with open(self.raw, "a") as f: f.write(line + "\n")
 
     def skip(self, wm, screen, why):
-        for label, _ in self.builds: self.add(raw_results.format_skip(wm, screen, label, why))
+        self.add(raw_results.format_skip(wm, screen, self.label, why))
         say("  skipped %s (%s): %s" % (wm, screen, why))
 
     def ensure_image(self, image):
@@ -130,13 +161,13 @@ class Runner:
             if not ok: say("  image build FAILED (see log)")
         self.img_ok[image] = ok; return ok
 
-    def pytest_args(self, env, screen, part, apps, host_dir=None):
+    def pytest_args(self, env, screen, part, app):
         c = ["python3", "-m", "pytest", "-q", "-c", "/gametests/pytest.ini", "/gametests", "--rootdir", "/gametests",
              "--ui-registry", "/uitest/environments.toml", "--ui-env", env, "--ui-screen", screen, "--ui-runs", str(self.runs_for(env)),
              "--ui-raw", "/out/%s.parts/%s" % (self.name, part), "--junitxml", "/out/%s.parts/%s.xml" % (self.name, part), "--ui-shots", "/out/%s.shots" % self.name, "--ui-logs", "/out/%s.logs" % self.name, "--ui-tol", str(self.a.tol)]
         if self.a.toggle: c.append("--ui-toggle")
         if self.a.tests: c += ["-k", test_selector(self.a.tests)]
-        for label, mnt in apps: c += ["--ui-app", "%s=%s" % (label, mnt)]
+        c += ["--ui-app=" + app, "--ui-label=" + self.label]
         return c
 
     def runs_for(self, env):
@@ -145,10 +176,10 @@ class Runner:
     def run_container(self, env, screen, extra=(), user=None):
         e = self.envs[env]; part = "%s-%s.raw" % (env, screen.replace(":", "_"))
         open(os.path.join(self.parts, part), "w").close()
-        mounts = ["-v", "%s:/uitest:ro" % PKG, "-v", "%s:/gametests:ro" % GAME_TESTS, "-v", "%s:/out" % self.out, "-e", "PYTHONPATH=/uitest/src"]; apps = []
-        for i, (label, path) in enumerate(self.builds):
-            mounts += ["-v", "%s:/apps/%s:ro" % (os.path.dirname(path), label)]; apps.append((label, "/apps/%s/%s" % (label, os.path.basename(path))))
-        cmd = ["docker", "run", "--rm"] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, apps)
+        mounts = ["-v", "%s:/uitest:ro" % PKG, "-v", "%s:/gametests:ro" % GAME_TESTS, "-v", "%s:/out" % self.out, "-e", "PYTHONPATH=/uitest/src",
+                  "-v", "%s:/app:ro" % os.path.dirname(self.path)]
+        app = "/app/" + os.path.basename(self.path)
+        cmd = ["docker", "run", "--rm"] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, app)
         r = subprocess.run(cmd, capture_output=True, text=True)
         tail = [l for l in r.stdout.splitlines() if l.strip()][-1:] or [r.stderr.strip()[-200:]]
         say("  %s" % tail[0])
@@ -173,7 +204,7 @@ class Runner:
                     extra, why = headed_args()
                     if why: self.skip(env, sc, "not available: " + why); continue
                     say("WARNING: %s opens a KWin window on THIS desktop; do not touch the mouse or keyboard while it runs." % env)
-                say("== %s %s (%s builds x %d runs) %s" % (env, sc, len(self.builds), self.runs_for(env), time.strftime("%T")))
+                say("== %s %s (%s, %d runs) %s" % (env, sc, self.label, self.runs_for(env), time.strftime("%T")))
                 self.run_container(env, sc, extra)
 
     def host(self):
@@ -196,7 +227,7 @@ class Runner:
             if self.docker_ok and self.ensure_image(e.image): helper = self.start_helper(e)
             elif not all(shutil.which(t) for t in ("xwininfo", "xprop", "xdotool", "xrandr")):
                 self.skip(n, scr, "not available: X tools missing on host and no helper container (%s)" % (self.docker_why or "image build failed")); continue
-            say("== %s: game on the host, X measured %s (%d runs per build) %s" % (n, "in helper container " + helper if helper else "with host tools", self.a.host_runs, time.strftime("%T")))
+            say("== %s: game on the host, X measured %s (%d runs) %s" % (n, "in helper container " + helper if helper else "with host tools", self.a.host_runs, time.strftime("%T")))
             try: self.host_inprocess(n, scr, helper)
             finally:
                 if helper: subprocess.run(["docker", "rm", "-f", helper], capture_output=True)
@@ -220,22 +251,21 @@ class Runner:
         except SessionError as ex: self.skip(env, scr, "not available: %s" % ex); return
         opts = scenarios.Opts(tol=self.a.tol)
         try:
-            for label, path in self.builds:
-                say("== %s %s (%d runs) %s" % (label, env, self.a.host_runs, time.strftime("%T")))
-                for n in range(1, self.a.host_runs + 1):
-                    g = scenarios.Game(path, [], s.game_env).start()
-                    try:
-                        if not self.a.no_prompt: say(">> Run %d: the Oolite window is open now. Please look at it (do not close it)." % n)
-                        rec = scenarios.record(s, g, env, label, scr, n, opts)
-                    finally: g.stop()
-                    self.add(raw_results.format_result(rec))
+            say("== %s %s (%d runs) %s" % (self.label, env, self.a.host_runs, time.strftime("%T")))
+            for n in range(1, self.a.host_runs + 1):
+                g = scenarios.Game(self.path, [], s.game_env).start()
+                try:
+                    if not self.a.no_prompt: say(">> Run %d: the Oolite window is open now. Please look at it (do not close it)." % n)
+                    rec = scenarios.record(s, g, env, self.label, scr, n, opts)
+                finally: g.stop()
+                self.add(raw_results.format_result(rec))
         finally: s.stop()
 
     def report(self):
-        hdr = self.stem + "-env.txt"; open(hdr, "w").write(envinfo.header(self.version()) + "\npurpose: %s\n" % (self.purpose or "not given") + "".join(
-            "build %s: %s\n" % (b[0], b[1]) for b in [(l, os.path.basename(p)) for l, p in self.builds])); md = self.md
-        argv = [self.raw, md, "--control", self.control, "--candidates", self.a.candidates, "--minruns", str(self.a.minruns), "--host-minruns", str(self.a.host_runs),
-                "--tol", str(self.a.tol), "--equiv", self.a.equiv, "--header", hdr]
+        """The single-build report of this result set (no verdicts against another build)."""
+        hdr = self.stem + "-env.txt"; open(hdr, "w").write(envinfo.header(self.version()) + "\npurpose: %s\n" % (self.purpose or "not given") +
+                                                          "build %s: %s\n" % (self.label, os.path.basename(self.path))); md = self.md
+        argv = [self.raw, md, "--control", self.label, "--minruns", str(self.a.minruns), "--host-minruns", str(self.a.host_runs), "--tol", str(self.a.tol), "--header", hdr]
         rc = report.main(argv)
         say("Report: %s\n(raw: %s, environment: %s; send these files)" % (md, self.raw, hdr)); return rc
 
@@ -245,8 +275,9 @@ class Runner:
 
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="uitest", description="Window frame / focus / centring matrix for Oolite builds. The FIRST label is the control.")
-    p.add_argument("builds", nargs="*", help="label:path/to/Oolite.AppImage")
+    p = argparse.ArgumentParser(prog="uitest", description="Window frame / focus / centring tests for Oolite builds. `uitest run LABEL:APPIMAGE` tests one build; "
+                                "`uitest compare --control SET --candidate SET` compares saved result sets; with several builds the FIRST label is the control.")
+    p.add_argument("builds", nargs="*", help="label:path/to/Oolite.AppImage (`uitest run` takes exactly one)")
     p.add_argument("--env", "--wm", dest="env", default=DEFAULT_ENVS, help="environment names from environments.toml (default: the X11 window managers)")
     p.add_argument("--screens", default="3840x1080", help="WxH or 2head, comma separated")
     p.add_argument("--runs", type=int, default=10); p.add_argument("--toggle", action="store_true")
@@ -258,7 +289,7 @@ def build_parser():
     p.add_argument("--quick", action="store_true", help="smoke run: 1 run, first screen size only, and (unless --tests is given) only %s" % QUICK_TESTS)
     p.add_argument("--minruns", type=int, default=10); p.add_argument("--tol", type=int, default=40); p.add_argument("--equiv", default="")
     p.add_argument("--registry", default=""); p.add_argument("--list", action="store_true", help="list the registry and exit")
-    p.add_argument("--report", metavar="PATH", help="markdown report path (raw and env files take the same stem); default results/uitest-<date>-<candidates>.md")
+    p.add_argument("--report", metavar="PATH", help="markdown report path (raw and env files take the same stem); default results/uitest-<date>-<label>.md")
     p.add_argument("--desc", default="", help="REQUIRED (or --desc-file): what this run is for (shown as Purpose at the top of the report)")
     p.add_argument("--desc-file", metavar="PATH", help="same, from a (markdown) file")
     p.add_argument("--note", action="append", default=[], metavar="LABEL=TEXT", help="note for a build, shown in the Builds table (repeatable)")
@@ -295,52 +326,152 @@ def failed_tests(raw):
     return out
 
 
+def compare_parser():
+    p = argparse.ArgumentParser(prog="uitest compare", description="Verdicts (FIXED / REGRESSED / ...) from result sets written by separate `uitest run`s.")
+    p.add_argument("--control", required=True, metavar="SET", help="the control's result set: results/<name> or results/<name>.raw")
+    p.add_argument("--candidate", action="append", required=True, metavar="SET", help="a candidate's result set (repeatable)")
+    p.add_argument("--report", metavar="PATH", help="markdown report path; default results/compare-<date>-<candidates>.md")
+    p.add_argument("--desc", default="", help="what this comparison is for (default: the control run's purpose)")
+    p.add_argument("--minruns", type=int, default=10); p.add_argument("--host-minruns", type=int, default=5); p.add_argument("--tol", type=int, default=40)
+    p.add_argument("--equiv", default=""); p.add_argument("--registry", default="")
+    p.add_argument("-q", "--quiet", action="store_true"); p.add_argument("--strict", action="store_true")
+    return p
+
+
+def read_set(path):
+    """A result set -> (raw path, label, lines). Accepts results/<name>, results/<name>.raw or results/<name>.md."""
+    stem = re.sub(r"\.(raw|md)$", "", path); raw = stem + ".raw"
+    try: lines = open(raw).read().splitlines()
+    except OSError: _die("result set not found: %s" % raw)
+    labels = []
+    for ln in lines:
+        if ln.startswith("SET "): labels.append(json.loads(ln[4:])["label"])
+    if not labels:   # older raw files have no SET header: the builds of their BUILD lines
+        labels = [json.loads(ln[6:])["label"] for ln in lines if ln.startswith("BUILD ")]
+    if len(set(labels)) != 1: _die("%s is not a single-build result set (builds: %s); make one per build with `uitest run`" % (raw, ", ".join(labels) or "none"))
+    return raw, labels[0], lines
+
+
+def compare_sets(control, candidates, stem, desc=""):
+    """Join the result sets into <stem>.raw (one PURPOSE line, every set's other lines) -> (raw path, control label, candidate labels)."""
+    sets = [read_set(control)] + [read_set(c) for c in candidates]
+    labels = [l for _, l, _ in sets]
+    if len(set(labels)) != len(labels): _die("two result sets have the same build label (%s): rename one with uitest run's label" % ", ".join(labels))
+    purpose = desc
+    if not purpose:
+        for ln in sets[0][2]:
+            if ln.startswith("PURPOSE "): purpose = json.loads(ln[8:])
+    out = ["PURPOSE " + json.dumps(purpose)]
+    for raw, _, lines in sets:
+        out += ["SOURCE " + json.dumps({"set": raw})] + [ln for ln in lines if not ln.startswith("PURPOSE ")]
+    os.makedirs(os.path.dirname(stem) or ".", exist_ok=True)
+    open(stem + ".raw", "w").write("\n".join(out) + "\n")
+    hdr = stem + "-env.txt"
+    with open(hdr, "w") as f:
+        for raw, label, _ in sets:
+            env = raw[:-4] + "-env.txt"
+            f.write("== %s (%s)\n" % (label, raw) + (open(env).read() if os.path.exists(env) else "(no environment file)\n") + "\n")
+    return stem + ".raw", labels[0], labels[1:]
+
+
+def exit_code(L, md, quiet=False, strict=False, failed=None):
+    """EXIT_* from report.LAST; `failed` (single-build runs) = failed tests, which fail the run even without a verdict."""
+    if not L.get("measured"):
+        print("uitest: error: nothing was measured (see %s)" % md, file=sys.stderr); return EXIT_ERROR
+    if L["regressed"] or (strict and (L["suspect"] or L["still_broken"])): return EXIT_FAIL
+    if failed:
+        if not quiet: print("FAILED TESTS: " + "; ".join(failed))
+        return EXIT_FAIL
+    return EXIT_PASS
+
+
+def finish(rc, md, quiet):
+    if quiet and rc != EXIT_ERROR: print("PASS" if rc == EXIT_PASS else "FAIL")
+    elif not quiet: print({EXIT_PASS: "PASS", EXIT_FAIL: "FAIL", EXIT_ERROR: "ERROR (could not run)"}[rc] + "  report: " + md)
+    return rc
+
+
+def compare_main(argv):
+    a = compare_parser().parse_args(argv)
+    envs = registry.load(a.registry or None)[0]; report.set_registry(envs)
+    out, name = output_stem(argparse.Namespace(report=a.report, out=None, name=None), "compare-%s-%s" % (stamp(), "+".join(read_set(c)[1] for c in a.candidate)))
+    stem = os.path.join(out, name)
+    raw, control, cands = compare_sets(a.control, a.candidate, stem, a.desc)
+    md = stem + ".md"
+    with contextlib.redirect_stdout(io.StringIO()) if a.quiet else contextlib.nullcontext():
+        report.main([raw, md, "--control", control, "--candidates", ",".join(cands), "--minruns", str(a.minruns), "--host-minruns", str(a.host_minruns),
+                     "--tol", str(a.tol), "--equiv", a.equiv, "--header", stem + "-env.txt", "--registry", a.registry or registry.DEFAULT_PATH])
+    return finish(exit_code(report.LAST, md, a.quiet, a.strict), md, a.quiet)
+
+
+def run_one(a, build, name=None, note=""):
+    """The coordinator for one build -> (Runner, rc). rc is None when the run itself is fine (the caller decides from the report)."""
+    r = Runner(a, build, name, note)
+    names = [x for x in a.env.split(",") if x] + ([x for x in WAYLAND_ENVS.split(",")] if a.wayland else [])
+    r.docker_cells(names, a.screens.split(","))
+    if a.host: r.host()
+    r.report()
+    want_docker = any(n in r.envs and r.envs[n].kind != "host" for n in names)
+    if want_docker and not r.docker_ok:
+        print("uitest: error: %s (docker environments were requested)" % r.docker_why, file=sys.stderr); return r, EXIT_ERROR
+    return r, None
+
+
 def main(argv=None):
-    a = build_parser().parse_args(argv)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["compare"]:
+        try: return compare_main(argv[1:])
+        except SystemExit as e: return e.code if isinstance(e.code, int) else EXIT_ERROR
+    single = argv[:1] == ["run"]
+    a = build_parser().parse_args(argv[1:] if single else argv)
     if a.quick:
         a.runs, a.host_runs, a.minruns = 1, 1, 1
         a.screens = a.screens.split(",")[0]
         a.tests = a.tests or QUICK_TESTS
     if a.selftest: return report.main(["--selftest"])
     if a.report_only:
-        return report.main([a.report_only, a.out or "report.md", "--control", a.control or "base", "--candidates", a.candidates, "--minruns", str(a.minruns),
-                             "--host-minruns", str(a.host_runs), "--tol", str(a.tol), "--registry", a.registry or registry.DEFAULT_PATH])
+        return report.main([a.report_only, a.report or a.report_only[:-4] + ".md" if a.report_only.endswith(".raw") else a.report or "report.md",
+                            "--control", a.control or "base", "--candidates", a.candidates, "--minruns", str(a.minruns),
+                            "--host-minruns", str(a.host_runs), "--tol", str(a.tol), "--registry", a.registry or registry.DEFAULT_PATH])
     if a.list:
         envs, _ = registry.load(a.registry or None)
         for n, e in envs.items(): say("%-18s %-8s %-15s %-8s image=%s" % (n, e.family, e.session, e.kind, e.image))
         return 0
     if not a.builds: build_parser().print_usage(file=sys.stderr); return EXIT_ERROR
+    if single and len(a.builds) != 1: print("uitest: error: `uitest run` takes exactly one LABEL:APPIMAGE (compare runs with `uitest compare`)", file=sys.stderr); return EXIT_ERROR
     if not (a.desc.strip() or a.desc_file):
         print("uitest: error: --desc TEXT (or --desc-file PATH) is required: say what this run is for, it heads the report", file=sys.stderr)
         return EXIT_ERROR
     global _QUIET
     _QUIET = a.quiet
-    import contextlib, io
     sink = io.StringIO() if a.quiet else None
     try:
         with contextlib.redirect_stdout(sink) if a.quiet else contextlib.nullcontext():
-            r = Runner(a)
-            names = [x for x in a.env.split(",") if x] + ([x for x in WAYLAND_ENVS.split(",")] if a.wayland else [])
-            r.docker_cells(names, a.screens.split(","))
-            if a.host: r.host()
-            r.report()
+            builds = [parse_build(b) for b in a.builds]
+            if len({l for l, _ in builds}) != len(builds): _die("two builds have the same label")
+            notes = parse_notes(a, [l for l, _ in builds])
+            if len(builds) == 1:
+                r, rc = run_one(a, builds[0], note=notes.get(builds[0][0], ""))
+                if rc is None: rc = exit_code(report.LAST, r.md, a.quiet, a.strict, failed_tests(r.raw))
+                md = r.md
+            else:   # several builds: one `run` per build (results/<name>-<label>), then `compare` into results/<name>
+                control = a.control or builds[0][0]
+                if control not in [l for l, _ in builds]: _die("--control '%s' is not one of the labels" % control)
+                out, name = output_stem(a, "uitest-%s-%s" % (stamp(), "+".join(l for l, _ in builds if l != control)))
+                sets = {}; rc = None
+                for b in builds:
+                    r, brc = run_one(a, b, "%s-%s" % (name, b[0]), notes.get(b[0], ""))
+                    sets[b[0]] = r.stem; rc = brc if brc is not None else rc
+                cands = [c for c in (a.candidates.split(",") if a.candidates else [l for l, _ in builds if l != control]) if c]
+                md = os.path.join(out, name + ".md")
+                if rc is None:
+                    raw, _, _ = compare_sets(sets[control], [sets[c] for c in cands], os.path.join(out, name), purpose_of(a))
+                    report.main([raw, md, "--control", control, "--candidates", ",".join(cands), "--minruns", str(a.minruns), "--host-minruns", str(a.host_runs),
+                                 "--tol", str(a.tol), "--equiv", a.equiv, "--header", os.path.join(out, name + "-env.txt")])
+                    say("Report: %s (per-build result sets: %s)" % (md, ", ".join(sets[l] + ".raw" for l, _ in builds)))
+                    rc = exit_code(report.LAST, md, a.quiet, a.strict)
     except SystemExit as e:
         return e.code if isinstance(e.code, int) else EXIT_ERROR
     finally:
         _QUIET = False
-    L = report.LAST
-    want_docker = any(n in r.envs and r.envs[n].kind != "host" for n in names)
-    if want_docker and not r.docker_ok:
-        print("uitest: error: %s (docker environments were requested)" % r.docker_why, file=sys.stderr); rc = EXIT_ERROR
-    elif not L.get("measured"):
-        print("uitest: error: nothing was measured (see %s)" % r.md, file=sys.stderr); rc = EXIT_ERROR
-    elif L["regressed"] or (a.strict and (L["suspect"] or L["still_broken"])): rc = EXIT_FAIL
-    else: rc = EXIT_PASS
-    if rc == EXIT_PASS and len(a.builds) == 1:
-        failed = failed_tests(r.raw)
-        if failed:
-            rc = EXIT_FAIL
-            if not a.quiet: print("FAILED TESTS: " + "; ".join(failed))
-    if a.quiet and rc != EXIT_ERROR: print("PASS" if rc == EXIT_PASS else "FAIL")
-    elif not a.quiet: print({EXIT_PASS: "PASS", EXIT_FAIL: "FAIL", EXIT_ERROR: "ERROR (could not run)"}[rc] + "  report: " + r.md)
-    return rc
+    return finish(rc, md, a.quiet)

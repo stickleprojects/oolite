@@ -25,16 +25,29 @@ The tests of the game are in [`tests/ui/`](../../tests/ui/) at the repo root.
 
 ## Running
 
-    ./uitest mine:/path/Oolite.AppImage                                # one build, the X11 window managers
-    ./uitest base:/path/Base.AppImage fix:/path/Fix.AppImage         # compare two builds; the first is the control
-    ./uitest --list                                                    # the environments
+Three layers, each usable on its own:
 
-Each build is `label:path`. Every run needs `--desc`; it is left out of the examples on this page.
+1. **Tests**: pytest with the plugin, against **one** AppImage in **one** environment. Runs inside the Docker images; it knows nothing
+   about other builds: `pytest tests/ui --ui-env marco --ui-app=/app/Oolite.AppImage --ui-label mine`.
+2. **Run** (`uitest run`): the coordinator. Tests one AppImage in every requested environment x screen and writes one **result set**
+   (`results/<name>.raw` with a `SET` header line naming the AppImage, its label, sha256, build date, environments and tool version,
+   plus `.md`, `-env.txt`, `.shots/`, `.logs/`). It never compares.
+3. **Compare** (`uitest compare`): takes saved result sets, one as the control, and gives the verdicts (FIXED, REGRESSED, ...).
+
+        ./uitest run base:/path/Base.AppImage --name base            # one result set per build ...
+        ./uitest run fix:/path/Fix.AppImage --name fix
+        ./uitest compare --control results/base --candidate results/fix   # ... compared afterwards (results/compare-<date>-fix.md)
+        ./uitest base:/path/Base.AppImage fix:/path/Fix.AppImage        # shorthand: run each build, then compare; the first is the control
+        ./uitest --list                                                  # the environments
+
+Each build is `label:path`. Every run needs `--desc`; it is left out of the examples on this page. The shorthand with several builds
+writes `results/<name>-<label>.*` per build and the comparison as `results/<name>.*`. `uitest compare` takes `--candidate` more than
+once, `--report PATH`, `--desc`, `--minruns`, `--strict` and `-q`; a result set is given as `results/<name>` or `results/<name>.raw`.
 
 | Option | What it does |
 |---|---|
 | `--desc TEXT` / `--desc-file PATH` | **required**: what the run is for; shown as Purpose at the top of the report |
-| `--name NAME` | name of the result files (`results/NAME.*`); default `uitest-<date>-<candidates>` |
+| `--name NAME` | name of the result files (`results/NAME.*`); default `uitest-<date>-<label>` (`uitest-<date>-<candidates>` for the shorthand) |
 | `--note LABEL=TEXT` | a note for one build in the report's Builds table (repeatable) |
 | `--env A,B` | environments to run (default: the six X11 window managers; `./uitest --list` shows all) |
 | `--wayland` | also the headless Wayland compositors |
@@ -111,8 +124,8 @@ check that the file parses.
 ## Add a test
 
 Add a function to a file in [`tests/ui/`](../../tests/ui/) (`app/`, `window/` or `screen/`), plus, if it needs a new rule, a small check
-function in `src/oolite_ui_test_framework/pass_fail.py`. It runs for every environment x build x run, with ids like
-`test_gets_focus[marco-x11-opt1-run3]`. Select with `-k` or the markers `-m family_kwin`, `-m session_xwayland`, `-m env_marco`;
+function in `src/oolite_ui_test_framework/pass_fail.py`. It runs for every environment x run of the one build under test, with ids like
+`test_gets_focus[marco-x11-run3]`. Select with `-k` or the markers `-m family_kwin`, `-m session_xwayland`, `-m env_marco`;
 `@pytest.mark.only_wm("marco")` limits a test to some environments.
 
 **Launch rules: fixtures are opt-in.**
