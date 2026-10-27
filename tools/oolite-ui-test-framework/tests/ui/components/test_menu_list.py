@@ -14,6 +14,8 @@ class FakeApp:
         self.keys += k
         if self.after: self.shot = self.after.pop(0) if isinstance(self.after, list) else self.after
     def hold_key(self, key, seconds): self.send_keys(key)
+    def press_until(self, key, cond, cap=3.0): self.hold_key(key, cap); return cond()
+    def keys_received(self): return None
     def wait_until(self, cond, what, timeout=None):
         if not cond(): raise AssertionError(what)
 

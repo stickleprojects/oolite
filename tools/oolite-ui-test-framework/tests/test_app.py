@@ -83,9 +83,27 @@ def test_game_exit_is_reported_at_once():
 
 def test_frozen_window_does_not_move_selection():
     a = make([with_bar(1280, 720, 1)])
-    with pytest.raises(appmod.ScenarioFailed, match="highlight did not leave row 1"):
+    with pytest.raises(appmod.ScenarioFailed, match="highlight did not leave row 1") as e:
         a.title_menu.wait_until_displayed().menu.move_down(2)
-    assert a.session.keys == ["Down", "Down"]      # held again once, then gave up
+    assert a.session.keys == ["Down"] and "key presses" not in str(e.value)      # held up to the cap once; no game log, no key count
+
+
+def test_a_key_is_released_as_soon_as_the_highlight_moves():
+    a = make([with_bar(1280, 720, 1)]); a.session.after = [with_bar(1280, 720, 2)]
+    t = []; down = a.session.key_down
+    a.session.key_down = lambda k: (t.append(a.clock.t), down(k)); a.session.key_up = lambda k: t.append(a.clock.t)
+    a.title_menu.wait_until_displayed().menu.move_down()
+    assert a.session.keys == ["Down"] and t[1] - t[0] < 0.1       # released on the first look after the highlight moved, not after a fixed hold
+
+
+def test_no_key_reached_the_game_says_so(tmp_path):
+    a = make([with_bar(1280, 720, 1)]); a.game.dir = str(tmp_path)
+    (tmp_path / "GameData").mkdir(); (tmp_path / "GameData" / "Latest.log").write_text("Opening log for Oolite\n")
+    with pytest.raises(appmod.ScenarioFailed, match="logged no key presses at all"):
+        a.title_menu.wait_until_displayed().menu.move_down()
+    (tmp_path / "GameData" / "Latest.log").write_text("Keydown scancode = 81, unicode = 269\n" * 3)
+    with pytest.raises(appmod.ScenarioFailed, match="logged 3 key presses"):
+        a.title_menu.menu.move_down()
 
 
 def test_no_grab_support_is_not_measurable():

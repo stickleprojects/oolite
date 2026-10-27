@@ -74,11 +74,28 @@ class App:
         for k in keys:
             self.session.send_key(k); self.clock.sleep(gap)
 
-    def hold_key(self, key, seconds):
-        """Hold `key` down for `seconds`, then release it. The game reads the keyboard once per frame (slow with software rendering), so a tap
-        shorter than a frame is missed, and holding for too long starts the key repeat (about 1 s is one menu step in the Docker images)."""
+    def press_until(self, key, cond, cap=3.0, poll=0.02):
+        """Hold `key` down until cond() is true, looking while it is down, then release it at once; at most `cap` seconds. The game moves a
+        menu once per frame while a key is down (its own repeat is 0.2 s, shorter than a software-rendered frame), so a fixed hold moved
+        0 rows or several depending on the frame rate. Returns whether cond() became true."""
+        t0 = self.clock.monotonic(); limit = self.session.hold_time(cap)
         self.session.key_down(key)
         try:
-            self.clock.sleep(self.session.hold_time(seconds))
+            while True:
+                if cond(): return True
+                if self.clock.monotonic() - t0 >= limit: return False
+                self.clock.sleep(poll)
         finally:
             self.session.key_up(key)
+
+    def keys_received(self, flush=2.5):
+        """How many key presses the game has logged so far (scenarios.add_key_logging turns that on), after waiting `flush` seconds: the game
+        writes its log at most every 2 s. None when there is no game log to read."""
+        d = getattr(self.game, "dir", None)
+        if not d: return None
+        self.clock.sleep(flush)
+        for root, _, files in os.walk(d):
+            if "Latest.log" in files:
+                try: return sum("Keydown scancode" in l for l in open(os.path.join(root, "Latest.log"), errors="replace"))
+                except OSError: return None
+        return None

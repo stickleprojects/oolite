@@ -82,16 +82,18 @@ class MenuList:
             last = cur; self.app.clock.sleep(step); waited += step
         return None
 
-    def _step(self, key, holds=(1.0, 1.5)):
-        """Move the highlight off its row: hold the key (see App.hold_key), wait for the highlight to settle, and hold longer if it did not move.
-        How many rows a hold moves depends on how fast the game draws, so select_index() looks at where it ended up."""
+    def _step(self, key, cap=3.0):
+        """Move the highlight off its row: hold the key only until the highlight has moved (see App.press_until), then let it settle.
+        It can still move one row too far on a slow frame, so select_index() looks at where it ended up."""
         from ...app import ScenarioFailed       # imported here: app.py imports the pages, which import this module
         before = self.settled_index()
-        for seconds in holds:
-            self.app.hold_key(key, seconds)
-            after = self.settled_index()
-            if after is not None and after != before: return
-        raise ScenarioFailed("the highlight did not leave row %s after %s was held for %.1f s" % (before, key, sum(holds)))
+        self.app.press_until(key, lambda: self.selected_index not in (None, before), cap)
+        after = self.settled_index()
+        if after is not None and after != before: return
+        n = self.app.keys_received()
+        why = "" if n is None else "; the game logged no key presses at all (does its window have keyboard focus?)" if n == 0 else \
+              "; the game logged %d key presses" % n
+        raise ScenarioFailed("the highlight did not leave row %s after %s was held for up to %.1f s%s" % (before, key, cap, why))
 
     def wait_until_selected_index(self, index, timeout=5):
         self.app.wait_until(lambda: self.selected_index == index, "row %d to be the highlighted row (now %s of %d visible)" % (index, self.selected_index, self.visible_count), timeout)
