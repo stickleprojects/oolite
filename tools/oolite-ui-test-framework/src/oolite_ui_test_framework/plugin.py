@@ -99,7 +99,7 @@ def pytest_generate_tests(metafunc):
 
 
 def build_label(cfg):
-    """--ui-label, else the AppImage's file name without .AppImage (e.g. 'opt2fix')."""
+    """--ui-label, else the AppImage's file name without .AppImage (e.g. 'pr774')."""
     name = cfg.getoption("--ui-label") or os.path.basename(cfg.getoption("--ui-app"))
     return re.sub(r"\.AppImage$", "", name, flags=re.I) or "app"
 

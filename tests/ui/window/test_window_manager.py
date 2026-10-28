@@ -44,5 +44,5 @@ def test_f12_toggle(fresh_game):
 @pytest.mark.saved_window_larger_than_screen
 def test_f12_toggle_with_saved_window_larger_than_screen(fresh_game):
     """A player whose saved window is larger than the screen (e.g. moved to a smaller monitor): F12 must still toggle. How the window
-    manager fits the oversized window differs between environments (#10: mutter fits it and opt2fix then ignored F12)."""
+    manager fits the oversized window differs between environments (#10: mutter maximises PR #774's window, see OoliteProject/oolite#775)."""
     enforce(pass_fail.check_f12_toggle(fresh_game.toggle()))

@@ -124,7 +124,7 @@ def _size(o):
 def _toggle_size(o):
     """Size of the game's own (client) area where the probe reports it, else of the outer window. F12 must be judged on the client: a
     maximised window's frame already covers the screen, so going fullscreen only drops the title bar and the outer size stays the same
-    (opt2fix with a saved window larger than the screen, #10)."""
+    (PR #774 with a saved window larger than the screen, #10)."""
     g = None if o is None else (o.client or o.outer)
     return None if g is None else (g[2], g[3])
 
