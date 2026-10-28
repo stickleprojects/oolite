@@ -78,7 +78,7 @@ container), so screenshots include KWin's own title bars; the F12 test saves bef
 
 | File | Contents |
 |---|---|
-| `<name>.md` | the report: Purpose, Builds, headline, counts per environment and test, verdicts, live-desktop table |
+| `<name>.md` | the report: Purpose, Builds, headline, **What ran where** (environment x test grid: passed / measured runs, `–` = not run, then each skip reason and where it applied), verdicts, counts per environment, live-desktop table |
 | `<name>.raw` | one RESULT line per run (with `start`, a UTC timestamp, and `startup_secs`), one TEST line per test (outcome, `start`, `secs` over setup + call + teardown, reason), plus WMVER / HOSTENV / SKIP lines |
 | `<name>-env.txt` | the machine and tool versions |
 | `<name>.parts/` | raw output and JUnit XML per container |

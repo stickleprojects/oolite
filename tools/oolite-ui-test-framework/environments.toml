@@ -11,6 +11,7 @@
 # optional  version_cmd/version_re (shown in the report), settle (s before readiness polling, default 4), settle_after (default 3),
 #           ready_timeout (default 20), ready_socket (wayland socket to wait for, default wl0), files {path = text}, env {VAR = value},
 #           post_start (commands run once the socket is up), focus_na (true if no keyboard focus can exist, e.g. headless weston), keys (how keys and the mouse are injected: xtest, or fakeinput = KWin fake-input protocol, needed on headless kwin), keys_na (true if no way to inject keys exists),
+#           tiling (true = a tiling compositor that sizes every window itself, so the saved-size test does not apply),
 #           headed (true = the compositor is a window on the host X display, with the GPU passed in; screenshots then show its decorations)
 
 [images.arch]
@@ -131,6 +132,7 @@ env = { WLR_BACKENDS = "headless", WLR_RENDERER = "pixman", WLR_LIBINPUT_NO_DEVI
 version_cmd = "sway --version"
 version_re = "[0-9][0-9.]+"
 probes = ["sway:framed,focused", "x11"]
+tiling = true
 [env.sway-native]
 family = "sway"
 session = "Wayland native"
@@ -144,6 +146,7 @@ env = { WLR_BACKENDS = "headless", WLR_RENDERER = "pixman", WLR_LIBINPUT_NO_DEVI
 version_cmd = "sway --version"
 version_re = "[0-9][0-9.]+"
 probes = ["sway"]
+tiling = true
 
 [env.mutter-xwayland]
 family = "mutter"

@@ -68,7 +68,8 @@ Wayland (X11 key events never reach the game there). This is chosen automaticall
 
 Everything is in `tools/oolite-ui-test-framework/results/`:
 
-- `<name>.md`: the report. Purpose and builds first, then the headline, then counts per environment and test.
+- `<name>.md`: the report. Purpose and builds first, then the headline, then **What ran where**: a grid of environment x test
+  (`3/3` passed, `1/3 ✗` failed, `–` not run) with the reason for every test that did not run, then the verdicts and counts.
 - `<name>.raw`: one line per run and per test (`grep "outcome=failed" <name>.raw` lists failures with their reason).
 - `<name>.logs/`: the game's own log for every launch. Key presses are logged, so you can see whether a key reached the game.
 - `<name>.shots/`: screenshots, where the run takes them.

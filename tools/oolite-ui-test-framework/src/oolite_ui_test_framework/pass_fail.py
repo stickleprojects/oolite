@@ -51,6 +51,24 @@ def check_f12_toggle(rec):
     return (FAILED, "after the round trip the window lost: " + ", ".join(bad)) if bad else (PASSED, "")
 
 
+def check_saved_size(rec, want, frame=(16, 64), tol=2):
+    """The game window opened at the saved windowed size `want` (w, h): its client area within `tol` px, or, where only the outer
+    window is known, larger than `want` by at most `frame` (the window manager's borders and title bar)."""
+    if _v(rec, "exited") == "1": return FAILED, "the game window was gone (game exited)"
+    req = (rec.get("requested_w"), rec.get("requested_h"))
+    if None not in req and tuple(map(int, req)) != tuple(want):
+        return FAILED, "the game asked for %sx%s, not the saved %dx%d" % (req + tuple(want))
+    c = geometry.parse_geom(rec.get("client")) if _v(rec, "client") else None
+    o = geometry.parse_geom(rec.get("outer")) if _v(rec, "outer") else None
+    if c:
+        if abs(c[2] - want[0]) <= tol and abs(c[3] - want[1]) <= tol: return PASSED, ""
+        return FAILED, "client area %dx%d, saved size %dx%d" % (c[2], c[3], want[0], want[1])
+    if o:
+        if 0 <= o[2] - want[0] <= frame[0] and 0 <= o[3] - want[1] <= frame[1]: return PASSED, ""
+        return FAILED, "outer window %dx%d, saved size %dx%d (+ up to %dx%d for the frame)" % (o[2], o[3], want[0], want[1], frame[0], frame[1])
+    return SKIPPED, "NOT MEASURABLE: window size cannot be observed in this environment"
+
+
 TESTS = {"test_has_frame": check_frame, "test_gets_focus": check_focus, "test_splash_centred": check_splash_centred,
          "test_game_window_centred": check_window_centred, "test_f12_toggle": check_f12_toggle}
 

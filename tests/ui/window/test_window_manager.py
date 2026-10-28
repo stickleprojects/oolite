@@ -3,7 +3,7 @@
 Each test is one line: pick a check from oolite_ui_test_framework.pass_fail and enforce() it."""
 import pytest
 
-from oolite_ui_test_framework import pass_fail
+from oolite_ui_test_framework import pass_fail, scenarios
 from oolite_ui_test_framework.pytest_helpers import enforce
 
 pytestmark = pytest.mark.game
@@ -29,6 +29,12 @@ def test_splash_centred(launched_game):
 
 def test_game_window_centred(launched_game):
     enforce(pass_fail.check_window_centred(launched_game))
+
+
+def test_saved_window_size_restored(launched_game, env_session):
+    """The window opens at the windowed size saved in the game's settings, not the splash size (OoliteProject/oolite#775)."""
+    if env_session.env.tiling: pytest.skip("NOT APPLICABLE: %s tiles windows, so it sets the size itself" % env_session.env.name)
+    enforce(pass_fail.check_saved_size(launched_game, scenarios.window_size_for(env_session.primary)))
 
 
 @pytest.mark.needs_toggle

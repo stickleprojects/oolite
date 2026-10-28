@@ -34,6 +34,7 @@ class Environment:
     focus_na: bool = False
     keys: str = "xtest"            # how keys and the mouse are injected: xtest (xdotool) | fakeinput (KWin fake-input, for headless kwin)
     keys_na: bool = False          # injected (XTEST) keys never reach X clients, e.g. headless kwin-xwayland
+    tiling: bool = False           # a tiling compositor (sway): it sizes and places every window itself, so saved sizes and centring do not apply
     headed: bool = False           # the compositor runs as a window on the host X display (GPU passed in); $UITEST_HOST_DISPLAY names it
     where: str = "docker"
 

@@ -92,3 +92,26 @@ def test_clean_runs_score(tmp_path):
     from oolite_ui_test_framework import report
     ok = {"wm": "m", "screen": "s", "build": "b", "frame": "1", "focus": "1", "exited": "0"}
     assert report.clean_runs([ok, dict(ok, focus="0"), ok]) == (2, 3)
+
+
+def test_what_ran_where_grid_and_skip_reasons(tmp_path):
+    raw = tmp_path / "g.raw"
+    raw.write_text("\n".join([
+        "TEST wm=marco build=b run=1 test=test_has_frame outcome=passed start=NA secs=1 reason=",
+        "TEST wm=marco build=b run=2 test=test_has_frame outcome=failed start=NA secs=1 reason=no frame",
+        "TEST wm=weston-native build=b run=1 test=test_has_frame outcome=skipped start=NA secs=0 reason=NOT MEASURABLE: no probe",
+        "TEST wm=weston-native build=b run=1 test=test_title_menu_is_displayed outcome=skipped start=NA secs=0 reason=NOT MEASURABLE: no probe"]) + "\n")
+    report.load(str(raw))
+    g = "\n".join(report.test_grid(report.TESTS, ["b"]))
+    assert "| environment | has_frame | title_menu_is_displayed |" in g
+    assert "| 1/2 ✗ |  |" in g and "| – | – |" in g
+    assert "- NOT MEASURABLE: no probe: has_frame (weston-native); title_menu_is_displayed (weston-native)" in g
+
+
+def test_grid_lists_environments_that_never_ran(tmp_path):
+    raw = tmp_path / "g.raw"
+    raw.write_text("TEST wm=marco build=b run=1 test=test_has_frame outcome=passed start=NA secs=1 reason=\n"
+                   "HARD wm=kwin screen=1920x1080 build=b reason=kwin failed to start\n")
+    report.load(str(raw))
+    g = "\n".join(report.test_grid(report.TESTS, ["b"]))
+    assert "| – |" in g.split("kwin", 1)[1] and "- hard failure: kwin failed to start: every test (kwin)" in g

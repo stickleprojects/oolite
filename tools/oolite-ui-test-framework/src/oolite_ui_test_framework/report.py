@@ -84,7 +84,7 @@ def set_registry(envs):
 def load(raw, tol=geometry.DEFAULT_TOL):
     cells, order = {}, []
     global SKIPS
-    SKIPS = []; VERS.clear(); HOSTENV.clear()
+    SKIPS = []; VERS.clear(); HOSTENV.clear(); TESTS.clear()
     META["purpose"] = None; META["builds"] = []; WARNINGS.clear()
     for line in open(raw):
         if line.startswith("WARN "):
@@ -107,6 +107,10 @@ def load(raw, tol=geometry.DEFAULT_TOL):
             if line.startswith("WMVER"): VERS[d.get("wm", "")] = d.get("version", "")
             else: HOSTENV.update(d)
             continue
+        if line.startswith("TEST "):
+            head, _, why = line.partition(" reason=")
+            d = dict(kv.split("=", 1) for kv in head.split()[1:] if "=" in kv)
+            TESTS.append((d.get("wm", "-"), d.get("build", "-"), d.get("test", "-"), d.get("outcome", "-"), why.strip())); continue
         if line.startswith("SKIP"):
             head, _, why = line.partition("reason=")
             d = dict(kv.split("=", 1) for kv in head.split()[1:] if "=" in kv)
@@ -124,7 +128,7 @@ def load(raw, tol=geometry.DEFAULT_TOL):
 def uniq(seq):
     return list(dict.fromkeys(seq))
 
-VERS = {}; HOSTENV = {}
+VERS = {}; HOSTENV = {}; TESTS = []   # TESTS: (wm, build, test, outcome, reason) per TEST line
 SESS_ORDER = {"X11": 0, "XWayland": 1, "Wayland native": 2}
 
 def parse_wm(wm):
@@ -270,6 +274,38 @@ def cell_outcomes(ctl, bld, minruns, has_x=True):
     return res
 
 
+def test_grid(tests, builds):
+    """'What ran where': per build, environment x test with passed/measured runs ('3/3', '1/3 ✗'), '–' where every run skipped, then the
+    skip reasons and where each applied, so a whole run can be read off one table."""
+    if not tests: return []
+    names = sorted({t for _, _, t, _, _ in tests}); short = [n[5:] if n.startswith("test_") else n for n in names]
+    L = ["## What ran where (passed / measured runs; – = not run, see the reasons below)", ""]
+    for b in builds:
+        rows = [t for t in tests if t[1] == b]
+        if not rows: continue
+        if len(builds) > 1: L += ["**%s**" % b, ""]
+        L += ["| environment | " + " | ".join(short) + " |", "|---|" + "---|" * len(names)]
+        for wm in sort_wms(uniq([t[0] for t in rows])):
+            cells = []
+            for n in names:
+                o = [t[3] for t in rows if t[0] == wm and t[2] == n]
+                m = [x for x in o if x != "skipped"]; p = sum(x == "passed" for x in m)
+                cells.append("" if not o else "–" if not m else "%d/%d%s" % (p, len(m), "" if p == len(m) else " ✗"))
+            L.append("| %s | %s |" % (wm_info(wm)[1], " | ".join(cells)))
+        for wm in sort_wms(uniq([w for w, _, sb, _ in SKIPS if sb == b and w not in {t[0] for t in rows}])):   # environments that never ran
+            L.append("| %s | %s |" % (wm_info(wm)[1], " | ".join("–" for _ in names)))
+        L.append("")
+    why = {}
+    for wm, b, n, o, r in tests:
+        if o == "skipped": why.setdefault(r or "no reason given", {}).setdefault(n[5:] if n.startswith("test_") else n, set()).add(wm)
+    for wm, _, b, r in SKIPS:
+        if b in builds and not any(t[0] == wm and t[1] == b for t in tests): why.setdefault(r[:160], {}).setdefault("every test", set()).add(wm)
+    if why:
+        L += ["**Not run, and why:**", ""] + ["- %s: %s" % (r, "; ".join("%s (%s)" % (n, ", ".join(sorted(w))) for n, w in sorted(d.items())))
+                                               for r, d in sorted(why.items())] + [""]
+    return L
+
+
 def cell_name(wm, sc, multi):
     return wm_info(wm)[1] + (" " + sc if multi and sc not in ("-", "host") and not wm.startswith("host") else "")
 
@@ -373,6 +409,7 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
     for k in sorted({(k[0], k[1]) for k in cells}):
         L.append("| %s | %s | %s |" % (k[0], k[1], " | ".join("%d/%d" % clean_runs(cells[(k[0], k[1], b)]) if (k[0], k[1], b) in cells else "-" for b in builds)))
     L.append("")
+    L += test_grid(TESTS, builds)
     L += ["## Outcomes (control `%s` v candidate, per cell)" % control,
           "- **WORKS** tested, both pass every criterion. **FIXED** control fails, candidate passes (significant). **STILL BROKEN** both fail the same criterion. **REGRESSED** control passes, candidate fails (significant).",
           "- **SUSPECT** candidate fails where control passes, too few runs to be sure. **NEEDS MORE RUNS** nothing failed but fewer than MINRUNS runs (or too few to be significant). **NOT MEASURABLE** this criterion cannot be observed here (NA). **NOT TESTED** the environment was not run (reason given).",
