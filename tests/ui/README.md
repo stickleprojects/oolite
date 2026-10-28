@@ -32,7 +32,7 @@ those check what the game does; these check what ends up on the screen.
 | Does my build behave under every window manager? | `./uitest mine:/path/Oolite.AppImage --toggle --desc "..." --name all-wms` (add `--wayland` for the Wayland compositors) | about 1 min per run; 10 runs per environment by default |
 | Does my change fix the bug without breaking anything? | `./uitest base:/path/Base.AppImage fix:/path/Fix.AppImage --toggle --desc "..." --name fix-vs-base` | the above, twice |
 | What does KWin actually draw (title bars, fullscreen)? | `./uitest mine:/path/Oolite.AppImage --env kwin-xwayland-headed --tests f12_toggle --toggle --runs 1 --desc "..." --name kwin-look` (opens a window on your desktop) | 1 min |
-| Does it work on my own desktop, with my drivers? | `./uitest mine:/path/Oolite.AppImage --env "" --host --desc "..." --name my-desktop` (opens game windows; `--env ""` = no Docker environments) | about 20 s per run, 5 runs |
+| Does it work on my own desktop, with my drivers? | `./uitest mine:/path/Oolite.AppImage --env "" --host --toggle --desc "..." --name my-desktop` (opens game windows and presses keys; `--env ""` = no Docker environments; the same tests as in Docker) | about 1 min per run, 5 runs |
 | I changed the framework itself: is it still right? | `python3 -m pytest tests -q` (no Docker, no game) | 40 s |
 
 `--env` takes one or more environment names (`./uitest --list` shows them all). `--tests` picks tests by name. `--runs` sets how
@@ -55,7 +55,7 @@ They answer three different questions, with the same command and the same tests:
 |---|---|---|---|
 | Where | inside Docker, on a virtual screen | inside Docker; KWin shows as a window on your desktop | directly on your desktop |
 | Use it for | all routine and long runs: unattended, any screen size, repeatable, anyone with Docker gets the same result | seeing what KWin draws: screenshots include KWin's own title bars (before, during and after F12) | checking with real drivers and your own desktop |
-| Needs | Docker | Docker, an X11 desktop, a GPU (`/dev/dri`) | your desktop; it may ask you yes/no questions |
+| Needs | Docker | Docker, an X11 desktop, a GPU (`/dev/dri`) | your desktop, Docker for the measuring helper; pytest in a venv of its own (made on first use); it may ask you yes/no questions |
 | Limits | KWin's own decorations cannot be screenshotted (headless KWin crashes on screenshot requests), so the title bar is checked by asking KWin instead | do not touch the mouse or keyboard while it runs; the screen size is limited by your desktop (panels shrink it) | do not touch the mouse or keyboard; only your one desktop |
 
 Use headless by default and headed when a headless result needs a look. Results from different kinds are not directly comparable

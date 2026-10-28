@@ -3,7 +3,9 @@
   run        `uitest run LABEL:APPIMAGE`: the coordinator. Builds images, runs the tests in each environment x screen, collects one result
              set (<name>.raw with a SET header, .md, -env.txt, .shots/, .logs/). It never compares;
   compare    `uitest compare --control SET --candidate SET`: verdicts (FIXED / REGRESSED ...) from result sets made by separate runs.
-`uitest A:path B:path` (several builds) still works: it runs each build, then compares them. Host mode (--host) runs pytest in a helper container against the live X display; native Wayland runs here."""
+`uitest A:path B:path` (several builds) still works: it runs each build, then compares them. Host mode (--host) runs the same pytest tests
+ON THE HOST (the game uses the host's libraries and drivers), with pytest from a venv of its own (.venv-host/, made on first use); X is
+measured by a helper container sharing the live X display. Without that venv only the startup checks run, and the report says so."""
 import argparse
 import contextlib
 import hashlib
@@ -29,6 +31,8 @@ WAYLAND_ENVS = "kwin-xwayland,kwin-native,sway-xwayland,sway-native,mutter-xwayl
 
 
 QUICK_TESTS = "game_launches,title_menu_is_displayed"   # --quick: the shared launch plus one title-menu launch per environment
+HOST_VENV = os.path.join(PKG, ".venv-host")   # host mode's pytest; never installed into the host's own python
+HOST_PYTEST = "pytest==9.0.2"
 
 
 def give_back_output(name, uid=None, gid=None):
@@ -161,10 +165,12 @@ class Runner:
             if not ok: say("  image build FAILED (see log)")
         self.img_ok[image] = ok; return ok
 
-    def pytest_args(self, env, screen, part, app):
-        c = ["python3", "-m", "pytest", "-q", "-c", "/gametests/pytest.ini", "/gametests", "--rootdir", "/gametests",
-             "--ui-registry", "/uitest/environments.toml", "--ui-env", env, "--ui-screen", screen, "--ui-runs", str(self.runs_for(env)),
-             "--ui-raw", "/out/%s.parts/%s" % (self.name, part), "--junitxml", "/out/%s.parts/%s.xml" % (self.name, part), "--ui-shots", "/out/%s.shots" % self.name, "--ui-logs", "/out/%s.logs" % self.name, "--ui-tol", str(self.a.tol)]
+    def pytest_args(self, env, screen, part, app, python="python3", tests="/gametests", reg="/uitest/environments.toml", out="/out"):
+        """The pytest command; the defaults are the paths inside the containers, host mode passes the host's own."""
+        o = "%s/%s" % (out, self.name)
+        c = [python, "-m", "pytest", "-q", "-c", tests + "/pytest.ini", tests, "--rootdir", tests,
+             "--ui-registry", reg, "--ui-env", env, "--ui-screen", screen, "--ui-runs", str(self.runs_for(env)),
+             "--ui-raw", "%s.parts/%s" % (o, part), "--junitxml", "%s.parts/%s.xml" % (o, part), "--ui-shots", o + ".shots", "--ui-logs", o + ".logs", "--ui-tol", str(self.a.tol)]
         if self.a.toggle: c.append("--ui-toggle")
         if self.a.tests: c += ["-k", test_selector(self.a.tests)]
         c += ["--ui-app=" + app, "--ui-label=" + self.label]
@@ -180,7 +186,10 @@ class Runner:
                   "-v", "%s:/app:ro" % os.path.dirname(self.path)]
         app = "/app/" + os.path.basename(self.path)
         cmd = ["docker", "run", "--rm"] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, app)
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        self.collect(env, screen, part, subprocess.run(cmd, capture_output=True, text=True))
+
+    def collect(self, env, screen, part, r):
+        """After one pytest run (container or host): its output's last line, its raw part into the result set, or a SKIP row if it never ran."""
         tail = [l for l in r.stdout.splitlines() if l.strip()][-1:] or [r.stderr.strip()[-200:]]
         say("  %s" % tail[0])
         # copy the parts in; a failed pytest (hard failure) leaves a SKIP row with the reason
@@ -211,7 +220,7 @@ class Runner:
         st = os.environ.get("XDG_SESSION_TYPE", "unknown"); h = envinfo.detect_host()
         self.add("HOSTENV " + " ".join("%s=%s" % kv for kv in h.items()))
         say("== host: session=%s desktop=%s DISPLAY=%s WAYLAND_DISPLAY=%s" % (st, h["desktop"], os.environ.get("DISPLAY", "unset"), os.environ.get("WAYLAND_DISPLAY", "unset")))
-        say("WARNING: host mode opens real Oolite windows on THIS desktop (each run about 17 s) and may press F12 (--toggle).\n"
+        say("WARNING: host mode opens real Oolite windows on THIS desktop (about 20 s each), presses keys and moves the pointer.\n"
               "         Do not touch the mouse or keyboard during the automated runs.")
         if not self.a.no_prompt and sys.stdin.isatty():
             if input("Continue with host mode? [y/N] ").strip().lower()[:1] != "y": self.skip("host-" + h["desktop"].lower(), "host", "not run: declined at the confirmation"); return
@@ -221,14 +230,14 @@ class Runner:
             for n in names: self.skip(n, scr, "not available: no desktop session"); return
         for n in names:
             e = self.envs[n]
-            if e.session == "Wayland native": self.host_inprocess(n, scr); continue
+            if e.session == "Wayland native": self.host_cell(n, scr); continue
             if not os.environ.get("DISPLAY"): self.skip(n, scr, "not available: no DISPLAY (X11/XWayland) in this session"); continue
             helper = None
             if self.docker_ok and self.ensure_image(e.image): helper = self.start_helper(e)
             elif not all(shutil.which(t) for t in ("xwininfo", "xprop", "xdotool", "xrandr")):
                 self.skip(n, scr, "not available: X tools missing on host and no helper container (%s)" % (self.docker_why or "image build failed")); continue
             say("== %s: game on the host, X measured %s (%d runs) %s" % (n, "in helper container " + helper if helper else "with host tools", self.a.host_runs, time.strftime("%T")))
-            try: self.host_inprocess(n, scr, helper)
+            try: self.host_cell(n, scr, helper)
             finally:
                 if helper: subprocess.run(["docker", "rm", "-f", helper], capture_output=True)
 
@@ -241,6 +250,20 @@ class Runner:
         if os.path.exists(xa): cmd += ["-v", xa + ":/tmp/hostxauth:ro", "-e", "XAUTHORITY=/tmp/hostxauth"]
         cmd += [self.images[e.image]["tag"], "sleep", "infinity"]
         return name if subprocess.run(cmd, capture_output=True).returncode == 0 else None
+
+    def host_cell(self, env, scr, helper=None):
+        """One host environment: every pytest test, run here on the host with the venv's pytest; without the venv only the startup checks."""
+        py, why = host_python(os.path.join(self.out, "host-venv.log"))
+        if py is None:
+            say("  NOTE: %s; only the startup checks run (frame, focus, centring)" % why)
+            self.add("WARN wm=%s build=%s run=0 text=only the startup checks ran (frame, focus, centring): %s, so the screen, key, mouse and F12 tests did not" % (env, self.label, why))
+            return self.host_inprocess(env, scr, helper)
+        part = "%s-%s.raw" % (env, scr.replace(":", "_")); open(os.path.join(self.parts, part), "w").close()
+        cmd = self.pytest_args(env, scr, part, self.path, python=py, tests=GAME_TESTS, reg=self.a.registry or registry.DEFAULT_PATH, out=self.out)
+        cmd += ["--ui-helper", helper] if helper else []
+        cmd += ["--ui-no-prompt"] if self.a.no_prompt else []
+        # output captured as for the containers; the ask probe's questions still reach the user, it talks to /dev/tty directly
+        self.collect(env, scr, part, subprocess.run(cmd, capture_output=True, text=True, env=dict(os.environ, PYTHONPATH=os.path.join(PKG, "src"), PYTHONDONTWRITEBYTECODE="1")))
 
     def host_inprocess(self, env, scr, helper=None):
         """Runs ON THE HOST (host libraries and drivers), pure stdlib. X rows: measured through the helper container; native Wayland:
@@ -298,6 +321,22 @@ def build_parser():
     p.add_argument("--selftest", action="store_true", help="run the verdict self-test and exit")
     p.add_argument("--report-only", metavar="RAW", help="render a report from an existing raw file and exit")
     return p
+
+
+def host_python(log, venv=None, run=subprocess.run):
+    """(python of the host-mode venv, '') or (None, why). Made on first use with `python3 -m venv` and HOST_PYTEST from PyPI (log: `log`);
+    pytest is never installed into the host's own python."""
+    venv = venv or HOST_VENV; py = os.path.join(venv, "bin", "python")
+    want = HOST_PYTEST.split("==")[1]
+    def has_pytest():
+        return os.path.exists(py) and run([py, "-c", "import pytest; print(pytest.__version__)"], capture_output=True, text=True).stdout.strip() == want
+    if has_pytest(): return py, ""
+    say("Making the host-mode venv %s with %s (first use only). Log: %s" % (venv, HOST_PYTEST, log))
+    with open(log, "w") as lf:
+        for c in ([sys.executable, "-m", "venv", venv], [py, "-m", "pip", "install", "-q", HOST_PYTEST]):
+            if run(c, stdout=lf, stderr=subprocess.STDOUT).returncode != 0:
+                return None, "could not make the host-mode venv (%s failed; see %s)" % (" ".join(c[:4]), log)
+    return (py, "") if has_pytest() else (None, "the host-mode venv has no %s (see %s)" % (HOST_PYTEST, log))
 
 
 def headed_args(environ=None, exists=os.path.exists, hostname=socket.gethostname):

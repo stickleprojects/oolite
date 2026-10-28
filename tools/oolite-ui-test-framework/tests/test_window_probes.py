@@ -62,17 +62,60 @@ def test_merge_respects_field_restriction():
     assert a.outer == (1, 2, 3, 4)
 
 
-def test_helper_backend_parses_xtool_json(monkeypatch):
-    calls = []
-    def fake(cmd, env=None, **k):
-        calls.append(cmd)
-        return {"observe": '{"win": 9, "framed": 1, "focused": 0, "outer": [1, 2, 3, 4], "client": [2, 3, 1, 2]}', "monitors": "[[0, 0, 2560, 1440, true]]"}.get(cmd[-1], "")
-    monkeypatch.setattr(window_probes, "sh", fake)
-    b = window_probes.HelperBackend("ct", ":0")
+class _HostX:
+    """What xtool sees in the helper container: a game window 9 on the host display."""
+    def __init__(self): self.keys = []; self.repeat = True
+    def find_window(self): return 9
+    def abs_geom(self, w): return (1, 2, 3, 4)
+    def parent_id(self, w): return 5
+    def root_id(self): return 1
+    def active_id(self): return 9
+    def focus_id(self): return 9
+    def monitors(self): return [(0, 0, 2560, 1440, True)]
+    def wm_name(self): return "KWin"
+    def send_key(self, key, window=None): self.keys.append((key, window))
+    def autorepeat_on(self): return self.repeat
+    def autorepeat_off(self): self.repeat = False
+    def autorepeat_restore(self): self.repeat = True
+    def grab(self, w): return 2, 1, b"\x01\x02\x03\x04\x05\x06"
+
+
+def _serving(x, started):
+    """A Popen stand-in that runs xtool.serve on x for each line written, the way the helper container's `xtool serve` would."""
+    import io
+    from oolite_ui_test_framework import xtool
+    class Proc:
+        def __init__(self, cmd, **k):
+            self.cmd = cmd; self.stdin = self; self.stdout = io.BytesIO(); self.dead = None; started.append(self)
+        def write(self, b): self.line = b
+        def flush(self):
+            pos = self.stdout.tell(); self.stdout.seek(0, 2); xtool.serve(x, [self.line.decode()], self.stdout); self.stdout.seek(pos)
+        def poll(self): return self.dead
+        def close(self): pass
+        def wait(self, timeout=None): return 0
+    return Proc
+
+
+def test_helper_backend_talks_to_one_xtool_serve():
+    x = _HostX(); started = []
+    b = window_probes.HelperBackend("ct", ":0", popen=_serving(x, started))
     o = window_probes.make_probe("x11", backend=b).observe()
-    assert (o.win, o.framed, o.focused, o.outer) == (9, 1, 0, (1, 2, 3, 4)) and b.monitors() == [(0, 0, 2560, 1440, True)]
-    b.send_key("F12", 9)
-    assert calls[-1][-4:] == ["oolite_ui_test_framework.xtool", "key", "F12", "9"] and calls[0][:3] == ["docker", "exec", "-e"]
+    assert (o.win, o.framed, o.focused, o.outer) == (9, 1, 1, (1, 2, 3, 4)) and b.monitors() == [(0, 0, 2560, 1440, True)]
+    assert b.abs_geom(9) == (1, 2, 3, 4) and b.grab(9) == (2, 1, b"\x01\x02\x03\x04\x05\x06")
+    b.send_key("F12", 9); b.send_key("Down")
+    assert x.keys == [("F12", 9), ("Down", None)]
+    assert b.autorepeat_on() is True and (b.autorepeat_off(), x.repeat) == (None, False) and (b.autorepeat_restore(), x.repeat) == (None, True)
+    assert len(started) == 1 and started[0].cmd[:3] == ["docker", "exec", "-i"] and started[0].cmd[-2:] == ["oolite_ui_test_framework.xtool", "serve"]
+
+
+def test_helper_backend_restarts_a_dead_helper_and_reads_errors_as_none():
+    x = _HostX(); started = []
+    b = window_probes.HelperBackend("ct", ":0", popen=_serving(x, started))
+    assert b.find_window() == 9
+    started[0].dead = 1
+    assert b.find_window() == 9 and len(started) == 2
+    x.grab = lambda w: 1 / 0   # an exception in the helper is an error answer, not a broken helper
+    assert b.grab(9) is None and b.find_window() == 9 and len(started) == 2
 
 
 def test_xtool_observe_uses_x11_probe():

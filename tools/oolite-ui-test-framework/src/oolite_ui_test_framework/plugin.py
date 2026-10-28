@@ -44,6 +44,8 @@ def pytest_addoption(parser):
     g.addoption("--ui-shots", default="", help="save game-window screenshots (PNG) in this directory")
     g.addoption("--ui-game-arg", action="append", default=[], help="extra argument for the game (repeatable)")
     g.addoption("--ui-logs", default="", help="keep each launch's game log (Latest.log) in this directory")
+    g.addoption("--ui-helper", default="", help="host environments: the helper container that measures the host's X display (uitest starts it)")
+    g.addoption("--ui-no-prompt", action="store_true", help="host environments: never ask the user; what only they could answer is not tested")
 
 
 def _game(cfg, case, s, what, oversize=False):
@@ -142,13 +144,13 @@ def _run(item):
 
 # ---------------------------------------------------------------- fixtures
 class SessionManager:
-    def __init__(self, env, screen, label):
-        self.env = env; self.screen = screen; self.label = label; self.session = None
+    def __init__(self, env, screen, label, helper="", no_prompt=False):
+        self.env = env; self.screen = screen; self.label = label; self.session = None; self.helper = helper; self.no_prompt = no_prompt
 
     def get(self):
         """The started environment, started on first use and kept for the whole pytest session."""
         if self.session is not None: return self.session
-        s = sessmod.Session(self.env, self.screen)
+        s = sessmod.Session(self.env, self.screen, probe_kw={"no_prompt": self.no_prompt}, helper=self.helper or None)
         try: s.start()
         except sessmod.SessionError as e:
             s.stop(); STATE.hard.append((self.env.name, self.screen, self.label, str(e)))
@@ -166,7 +168,8 @@ class SessionManager:
 def session_mgr(request):
     env = _env(request.config)
     if env is None: pytest.skip("no --ui-env given")
-    m = SessionManager(env, request.config.getoption("--ui-screen"), build_label(request.config))
+    c = request.config
+    m = SessionManager(env, c.getoption("--ui-screen"), build_label(c), c.getoption("--ui-helper"), c.getoption("--ui-no-prompt"))
     yield m
     m.stop()
 

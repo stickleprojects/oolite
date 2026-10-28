@@ -40,3 +40,4 @@ tools-make/
 /tools/oolite-ui-test-framework/wmtest/
 /tools/oolite-ui-test-framework/wmtest-share/
 /tools/oolite-ui-test-framework/results/
+/tools/oolite-ui-test-framework/.venv-host/

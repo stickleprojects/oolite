@@ -54,14 +54,14 @@ def fake_input_offered(env, run=subprocess.run):
 
 def key_repeat_off(session):
     """Only where the session switched it off (X11 and XWayland); None where it cannot be read."""
-    if session.backend is None or session.env.kind == "host" or not hasattr(session.backend, "autorepeat_on"): return None
+    if session.backend is None or not hasattr(session.backend, "autorepeat_on"): return None
     on = session.backend.autorepeat_on()
     return "X key repeat is on, so a held key reaches the game as many presses" if on else None
 
 
 def screenshot_support(session):
     """An X session can always grab the game window with python-xlib; without it the screenshot tests cannot run."""
-    if session.backend is None or session.env.kind == "host": return None
+    if session.backend is None: return None
     if getattr(session.backend, "grab", None) is None:
         return "this X session cannot grab the game window (python-xlib missing: the XTools backend has no grab)"
     return None

@@ -119,6 +119,9 @@ class XToolsBackend:
     def autorepeat_off(self):
         sh(["xset", "r", "off"], self.env)
 
+    def autorepeat_restore(self):
+        sh(["xset", "r", "on"], self.env)
+
     def autorepeat_on(self):
         """True / False, or None if xset could not tell."""
         m = re.search(r"auto repeat:\s+(on|off)", sh(["xset", "q"], self.env))
@@ -138,6 +141,10 @@ class XlibBackend:
     def autorepeat_off(self):
         from Xlib import X
         self.d.change_keyboard_control(auto_repeat_mode=X.AutoRepeatModeOff); self.d.sync()
+
+    def autorepeat_restore(self):
+        from Xlib import X
+        self.d.change_keyboard_control(auto_repeat_mode=X.AutoRepeatModeOn); self.d.sync()
 
     def autorepeat_on(self):
         try: return bool(self.d.get_keyboard_control().global_auto_repeat)
@@ -423,47 +430,82 @@ class AskProbe(Probe):
 
 
 class HelperBackend:
-    """Host mode: the game runs on the host; X is measured by `python3 -m oolite_ui_test_framework.xtool` in a helper container sharing the host's X display."""
-    def __init__(self, container, display=None):
-        self.ct = container; self.display = display or os.environ.get("DISPLAY", ":0")
+    """Host mode: the game runs on the host; X is measured in a helper container sharing the host's X display, by one long-lived
+    `python3 -m oolite_ui_test_framework.xtool serve` (see xtool.py). Same interface as the X backends, screenshots and key repeat included."""
+    def __init__(self, container, display=None, popen=subprocess.Popen):
+        self.ct = container; self.display = display or os.environ.get("DISPLAY", ":0"); self.popen = popen; self.proc = None
 
-    def _x(self, *args):
-        return sh(["docker", "exec", "-e", "DISPLAY=" + self.display, self.ct, "python3", "-m", "oolite_ui_test_framework.xtool"] + [str(a) for a in args], timeout=30)
+    def _start(self):
+        self.proc = self.popen(["docker", "exec", "-i", "-e", "DISPLAY=" + self.display, self.ct, "python3", "-u", "-m", "oolite_ui_test_framework.xtool", "serve"],
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    def _call(self, *cmd):
+        """The command's result; None if the helper failed (it is restarted on the next call)."""
+        for _ in range(2):
+            if self.proc is None or self.proc.poll() is not None: self._start()
+            try:
+                self.proc.stdin.write(json.dumps(list(cmd)).encode() + b"\n"); self.proc.stdin.flush()
+                d = json.loads(self.proc.stdout.readline() or b"null")
+            except (OSError, ValueError):
+                self.close(); continue
+            if not d or "error" in d: return None
+            if "n" in d: return d["r"][0], d["r"][1], self.proc.stdout.read(d["n"])
+            return d["r"]
+        return None
+
+    def close(self):
+        if self.proc is not None:
+            try: self.proc.stdin.close(); self.proc.wait(timeout=5)
+            except (OSError, subprocess.SubprocessError): self.proc.kill()
+        self.proc = None
 
     def observe(self):
-        try: d = json.loads(self._x("observe") or "null")
-        except ValueError: return None
+        d = self._call("observe")
         if not d: return None
         t = lambda v: tuple(v) if v else None
         return Obs(framed=d["framed"], focused=d["focused"], outer=t(d["outer"]), client=t(d["client"]), win=d["win"], source="x11")
 
     def find_window(self):
-        o = self.observe(); return o.win if o else None
+        return self._call("find")
+
+    def abs_geom(self, w):
+        g = self._call("geom", w); return tuple(g) if g else None
+
+    def grab(self, w):
+        return self._call("grab", w)
 
     def monitors(self):
-        try: return [tuple(m) for m in json.loads(self._x("monitors") or "[]")]
-        except ValueError: return []
+        return [tuple(m) for m in self._call("monitors") or []]
 
     def wm_name(self):
-        return self._x("wmname").strip()
+        return self._call("wmname") or ""
 
     def send_key(self, key, window=None):
-        self._x(*(["key", key] + ([window] if window else [])))
+        self._call("key", key, window or 0)
 
     def key_down(self, key):
-        self._x("keydown", key)
+        self._call("keydown", key)
 
     def key_up(self, key):
-        self._x("keyup", key)
+        self._call("keyup", key)
 
     def mouse_move(self, window, x, y):
-        self._x("mousemove", window, x, y)
+        self._call("mousemove", window, x, y)
 
     def mouse_down(self):
-        self._x("mousedown")
+        self._call("mousedown")
 
     def mouse_up(self):
-        self._x("mouseup")
+        self._call("mouseup")
+
+    def autorepeat_on(self):
+        return self._call("repeat")
+
+    def autorepeat_off(self):
+        self._call("repeat_off")
+
+    def autorepeat_restore(self):
+        self._call("repeat_on")
 
 
 class HelperX11Probe(Probe):

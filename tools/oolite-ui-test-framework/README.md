@@ -6,7 +6,8 @@ tests are written with.
 **New here? Start with [`tests/ui/README.md`](../../tests/ui/README.md).** It explains the kinds of test run and which command to use.
 This page is the reference: every option, the output files, exit codes, adding an environment, writing tests, and how it works.
 
-The host needs only **python3 3.11 or newer (standard library)** and **Docker**; pytest, python-xlib and the window managers live in
+The host needs only **python3 3.11 or newer (standard library)** and **Docker** (host mode also makes a venv of its own with pytest, see
+[Host mode](#host-mode)); pytest, python-xlib and the window managers live in
 pinned Docker images. `uitest` is plain stdlib Python, so it can later be hooked into `mk.sh` or CI.
 
 ## What is in this folder
@@ -168,10 +169,21 @@ The plugin writes the raw file (RESULT, TEST, WMVER, HARD lines) and a pass-rate
 
 ## Host mode
 
-`--host` runs the game **on your desktop** (your libraries and drivers). For X11 and XWayland the measuring tools run in a helper
-container that shares your X display, so nothing is installed on your machine. Native Wayland is measured through KWin D-Bus or sway IPC
-where available; otherwise you are asked up to three yes/no questions (`--no-prompt`: recorded as not tested). On KDE under XWayland,
-frame and focus are cross-checked with KWin. About 20 s per run; do not touch the mouse or keyboard.
+`--host` runs the game **on your desktop** (your libraries and drivers) with **the same pytest tests** as the Docker environments:
+startup checks, title menu, keys, mouse clicks and, with `--toggle`, the F12 round trip.
+
+- **pytest comes from a venv of its own**, `tools/oolite-ui-test-framework/.venv-host/` (not in git), made on first use with
+  `python3 -m venv` and pytest 9.0.2 from PyPI (needs the network once; log in `results/host-venv.log`). Nothing is installed into the
+  host's own python. If the venv cannot be made, only the startup checks run and the report warns which tests did not.
+- **X11 and XWayland:** the game runs on the host; window state, screenshots, keys and clicks go through one long-lived
+  `xtool serve` in a helper container that shares your X display (`xtool.py`), so python-xlib and xdotool need not be on the host. Key
+  repeat is switched off for the run (a held key must be one press, as in the containers) and switched back on afterwards.
+- **Native Wayland:** measured through KWin D-Bus or sway IPC where available; otherwise you are asked up to three yes/no questions
+  (`--no-prompt`: recorded as not tested). There are no screenshots there, so the screen tests are NOT MEASURABLE, as in the headless
+  native environments.
+
+On KDE under XWayland, frame and focus are cross-checked with KWin. About 20 s per startup run, plus about 20 s for each screen test;
+the pointer moves and keys are pressed on your desktop, so do not touch the mouse or keyboard.
 
 ## Time and machine load
 

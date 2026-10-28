@@ -44,6 +44,7 @@ class Session:
         self.procs = []; self.probes = []; self.backend = None; self.primary = None; self.version = ""
         self.saved = dict(os.environ)
         self.game_env = {}
+        self.repeat_was = None   # host: the desktop's key repeat before the run, put back by stop()
 
     # ---- helpers
     def _popen(self, cmd, log):
@@ -129,6 +130,9 @@ class Session:
             if os.environ.get("DISPLAY") and e.session != "Wayland native":
                 self.backend = window_probes.HelperBackend(self.helper) if self.helper else window_probes.x_backend(dict(os.environ))
                 self.primary = window_probes.primary_monitor(self.backend.monitors())
+                # as in the X11 sessions: a held key must be one press. This is the user's own desktop, so stop() switches it back on
+                self.repeat_was = self.backend.autorepeat_on()
+                if self.repeat_was: self.backend.autorepeat_off()
         if e.version_cmd:
             m = re.search(e.version_re, self._run(e.version_cmd + " 2>&1") or "")
             self.version = m[0] if m else ""
@@ -226,6 +230,8 @@ class Session:
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).mouse_up()
 
     def stop(self):
+        if self.repeat_was and self.backend is not None: self.backend.autorepeat_restore()
+        if hasattr(self.backend, "close"): self.backend.close()
         if self.env.keys == "fakeinput": fakeinput.close()
         for p, _ in self.probes: p.close()
         for p in reversed(self.procs):
