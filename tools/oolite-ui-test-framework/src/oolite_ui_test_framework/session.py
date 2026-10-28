@@ -137,6 +137,11 @@ class Session:
             m = re.search(e.version_re, self._run(e.version_cmd + " 2>&1") or "")
             self.version = m[0] if m else ""
         self._make_probes()
+        kwin = next((p for p, _ in self.probes if p.name == "kwin"), None)
+        # no X display: find, place and grab the window through KWin. Not on the host (ScreenShot2 is permission-checked there), and not
+        # without a render device (KWin would crash on the first grab; the render_device precondition test says so instead)
+        if self.backend is None and e.kind == "wayland" and e.session == "Wayland native" and kwin is not None and preconditions.render_device(e) is None:
+            self.backend = window_probes.KWinBackend(kwin, dict(os.environ))
         if e.session == "XWayland" and self.backend is not None:
             # XWayland generates the key repeat itself (from KWin's fake-input keys too), as release + press pairs: off, as in the X11 sessions
             self.backend.autorepeat_off()

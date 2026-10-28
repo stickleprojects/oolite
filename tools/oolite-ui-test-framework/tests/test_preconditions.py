@@ -8,7 +8,7 @@ from oolite_ui_test_framework import preconditions as pre
 
 
 def env(**kw):
-    d = dict(name="kwin-xwayland", kind="wayland", keys="fakeinput", keys_na=False, headed=False)
+    d = dict(name="kwin-xwayland", kind="wayland", keys="fakeinput", keys_na=False, headed=False, devices=[])
     d.update(kw); return types.SimpleNamespace(**d)
 
 
@@ -54,9 +54,11 @@ def test_screenshot_support_only_where_an_x_session_should_grab():
     assert pre.screenshot_support(types.SimpleNamespace(backend=None, env=env())) is None
 
 
-def test_gpu_present_only_for_headed_environments():
-    assert pre.gpu_present(env(), exists=lambda p: False) is None
-    assert "/dev/dri is missing" in pre.gpu_present(env(headed=True), exists=lambda p: False)
+def test_render_device_for_headed_and_declared_devices():
+    assert pre.render_device(env(), exists=lambda p: False) is None
+    assert "/dev/dri is missing" in pre.render_device(env(headed=True), exists=lambda p: False)
+    assert "modprobe udmabuf" in pre.render_device(env(devices=["/dev/udmabuf"]), exists=lambda p: False)
+    assert pre.render_device(env(devices=["/dev/udmabuf"]), exists=lambda p: True) is None
 
 
 def test_requested_window_comes_from_the_game_log():

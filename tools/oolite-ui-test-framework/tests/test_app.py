@@ -125,6 +125,14 @@ def test_real_title_screenshot():
     assert a.title_menu.selected_item == "Start New Commander"
 
 
+def test_lit_ship_hull_above_the_menu_is_not_a_row():
+    """The rotating ship's hull, lit white, dips into the menu region (kwin-native, #37): it must not count as a seventh row."""
+    import os
+    from oolite_ui_test_framework import png
+    a = make([screen.Shot(*png.read_png(os.path.join(os.path.dirname(__file__), "fixtures", "title-menu-lit-hull-1280x720.png")))])
+    assert a.title_menu.menu.visible_count == 6 and a.title_menu.selected_item == "Start New Commander"
+
+
 def test_wrong_number_of_rows_is_reported_and_has_no_selected_item():
     a = make([with_bar(1280, 720, 1, n=4)] * 3)
     ok, why = a.title_menu.shows_expected_items()

@@ -55,8 +55,8 @@ They answer three different questions, with the same command and the same tests:
 |---|---|---|---|
 | Where | inside Docker, on a virtual screen | inside Docker; KWin shows as a window on your desktop | directly on your desktop |
 | Use it for | all routine and long runs: unattended, any screen size, repeatable, anyone with Docker gets the same result | seeing what KWin draws: screenshots include KWin's own title bars (before, during and after F12) | checking with real drivers and your own desktop |
-| Needs | Docker | Docker, an X11 desktop, a GPU (`/dev/dri`) | your desktop, Docker for the measuring helper; pytest in a venv of its own (made on first use); it may ask you yes/no questions |
-| Limits | KWin's own decorations cannot be screenshotted (headless KWin crashes on screenshot requests), so the title bar is checked by asking KWin instead | do not touch the mouse or keyboard while it runs; the screen size is limited by your desktop (panels shrink it) | do not touch the mouse or keyboard; only your one desktop |
+| Needs | Docker; for the headless KWin environments also `/dev/udmabuf` (KWin's render device, no GPU needed: `sudo modprobe udmabuf` if it is missing) | Docker, an X11 desktop, a GPU (`/dev/dri`) | your desktop, Docker for the measuring helper; pytest in a venv of its own (made on first use); it may ask you yes/no questions |
+| Limits | under XWayland the screenshot is of the game window only, so KWin's title bar is checked by asking KWin instead (native KWin is grabbed through KWin itself) | do not touch the mouse or keyboard while it runs; the screen size is limited by your desktop (panels shrink it) | do not touch the mouse or keyboard; only your one desktop |
 
 Use headless by default and headed when a headless result needs a look. Results from different kinds are not directly comparable
 (different screen sizes and rendering).
@@ -97,7 +97,8 @@ Headed KWin and host mode need a desktop and a GPU, so they only run on your mac
 | `window/` | what the window manager does with the window: title bar, keyboard focus, centred splash and window, F12 round trip | no |
 | `screen/` | what the player sees: the window draws, keys change the screen, the title menu is shown and its selection moves | yes |
 
-Tests that need screenshots are reported as NOT MEASURABLE where none can be taken (the native Wayland environments).
+Tests that need screenshots are reported as NOT MEASURABLE where none can be taken (native Wayland under mutter, weston and sway).
+Native KWin is grabbed through KWin's ScreenShot2 D-Bus interface.
 `conftest.py` loads the framework's pytest plugin and `pytest.ini` puts the framework on the Python path.
 
 **Adding a test:** add a function to the folder that fits, using the fixtures described under "Add a test" in the

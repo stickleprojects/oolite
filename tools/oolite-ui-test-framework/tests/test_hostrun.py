@@ -235,3 +235,9 @@ def test_container_output_is_given_back_to_the_host_user(tmp_path):
     out = tmp_path / "out"; out.mkdir(); (out / "my run.logs").mkdir()
     script = cmd[2].replace("dbus-run-session -- ", "").replace("/out/", str(out) + "/").replace("chown -R 1000:1001", "touch -c")
     assert subprocess.run(["sh", "-c", script, "sh", "sh", "-c", "exit 1"]).returncode == 1
+
+
+def test_device_args_pass_only_the_declared_devices_the_host_has():
+    e = lambda d: type("E", (), {"devices": d})()
+    assert hostrun.device_args(e(["/dev/udmabuf"]), exists=lambda p: True) == ["--device", "/dev/udmabuf"]
+    assert hostrun.device_args(e(["/dev/udmabuf"]), exists=lambda p: False) == [] and hostrun.device_args(e([])) == []

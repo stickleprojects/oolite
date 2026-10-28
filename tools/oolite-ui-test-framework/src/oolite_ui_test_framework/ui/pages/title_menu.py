@@ -13,10 +13,12 @@ class TitleMenuPage(Page):
 
     def __init__(self, app):
         super().__init__(app)
-        # menu block at the bottom centre; highlighted row = black text on a red bar, other rows = bright yellow text
+        # menu block at the bottom centre; highlighted row = black text on a red bar, other rows = yellow text. Text is yellow only (little
+        # blue): the rotating ship above the menu can dip into this region, and its lit hull is white or grey, so "any bright pixel" counted
+        # it as an extra row (7 rows, highlight on row 2) in every environment
         self.menu = MenuList(app, x=(0.35, 0.65), y=(0.75, 1.0),
                              is_highlight=lambda r, g, b: r > 200 and g < 40 and b < 40,
-                             is_text=lambda r, g, b: max(r, g, b) > 120)
+                             is_text=lambda r, g, b: max(r, g) > 120 and b < min(r, g) // 2)
 
     def is_displayed(self):
         return self.menu.is_visible()

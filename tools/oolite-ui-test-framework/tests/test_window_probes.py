@@ -12,6 +12,41 @@ def test_kwin_row():
     o = window_probes.parse_kwin_row("1 0 640 180 1280 720 0 0 2560 1440")
     assert (o.framed, o.focused, o.outer, o.mon) == (1, 0, (640, 180, 1280, 720), (0, 0, 2560, 1440))
     assert window_probes.parse_kwin_row("1 1 0 0 10 10 NA NA NA NA").mon is None and window_probes.parse_kwin_row("junk") is None
+    c = window_probes.parse_kwin_row("1 1 630 150 1300 750 NA NA NA NA 640 180 1280 720")
+    assert c.mon is None and c.client == (640, 180, 1280, 720) and o.client is None
+
+
+SHOT_REPLY = "({'format': <uint32 16>, 'height': <uint32 2>, 'scale': <1.0>, 'stride': <uint32 12>, 'type': <'raw'>, 'width': <uint32 3>},)"
+
+
+def test_shot_meta_from_gdbus_reply():
+    assert window_probes.parse_shot_meta(SHOT_REPLY) == {"width": 3, "height": 2, "stride": 12, "format": 16, "scale": 1.0}
+    assert window_probes.parse_shot_meta("Error: GDBus.Error:org.freedesktop.DBus.Error.NoReply") is None
+
+
+def test_crop_reads_rgbx_and_bgrx_rows_and_clips_to_the_image():
+    meta = window_probes.parse_shot_meta(SHOT_REPLY)                     # 3 x 2 pixels, pixel n = (n, 10 + n, 20 + n, 255)
+    data = bytes(v for n in range(6) for v in (n, 10 + n, 20 + n, 255))
+    assert window_probes.crop_rgba(data, meta, (1, 0, 2, 2)) == (2, 2, bytes([1, 11, 21, 2, 12, 22, 4, 14, 24, 5, 15, 25]))
+    assert window_probes.crop_rgba(data, dict(meta, format=4), (0, 1, 1, 1)) == (1, 1, bytes([23, 13, 3]))
+    assert window_probes.crop_rgba(data, meta, (2, 1, 5, 5)) == (1, 1, bytes([5, 15, 25]))       # clipped
+    assert window_probes.crop_rgba(data, meta, (5, 5, 2, 2)) is None and window_probes.crop_rgba(data, dict(meta, format=3), (0, 0, 1, 1)) is None
+    assert window_probes.crop_rgba(data[:10], meta, (0, 0, 1, 1)) is None                          # short read
+
+
+def test_kwin_backend_finds_places_and_grabs_through_kwin():
+    class Probe:
+        n = 0; obs = window_probes.Obs(outer=(0, 0, 4, 3), client=(1, 1, 2, 1))
+        def observe(self): self.n += 1; return self.obs
+    meta = {"width": 4, "height": 3, "stride": 16, "format": 16, "scale": 1.0}
+    data = bytes(v for n in range(12) for v in (n, n, n, 0))               # pixel n = grey n
+    t = [0.0]; p = Probe()
+    b = window_probes.KWinBackend(p, clock=lambda: t[0], capture=lambda env: (data, meta))
+    assert b.find_window() == 1 and b.abs_geom(1) == (1, 1, 2, 1) and p.n == 1      # one KWin round trip for both
+    assert b.grab(1) == (2, 1, bytes([5, 5, 5, 6, 6, 6]))
+    t[0] = 2.0; b.find_window(); assert p.n == 2                                        # stale: asked again
+    p.obs = window_probes.Obs(); t[0] = 4.0
+    assert b.find_window() is None and b.grab(None) is None                             # no window: no capture attempted
 
 
 def test_sway_tree():

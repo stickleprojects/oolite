@@ -13,6 +13,8 @@
 #           post_start (commands run once the socket is up), focus_na (true if no keyboard focus can exist, e.g. headless weston), keys (how keys and the mouse are injected: xtest, or fakeinput = KWin fake-input protocol, needed on headless kwin), keys_na (true if no way to inject keys exists),
 #           tiling (true = a tiling compositor that sizes every window itself, so the saved-size test does not apply),
 #           headed (true = the compositor is a window on the host X display, with the GPU passed in; screenshots then show its decorations)
+#           devices (host devices passed into the container, e.g. ["/dev/udmabuf"]: KWin needs a render device, and udmabuf is one without a
+#           GPU (KDE 527906). A device the host lacks is not passed and the render_device precondition test fails)
 
 [images.arch]
 dockerfile = "docker/Dockerfile.arch"
@@ -96,9 +98,10 @@ version_cmd = "kwin_wayland --version"
 version_re = "[0-9][0-9.]+"
 probes = ["kwin:framed,focused", "x11"]
 keys = "fakeinput"
+devices = ["/dev/udmabuf"]
 [env.kwin-xwayland-headed]
-# kwin-xwayland as a window on your desktop instead of headless, so screenshots include KWin's own title bars (headless KWin crashes
-# on screenshot requests). Needs a host X display and /dev/dri; not in --wayland, name it with --env. Opens a window on your screen.
+# kwin-xwayland as a window on your desktop instead of headless, so screenshots include KWin's own title bars (the headless X11
+# grab sees only the game window). Needs a host X display and /dev/dri; not in --wayland, name it with --env. Opens a window on your screen.
 family = "kwin"
 session = "XWayland"
 image = "wayland"
@@ -114,10 +117,12 @@ family = "kwin"
 session = "Wayland native"
 image = "wayland"
 kind = "wayland"
-start = ["kwin_wayland --virtual --width {w} --height {h} --socket wl0 --no-lockscreen"]
+start = ["KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1 kwin_wayland --virtual --width {w} --height {h} --socket wl0 --no-lockscreen"]
 version_cmd = "kwin_wayland --version"
 version_re = "[0-9][0-9.]+"
 probes = ["kwin"]
+keys = "fakeinput"
+devices = ["/dev/udmabuf"]
 
 [env.sway-xwayland]
 family = "sway"

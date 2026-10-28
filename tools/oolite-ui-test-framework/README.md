@@ -105,7 +105,10 @@ NOT TESTED and NOT MEASURABLE are never failures.
 
 How each environment is observed is set by `probes`: `x11` (python-xlib, or xwininfo/xprop/xdotool), `kwin` (KWin scripting over
 D-Bus), `sway` (IPC), `ask` (yes/no questions), `none`. How keys are sent is set by `keys`: X11 key events (default), or `fakeinput`
-(KWin's fake-input protocol, needed under KWin on Wayland, where X11 key events never reach the game).
+(KWin's fake-input protocol, needed under KWin on Wayland, where X11 key events never reach the game). `devices` lists host devices
+passed into the container: the headless KWin environments need `/dev/udmabuf`, a render device without a GPU (KWin refuses to run
+without one, [KDE 527906](https://bugs.kde.org/show_bug.cgi?id=527906)); if the host lacks it, the `render_device` precondition test
+fails and says how to load it. Native KWin screenshots go through KWin's ScreenShot2 D-Bus interface, cropped to the game window.
 
 **Add a window manager** (no test changes): add its package to the right Dockerfile, then a table such as
 

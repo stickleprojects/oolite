@@ -305,21 +305,24 @@ try {
   var l = workspace.windowList();
   for (var i = 0; i < l.length; i++) { var w = l[i];
     if (/oolite/i.test(w.resourceClass + " " + w.resourceName + " " + w.caption)) {
-      var g = w.frameGeometry, o = "NA NA NA NA";
+      var g = w.frameGeometry, c = w.clientGeometry, o = "NA NA NA NA";
       try { var q = w.output.geometry; o = Math.round(q.x) + " " + Math.round(q.y) + " " + Math.round(q.width) + " " + Math.round(q.height); } catch (e2) {}
-      r = "OOPROBE " + (w.noBorder ? 0 : 1) + " " + (w.active ? 1 : 0) + " " + Math.round(g.x) + " " + Math.round(g.y) + " " + Math.round(g.width) + " " + Math.round(g.height) + " " + o; } }
+      r = "OOPROBE " + (w.noBorder ? 0 : 1) + " " + (w.active ? 1 : 0) + " " + Math.round(g.x) + " " + Math.round(g.y) + " " + Math.round(g.width) + " " + Math.round(g.height) + " " + o +
+          " " + Math.round(c.x) + " " + Math.round(c.y) + " " + Math.round(c.width) + " " + Math.round(c.height); } }
 } catch (e) { r = "ERR " + e; }
 callDBus("org.oolite.probe", "/p", "org.oolite.probe", "report", r);
 """
 
 
 def parse_kwin_row(row):
-    """'fr fo x y w h [ox oy ow oh]' -> Obs (output geometry optional)."""
+    """'fr fo x y w h [ox oy ow oh [cx cy cw ch]]' -> Obs (output and client geometry optional; the output may be NA)."""
     f = row.split()
     if len(f) < 6: return None
     o = Obs(framed=int(f[0]), focused=int(f[1]), outer=(int(f[2]), int(f[3]), int(f[4]), int(f[5])), source="compositor")
     if len(f) >= 10 and all(re.fullmatch(r"-?\d+", x) for x in f[6:10]):
         o.mon = (int(f[6]), int(f[7]), int(f[8]), int(f[9]))
+    if len(f) >= 14 and all(re.fullmatch(r"-?\d+", x) for x in f[10:14]):
+        o.client = (int(f[10]), int(f[11]), int(f[12]), int(f[13]))
     return o
 
 
@@ -361,6 +364,82 @@ class KWinProbe(Probe):
             if f:
                 try: os.unlink(f)
                 except OSError: pass
+
+
+def parse_shot_meta(out):
+    """gdbus' reply to a ScreenShot2 capture -> {width, height, stride, format, scale}, or None. format is a QImage::Format number."""
+    meta = {}
+    for k in ("width", "height", "stride", "format"):
+        m = re.search(r"'%s': <uint32 (\d+)>" % k, out)
+        if not m: return None
+        meta[k] = int(m[1])
+    m = re.search(r"'scale': <([0-9.]+)>", out); meta["scale"] = float(m[1]) if m else 1.0
+    return meta
+
+
+def crop_rgba(data, meta, box):
+    """Rows of a raw ScreenShot2 image -> rgb bytes of box (x, y, w, h, in image pixels), clipped to the image. -> (w, h, rgb) or None.
+    QImage formats 16-18 (RGBX/RGBA8888) are R G B A in memory; 4-6 (RGB32/ARGB32) are B G R A on little-endian machines."""
+    W, H, stride, fmt = meta["width"], meta["height"], meta["stride"], meta["format"]
+    if fmt not in (4, 5, 6, 16, 17, 18) or len(data) < stride * H: return None
+    x0, y0 = max(0, box[0]), max(0, box[1]); x1, y1 = min(W, box[0] + box[2]), min(H, box[1] + box[3])
+    if x1 <= x0 or y1 <= y0: return None
+    w, h = x1 - x0, y1 - y0
+    rows = b"".join(data[y * stride + 4 * x0: y * stride + 4 * x1] for y in range(y0, y1))
+    if fmt in (4, 5, 6):
+        from . import png
+        return w, h, png.bgrx_to_rgb(rows, w, h)
+    out = bytearray(w * h * 3); out[0::3] = rows[0::4]; out[1::3] = rows[1::4]; out[2::3] = rows[2::4]
+    return w, h, bytes(out)
+
+
+def kwin_capture(env=None, timeout=15):
+    """The whole KWin workspace through D-Bus org.kde.KWin.ScreenShot2 (needs KWIN_SCREENSHOT_NO_PERMISSION_CHECKS=1 on kwin_wayland and
+    a render device: /dev/udmabuf or a GPU node, KDE 527906). KWin writes the raw image into the pipe we pass as the handle.
+    -> (data, meta) or None."""
+    import threading
+    r, w = os.pipe(); chunks = []
+    reader = threading.Thread(target=lambda: chunks.extend(iter(lambda: os.read(r, 1 << 20), b"")), daemon=True); reader.start()
+    try:
+        p = subprocess.run(["gdbus", "call", "--session", "--dest", "org.kde.KWin", "--object-path", "/org/kde/KWin/ScreenShot2",
+                            "--method", "org.kde.KWin.ScreenShot2.CaptureWorkspace", "{}", str(w)],
+                           pass_fds=(w,), env=env, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired):
+        p = None
+    finally:
+        os.close(w)
+    reader.join(timeout); os.close(r)
+    meta = parse_shot_meta(p.stdout) if p is not None and p.returncode == 0 else None
+    return (b"".join(chunks), meta) if meta else None
+
+
+class KWinBackend:
+    """Native Wayland under KWin, where there is no X display: the game window is found and placed through the KWin probe, and grabbed
+    with ScreenShot2 (the workspace, cropped to the game's client area, like the X11 grab). Keys and the mouse go through fake-input."""
+    def __init__(self, probe, env=None, max_age=1.0, clock=time.monotonic, capture=kwin_capture):
+        self.probe = probe; self.env = env; self.max_age = max_age; self.clock = clock; self.capture = capture
+        self._obs = None; self._t = None
+
+    def _observe(self):
+        """The last KWin observation, re-taken when older than max_age (each one costs a script round trip of about 0.7 s)."""
+        if self._t is None or self.clock() - self._t > self.max_age:
+            self._obs = self.probe.observe(); self._t = self.clock()
+        return self._obs
+
+    def find_window(self):
+        o = self._observe()
+        return 1 if o is not None and o.client is not None else None
+
+    def abs_geom(self, w):
+        o = self._observe()
+        return o.client if o is not None else None
+
+    def grab(self, w):
+        """(width, height, rgb bytes) of the game's client area as drawn on screen, or None."""
+        g = self.abs_geom(w); shot = self.capture(self.env) if g else None
+        if not shot: return None
+        data, meta = shot; s = meta["scale"]
+        return crop_rgba(data, meta, tuple(int(round(v * s)) for v in g))
 
 
 def parse_sway_tree(tree, outputs=None):

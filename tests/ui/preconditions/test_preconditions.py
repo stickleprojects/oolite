@@ -28,8 +28,8 @@ def test_screenshot_support(env_session):
 
 
 @pytest.mark.once_per_build
-def test_gpu_present(env_session):
-    pre.require("gpu_present", pre.gpu_present(env_session.env))
+def test_render_device(env_session):
+    pre.require("render_device", pre.render_device(env_session.env))
 
 
 def test_window_fits_screen(launched_game, env_session):

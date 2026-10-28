@@ -6,7 +6,8 @@ precondition holds, else the reason; checks that do not apply in an environment 
   fake_input_offered  KWin started without KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 offers no fake-input, so keys and clicks go nowhere (#30)
   key_repeat_off      X / XWayland key repeat turns one held key into many presses (F12 toggled about 10 times)
   screenshot_support  an X session without python-xlib cannot grab the window, which used to look like "no screenshot support"
-  gpu_present         an environment that needs /dev/dri (headed kwin) was started without it (KWin crashes on screenshots, KDE 527906)
+  render_device       KWin needs a render device: /dev/dri for headed kwin, the `devices` of an environment (headless kwin: /dev/udmabuf,
+                      no GPU needed). Without one KWin crashes on every screenshot (KDE 527906, WONTFIX: unsupported configuration)
   window_fits_screen  the game asks for a window larger than the screen; the WM fits or maximises it, which changes F12 and clicks (#10)
   point_on_screen     a click target outside the visible screen (native kwin showed the game taller than the output)
 """
@@ -67,9 +68,12 @@ def screenshot_support(session):
     return None
 
 
-def gpu_present(env, exists=os.path.exists):
-    if not env.headed: return None
-    return None if exists("/dev/dri") else "%s needs a GPU render node but /dev/dri is missing (docker run --device /dev/dri)" % env.name
+def render_device(env, exists=os.path.exists):
+    need = (["/dev/dri"] if env.headed else []) + list(env.devices)
+    missing = [d for d in need if not exists(d)]
+    if not missing: return None
+    hint = " (on the host: sudo modprobe udmabuf)" if "/dev/udmabuf" in missing else ""
+    return "%s needs a render device but %s is missing%s" % (env.name, ", ".join(missing), hint)
 
 
 def requested_window(log_text):

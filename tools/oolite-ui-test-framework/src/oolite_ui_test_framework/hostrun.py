@@ -208,9 +208,9 @@ class Runner:
                 if e.kind == "wayland" and not sc[0].isdigit(): sc = "3840x1080"
                 if not self.docker_ok: self.skip(env, sc, "not available: " + self.docker_why); continue
                 if not self.ensure_image(e.image): self.skip(env, sc, "not available: Docker image %s could not be built" % self.images[e.image]["tag"]); continue
-                extra = ()
+                extra = device_args(e)   # a missing device is not passed; the render_device precondition test then fails inside
                 if e.headed:
-                    extra, why = headed_args()
+                    h, why = headed_args(); extra = list(h) + extra
                     if why: self.skip(env, sc, "not available: " + why); continue
                     say("WARNING: %s opens a KWin window on THIS desktop; do not touch the mouse or keyboard while it runs." % env)
                 say("== %s %s (%s, %d runs) %s" % (env, sc, self.label, self.runs_for(env), time.strftime("%T")))
@@ -337,6 +337,11 @@ def host_python(log, venv=None, run=subprocess.run):
             if run(c, stdout=lf, stderr=subprocess.STDOUT).returncode != 0:
                 return None, "could not make the host-mode venv (%s failed; see %s)" % (" ".join(c[:4]), log)
     return (py, "") if has_pytest() else (None, "the host-mode venv has no %s (see %s)" % (HOST_PYTEST, log))
+
+
+def device_args(e, exists=os.path.exists):
+    """docker run options for the host devices an environment declares (`devices`), the ones the host has."""
+    return [a for d in e.devices if exists(d) for a in ("--device", d)]
 
 
 def headed_args(environ=None, exists=os.path.exists, hostname=socket.gethostname):
