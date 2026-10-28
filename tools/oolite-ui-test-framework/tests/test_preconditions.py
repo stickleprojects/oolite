@@ -8,7 +8,7 @@ from oolite_ui_test_framework import preconditions as pre
 
 
 def env(**kw):
-    d = dict(name="kwin-xwayland", kind="wayland", keys="fakeinput", keys_na=False, headed=False, devices=[])
+    d = dict(name="kwin-xwayland", kind="wayland", session="XWayland", keys="fakeinput", keys_na=False, headed=False, devices=[])
     d.update(kw); return types.SimpleNamespace(**d)
 
 
@@ -46,6 +46,17 @@ def test_key_repeat_off():
     assert "key repeat is on" in pre.key_repeat_off(session(on=True))
     assert pre.key_repeat_off(session(on=None)) is None                                # cannot tell: no verdict
     assert pre.key_repeat_off(types.SimpleNamespace(backend=None, env=env())) is None  # native Wayland: no X
+
+
+def test_key_repeat_off_on_native_wayland_reads_the_advertised_rate():
+    native = lambda **kw: types.SimpleNamespace(backend=None, env=env(name="kwin-native", session="Wayland native", **kw))
+    info = lambda out, code=0: (lambda *a, **k: types.SimpleNamespace(returncode=code, stdout=out))
+    on = "\tcapabilities: keyboard\n\tkeyboard repeat rate: 25\n\tkeyboard repeat delay: 600\n"
+    assert "advertises key repeat (25/s)" in pre.key_repeat_off(native(), run=info(on))
+    assert pre.key_repeat_off(native(), run=info("\tcapabilities: keyboard\n")) is None          # KeyRepeat=nothing: no rate sent
+    assert pre.key_repeat_off(native(), run=info("\tkeyboard repeat rate: 0\n")) is None
+    assert pre.key_repeat_off(native(), run=info(on, code=1)) is None                              # cannot tell: no verdict
+    assert pre.key_repeat_off(native(keys="xtest"), run=info(on)) is None                          # keys cannot reach the game anyway
 
 
 def test_screenshot_support_only_where_an_x_session_should_grab():

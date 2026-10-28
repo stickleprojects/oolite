@@ -74,16 +74,29 @@ class App:
         for k in keys:
             self.session.send_key(k); self.clock.sleep(gap)
 
-    def press_until(self, key, cond, cap=3.0, poll=0.02):
+    GAME_KEY_REPEAT = 0.2   # the game moves a menu again after a key has been down this long
+
+    def press_until(self, key, cond, cap=3.0, poll=0.02, tap=0.08, slow_cap=8.0):
         """Hold `key` down until cond() is true, looking while it is down, then release it at once; at most `cap` seconds. The game moves a
         menu once per frame while a key is down (its own repeat is 0.2 s, shorter than a software-rendered frame), so a fixed hold moved
-        0 rows or several depending on the frame rate. Returns whether cond() became true."""
-        t0 = self.clock.monotonic(); limit = cap
+        0 rows or several depending on the frame rate. That needs a look quicker than the game's repeat: where one look takes longer
+        (native KWin grabs through D-Bus, 0.5-1.4 s) the key stayed down through several repeats and the highlight ran past the row and
+        wrapped round. There the key is tapped for `tap` seconds (0 or 1 rows) and looked at after each tap, for up to `slow_cap` seconds.
+        Returns whether cond() became true."""
+        t0 = self.clock.monotonic()
+        if cond(): return True
+        if self.clock.monotonic() - t0 > self.GAME_KEY_REPEAT / 2:
+            while self.clock.monotonic() - t0 < slow_cap:
+                self.session.key_down(key)
+                try: self.clock.sleep(tap)
+                finally: self.session.key_up(key)
+                if cond(): return True
+            return False
         self.session.key_down(key)
         try:
             while True:
                 if cond(): return True
-                if self.clock.monotonic() - t0 >= limit: return False
+                if self.clock.monotonic() - t0 >= cap: return False
                 self.clock.sleep(poll)
         finally:
             self.session.key_up(key)

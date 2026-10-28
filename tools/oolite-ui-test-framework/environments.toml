@@ -9,7 +9,7 @@
 # probes    how the game window is observed; first probe giving a field wins. "name:fields" restricts a probe to some fields
 #           (e.g. "kwin:framed,focused" = take frame and focus from KWin, geometry from the next probe). Probes: x11 kwin sway ask none
 # optional  version_cmd/version_re (shown in the report), settle (s before readiness polling, default 4), settle_after (default 3),
-#           ready_timeout (default 20), ready_socket (wayland socket to wait for, default wl0), files {path = text}, env {VAR = value},
+#           ready_timeout (default 20), ready_socket (wayland socket to wait for, default wl0), files {path = text} (~ expands, folders are made), env {VAR = value},
 #           post_start (commands run once the socket is up), focus_na (true if no keyboard focus can exist, e.g. headless weston), keys (how keys and the mouse are injected: xtest, or fakeinput = KWin fake-input protocol, needed on headless kwin), keys_na (true if no way to inject keys exists),
 #           tiling (true = a tiling compositor that sizes every window itself, so the saved-size test does not apply),
 #           headed (true = the compositor is a window on the host X display, with the GPU passed in; screenshots then show its decorations)
@@ -98,6 +98,7 @@ version_cmd = "kwin_wayland --version"
 version_re = "[0-9][0-9.]+"
 probes = ["kwin:framed,focused", "x11"]
 keys = "fakeinput"
+files = { "~/.config/kcminputrc" = "[Keyboard]\nKeyRepeat=nothing\n" }   # no key repeat: one held key = one press, as in the X11 sessions
 devices = ["/dev/udmabuf"]
 [env.kwin-xwayland-headed]
 # kwin-xwayland as a window on your desktop instead of headless, so screenshots include KWin's own title bars (the headless X11
@@ -112,6 +113,7 @@ version_cmd = "kwin_wayland --version"
 version_re = "[0-9][0-9.]+"
 probes = ["kwin:framed,focused", "x11"]
 keys = "fakeinput"
+files = { "~/.config/kcminputrc" = "[Keyboard]\nKeyRepeat=nothing\n" }   # no key repeat: one held key = one press, as in the X11 sessions
 [env.kwin-native]
 family = "kwin"
 session = "Wayland native"
@@ -122,6 +124,7 @@ version_cmd = "kwin_wayland --version"
 version_re = "[0-9][0-9.]+"
 probes = ["kwin"]
 keys = "fakeinput"
+files = { "~/.config/kcminputrc" = "[Keyboard]\nKeyRepeat=nothing\n" }   # no key repeat: one held key = one press, as in the X11 sessions
 devices = ["/dev/udmabuf"]
 
 [env.sway-xwayland]

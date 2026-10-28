@@ -100,6 +100,7 @@ class Session:
             os.environ.update({"XDG_RUNTIME_DIR": rt, "XDG_SESSION_TYPE": "wayland", "WAYLAND_DISPLAY": "wl0"})
             os.environ.update(e.env)
             for path, text in e.files.items():
+                path = os.path.expanduser(path); os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
                 with open(path, "w") as f: f.write(text.format(w=self.w, h=self.h))
             self._start_cmds()
             sock = os.path.join(rt, e.ready_socket)

@@ -95,6 +95,20 @@ def test_a_key_is_released_as_soon_as_the_highlight_moves():
     assert a.session.keys == ["Down"] and t[1] - t[0] < 0.1       # released on the first look after the highlight moved, not after a fixed hold
 
 
+def test_where_a_look_is_slower_than_the_game_repeat_the_key_is_tapped():
+    """Native KWin: a grab takes about a second, so holding the key until the highlight is seen to move ran it past the row (#38 smoke).
+    Each press is a short tap, looked at after; a tap the game did not see (no move) is repeated."""
+    a = make([with_bar(1280, 720, 1)]); a.session.after = [with_bar(1280, 720, 1), with_bar(1280, 720, 2)]
+    grab = a.session.backend.grab
+    a.session.backend.grab = lambda w: (setattr(a.clock, "t", a.clock.t + 0.6), grab(w))[1]      # every look takes 0.6 s
+    t = []; down = a.session.key_down
+    a.session.key_down = lambda k: (t.append(("down", a.clock.t)), down(k)); a.session.key_up = lambda k: t.append(("up", a.clock.t))
+    a.title_menu.wait_until_displayed().menu.move_down()
+    assert a.title_menu.selected_item == "Load Commander" and a.session.keys == ["Down", "Down"]   # the first tap moved nothing
+    holds = [u[1] - d[1] for d, u in zip(t[0::2], t[1::2])]
+    assert all(h < appmod.App.GAME_KEY_REPEAT for h in holds), holds                              # never held into the game's repeat
+
+
 def test_no_key_reached_the_game_says_so(tmp_path):
     a = make([with_bar(1280, 720, 1)]); a.game.dir = str(tmp_path)
     (tmp_path / "GameData").mkdir(); (tmp_path / "GameData" / "Latest.log").write_text("Opening log for Oolite\n")

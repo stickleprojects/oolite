@@ -4,7 +4,9 @@ precondition holds, else the reason; checks that do not apply in an environment 
 
   input_tool          the image lacks uitest-fakeinput / xdotool (a failed image build left every Wayland env without it, #29)
   fake_input_offered  KWin started without KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 offers no fake-input, so keys and clicks go nowhere (#30)
-  key_repeat_off      X / XWayland key repeat turns one held key into many presses (F12 toggled about 10 times)
+  key_repeat_off      X / XWayland key repeat turns one held key into many presses (F12 toggled about 10 times); on native Wayland
+                      the game repeats keys itself at the rate the compositor advertises (KWin: kcminputrc KeyRepeat), which
+                      scrolled the title menu past the row the keys test was waiting for
   screenshot_support  an X session without python-xlib cannot grab the window, which used to look like "no screenshot support"
   render_device       KWin needs a render device: /dev/dri for headed kwin, the `devices` of an environment (headless kwin: /dev/udmabuf,
                       no GPU needed). Without one KWin crashes on every screenshot (KDE 527906, WONTFIX: unsupported configuration)
@@ -53,11 +55,20 @@ def fake_input_offered(env, run=subprocess.run):
     return "%s (KWin must be started with KWIN_WAYLAND_NO_PERMISSION_CHECKS=1)" % why
 
 
-def key_repeat_off(session):
-    """Only where the session switched it off (X11 and XWayland); None where it cannot be read."""
-    if session.backend is None or not hasattr(session.backend, "autorepeat_on"): return None
-    on = session.backend.autorepeat_on()
-    return "X key repeat is on, so a held key reaches the game as many presses" if on else None
+def key_repeat_off(session, run=subprocess.run):
+    """X11 and XWayland: the X server's auto-repeat, which the session switches off. Native Wayland where keys reach the game (fake-input):
+    the repeat rate the compositor advertises, read with wayland-info (no "keyboard repeat rate" line, or 0, = off). None where it cannot be read."""
+    e = session.env
+    if session.backend is not None and hasattr(session.backend, "autorepeat_on"):
+        on = session.backend.autorepeat_on()
+        return "X key repeat is on, so a held key reaches the game as many presses" if on else None
+    if e.kind != "wayland" or e.session != "Wayland native" or e.keys != "fakeinput": return None
+    try: p = run(["wayland-info"], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired): return None
+    m = re.search(r"keyboard repeat rate: (\d+)", p.stdout) if p.returncode == 0 else None
+    if p.returncode != 0 or not m or int(m[1]) == 0: return None
+    return ("the compositor advertises key repeat (%s/s), so the game repeats a held key itself (KWin: KeyRepeat=nothing in "
+            "~/.config/kcminputrc, see environments.toml)" % m[1])
 
 
 def screenshot_support(session):
