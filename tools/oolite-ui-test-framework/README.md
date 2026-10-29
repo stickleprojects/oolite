@@ -142,6 +142,18 @@ function in `src/oolite_ui_test_framework/pass_fail.py`. It runs for every envir
   `@pytest.mark.once_per_build` to run once.
 - `@pytest.mark.needs_toggle`, `needs_x11`, `needs_keys` and `needs_mouse` skip with a reason when the run or environment cannot support the test.
 
+**Waiting, and the game's log.**
+- Wait on the *result*, not a fixed time: poll what the player would see (the screenshot) or what the window manager reports (frame,
+  focus, full-screen state) until it changes, with a limit. `App.wait_until`, `press_until` / `click_until` and the F12 round trip
+  all work this way.
+- The game's own log (`game_log.py`) is evidence that an input *arrived*, and of what the game *asked for* (window size, GL errors).
+  Use it to explain a failure ("the game logged 0 key presses") and to decide what the harness does next (the fallback F12 is sent
+  only if the game never logged the first one: a second F12 after one that worked switches straight back).
+- Never use the log as the verdict on what the player sees. In #773 the game logged nothing wrong while its window had no title bar
+  and no focus. A logged key is not proof it acted either: under sway the game logged every Down while the highlight never moved,
+  because down and up arrived in the same frame.
+- The game writes its log about every 2 s, so a log line can lag the event by that much; polling the screen is faster.
+
 pytest decides: each test passes or fails; `pytest.skip(reason)` means NOT TESTED / NOT MEASURABLE, and the reason appears in the report.
 The plugin writes the raw file (RESULT, TEST, WMVER, HARD lines) and a pass-rate summary; `report.py` makes the report from it.
 

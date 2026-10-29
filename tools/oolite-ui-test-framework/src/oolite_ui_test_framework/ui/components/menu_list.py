@@ -11,9 +11,9 @@ class MenuList:
       texts()         -> the text of each row, only when an OCR function is available (else None); OCR is optional.
     A row = a run of pixels that are `is_text` or `is_highlight` across the region; it is highlighted when much of it is `is_highlight`."""
 
-    def __init__(self, app, x, y, is_highlight, is_text, min_row_pixels=8, max_gap=3, highlight_share=0.25):
+    def __init__(self, app, x, y, is_highlight, is_text, min_row_pixels=8, max_gap=3, highlight_share=0.25, ocr_pad_share=0.4):
         self.app, self.x, self.y, self.is_highlight, self.is_text = app, x, y, is_highlight, is_text
-        self.min_row_pixels, self.max_gap, self.highlight_share = min_row_pixels, max_gap, highlight_share
+        self.min_row_pixels, self.max_gap, self.highlight_share, self.ocr_pad_share = min_row_pixels, max_gap, highlight_share, ocr_pad_share
 
     # ---- reading
     def rows_in(self, shot):
@@ -27,12 +27,15 @@ class MenuList:
                 if self.is_highlight(*p): hl += 1; t += 1
                 elif self.is_text(*p): t += 1
             scan.append((t, hl))
-        bands = []; start = last = None
-        for i, (t, _) in enumerate(scan):
+        # a new row after a gap, or where the lines switch between highlight bar and plain text: the bar is taller than the text and can
+        # come within max_gap of the row next to it (Exit Game highlighted merged with Manage Expansion Packs into one row, #42)
+        bands = []; start = last = None; bar = None
+        for i, (t, hl) in enumerate(scan):
             if t >= self.min_row_pixels:
+                is_bar = hl >= self.min_row_pixels
                 if start is None: start = i
-                elif i - last > self.max_gap + 1: bands.append((start, last)); start = i
-                last = i
+                elif i - last > self.max_gap + 1 or is_bar != bar: bands.append((start, last)); start = i
+                last = i; bar = is_bar
         if start is not None: bands.append((start, last))
         rows = []
         for a, b in bands:
@@ -60,7 +63,19 @@ class MenuList:
         """Text of each visible row via the app's OCR function, or None when there is no OCR (callers must then skip, not fail)."""
         ocr = getattr(self.app, "ocr", None); shot = self.app.screenshot()
         if ocr is None or shot is None: return None
-        return [ocr(shot.crop_box(r["box"])) for r in self.rows_in(shot)]
+        rows = self.rows_in(shot)
+        return [ocr(shot.crop_box(self.ocr_box(rows, i, shot, self.ocr_pad_share))) for i in range(len(rows))]
+
+    @staticmethod
+    def ocr_box(rows, i, shot, share):
+        """Row i's box with room above and below for OCR. A row ends at the last pixel line with `min_row_pixels` text pixels, which cuts off
+        descenders (the tail of the "p" in "Options" has only a few), and tesseract then read "Ontions" or "Gntions" (#42). The room is
+        `share` of the row's height (ocr_pad_share: a proportion, so it holds at any window size), but at most half the gap to the next row: in a big window (sway) the rows are closer, and a crop that
+        took in part of the next row read as nothing."""
+        x0, y0, x1, y1 = rows[i]["box"]; pad = max(2, round((y1 - y0) * share))
+        up = (y0 - rows[i - 1]["box"][3]) // 2 if i > 0 else pad
+        down = (rows[i + 1]["box"][1] - y1) // 2 if i + 1 < len(rows) else pad
+        return x0, max(0, y0 - max(0, min(pad, up))), x1, min(shot.h, y1 + max(0, min(pad, down)))
 
     # ---- operating
     def move_down(self, times=1):

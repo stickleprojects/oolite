@@ -148,3 +148,37 @@ def test_key_logging_is_added_to_the_run_folder_but_never_overwrites(tmp_path):
     assert "input.keyMapping.keyPress = yes" in p.read_text()
     p.write_text("mine"); scenarios.add_key_logging(str(tmp_path))
     assert p.read_text() == "mine"
+
+
+def test_toggle_is_judged_by_full_screen_state_when_the_size_cannot_change():
+    """#42: KWin 5.27 X11 fits a window larger than the screen by making its client area the screen size, so windowed and full screen are
+    the same size. Judged by size, F12 looked ignored and the fallback F12 undid it; by the window manager's state it works."""
+    clk = FakeClock(); size = dict(outer=(0, 0, 3840, 1080), client=(0, 0, 3840, 1080))
+    windowed = window_probes.Obs(framed=1, focused=1, fullscreen=0, **size); full = window_probes.Obs(framed=0, focused=1, fullscreen=1, **size)
+    s = FakeSession(clk, [(0, windowed)]); s.toggle = [full, windowed]
+    t = scenarios.run_toggle(s, game(), scenarios.Opts(toggle=True), clk)
+    assert t["t_ok"] == 1 and t["t_method"] == "key" and t["t_judged_by"] == "state" and [k for k, _ in s.keys] == ["F12", "F12"]
+    assert (t["t_fs_before"], t["t_fs_during"], t["t_fs_after"]) == (0, 1, 0)
+
+
+def test_no_fallback_f12_when_the_game_logged_the_first(monkeypatch):
+    """A second F12 after one the game received switches it straight back; only resend when the game never saw the first."""
+    clk = FakeClock(); win = window_probes.Obs(framed=1, focused=1, fullscreen=0, outer=(1280, 180, 1280, 720))
+    s = FakeSession(clk, [(0, win)]); s.toggle = []
+    presses = iter([0, 1]); monkeypatch.setattr(scenarios, "f12_presses", lambda g: next(presses))
+    t = scenarios.run_toggle(s, game(), scenarios.Opts(toggle=True), clk)
+    assert t["t_ok"] == 0 and t["t_method"] == "key" and s.keys == [("F12", None)]
+
+
+def test_full_screen_state_comes_from_the_full_observation_where_the_cheap_probes_lack_it():
+    clk = FakeClock(); s = FakeSession(clk, [(0, window_probes.Obs(outer=(0, 0, 10, 10)))])
+    full = s.observe; s.observe = lambda cheap_only=False: full() if cheap_only else window_probes.Obs(fullscreen=1)
+    o = scenarios._toggle_obs(s)
+    assert o.outer == (0, 0, 10, 10) and o.fullscreen == 1
+
+
+def test_f12_presses_counts_scancode_69_in_the_game_log(tmp_path):
+    (tmp_path / "Logs").mkdir()
+    (tmp_path / "Logs" / "Latest.log").write_text("x [input.keyMapping.keyPress.keyDown]: Keydown scancode = 69, unicode = 327\n"
+                                                  "x [input.keyMapping.keyPress.keyDown]: Keydown scancode = 81, unicode = 269\n")
+    assert scenarios.f12_presses(type("G", (), {"dir": str(tmp_path)})()) == 1 and scenarios.f12_presses(object()) is None

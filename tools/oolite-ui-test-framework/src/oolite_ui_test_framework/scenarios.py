@@ -7,9 +7,10 @@ import shutil
 import subprocess
 import tempfile
 import time
+import dataclasses
 from dataclasses import dataclass
 
-from . import geometry
+from . import game_log, geometry
 from .window_probes import Obs
 
 
@@ -129,6 +130,44 @@ def _toggle_size(o):
     return None if g is None else (g[2], g[3])
 
 
+def _toggle_obs(session):
+    """The cheap probes for the size; the full-screen state from the full observation where they lack it (native KWin has no X11 probe:
+    only the KWin script, which is not cheap, sees it)."""
+    o = session.observe(cheap_only=True)
+    if o is not None and o.fullscreen is not None: return o
+    f = session.observe()
+    if o is None: return f
+    return dataclasses.replace(o, fullscreen=None if f is None else f.fullscreen)
+
+
+def _wait_fullscreen(session, o0, clock, limit=3.0, step=0.5):
+    """Wait for the result, not a fixed time: look every `step` s until F12 has taken the window to full screen, at most `limit` s.
+    Returns the last observation. The game's log is checked only after this, and only to decide whether resending is safe: it is written
+    about every 2 s (game_log.py), which `limit` covers."""
+    t0 = clock.monotonic()
+    while True:
+        clock.sleep(step); o1 = _toggle_obs(session)
+        if _went_fullscreen(o0, o1) or clock.monotonic() - t0 >= limit: return o1
+
+
+def _fs(o):
+    return None if o is None else o.fullscreen
+
+
+def _went_fullscreen(o0, o1):
+    """Did F12 take the window to full screen? By the window manager's full-screen state where both observations have it. Otherwise by
+    size, which cannot tell where the windowed client area already is the screen size: KWin 5.27 X11 fits a window larger than the
+    screen that way (#42)."""
+    if _fs(o0) is not None and _fs(o1) is not None: return _fs(o0) == 0 and _fs(o1) == 1
+    s0, s1 = _toggle_size(o0), _toggle_size(o1)
+    return s0 is not None and s1 is not None and s0 != s1
+
+
+def f12_presses(game):
+    """F12 presses the game has logged (game_log.py); the waits in run_toggle are longer than the game's 2 s log flush."""
+    return game_log.keydowns(game, "F12")
+
+
 def run_startup(session, game, opts=Opts(), clock=Clock):
     """Sample until the window has settled (at most opts.wait seconds), then take the final observation. Returns the raw record
     (geometry strings; no dx/dy yet)."""
@@ -169,21 +208,23 @@ def run_toggle(session, game, opts=Opts(), clock=Clock, shoot=lambda stage: None
     ok = 0; method = "key"; t = {}
     win = session.window_id()
     if win is not None:
-        s0 = _toggle_size(session.observe(cheap_only=True)); shoot("before")
-        _hold(session, "F12", clock); clock.sleep(3); s1 = _toggle_size(session.observe(cheap_only=True))
-        if s1 == s0:
-            session.send_key("F12", win); method = "sendevent"; clock.sleep(3); s1 = _toggle_size(session.observe(cheap_only=True))
-        if s1 != s0:
+        o0 = _toggle_obs(session); shoot("before"); n0 = f12_presses(game)
+        _hold(session, "F12", clock); o1 = _wait_fullscreen(session, o0, clock)
+        # resend only if the game never saw the first F12: a second press after one that worked switches it straight back (#42)
+        if not _went_fullscreen(o0, o1) and f12_presses(game) in (None, n0):
+            session.send_key("F12", win); method = "sendevent"; o1 = _wait_fullscreen(session, o0, clock)
+        if _went_fullscreen(o0, o1):
             ok = 1; shoot("fullscreen")
             if method == "sendevent": session.send_key("F12", win)
             else: _hold(session, "F12", clock)
             clock.sleep(4)
+        t.update(t_fs_before=_fs(o0), t_fs_during=_fs(o1), t_judged_by="state" if _fs(o0) is not None and _fs(o1) is not None else "size")
     t["t_ok"] = ok; t["t_method"] = method
     if ok: shoot("after")
     # a full observation, as after startup: on XWayland only the compositor probe sees the frame (the X11 probe needs reparenting)
     o = session.observe() if ok else None
     if ok and o is not None:
-        t.update(t_frame=o.framed, t_focus=o.focused, t_outer=geometry.fmt_geom(o.outer))
+        t.update(t_frame=o.framed, t_focus=o.focused, t_outer=geometry.fmt_geom(o.outer), t_fs_after=o.fullscreen)
     else:
         t.update(t_frame=0, t_focus=0, t_dx=None, t_dy=None, t_centred=0)
     return t

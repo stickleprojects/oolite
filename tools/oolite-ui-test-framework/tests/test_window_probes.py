@@ -14,6 +14,19 @@ def test_kwin_row():
     assert window_probes.parse_kwin_row("1 1 0 0 10 10 NA NA NA NA").mon is None and window_probes.parse_kwin_row("junk") is None
     c = window_probes.parse_kwin_row("1 1 630 150 1300 750 NA NA NA NA 640 180 1280 720")
     assert c.mon is None and c.client == (640, 180, 1280, 720) and o.client is None
+    assert window_probes.parse_kwin_row("1 1 0 0 10 10 NA NA NA NA 0 0 10 10 1").fullscreen == 1 and c.fullscreen is None
+
+
+def test_sway_and_x_tools_report_full_screen_state(monkeypatch):
+    tree = {"nodes": [{"pid": 5, "app_id": "oolite", "rect": {"x": 0, "y": 0, "width": 3840, "height": 1080}, "fullscreen_mode": 1}]}
+    assert window_probes.parse_sway_tree(tree).fullscreen == 1
+    tree["nodes"][0]["fullscreen_mode"] = 0; assert window_probes.parse_sway_tree(tree).fullscreen == 0
+    outs = {"full": "_NET_WM_STATE(ATOM) = _NET_WM_STATE_FULLSCREEN, _NET_WM_STATE_FOCUSED\n",
+            "win": "_NET_WM_STATE(ATOM) = _NET_WM_STATE_FOCUSED\n", "none": "_NET_WM_STATE:  not found.\n", "gone": ""}
+    b = window_probes.XToolsBackend()
+    for k, want in (("full", 1), ("win", 0), ("none", 0), ("gone", None)):
+        monkeypatch.setattr(window_probes, "sh", lambda cmd, env=None, k=k: outs[k])
+        assert b.fullscreen(7) == want, k
 
 
 SHOT_REPLY = "({'format': <uint32 16>, 'height': <uint32 2>, 'scale': <1.0>, 'stride': <uint32 12>, 'type': <'raw'>, 'width': <uint32 3>},)"

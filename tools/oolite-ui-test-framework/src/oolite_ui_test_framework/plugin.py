@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from . import geometry, pass_fail, preconditions, raw_results, registry, scenarios, shared_launch, session as sessmod
+from . import game_log, geometry, pass_fail, preconditions, raw_results, registry, scenarios, shared_launch, session as sessmod
 
 Case = collections.namedtuple("Case", "env label app run")
 
@@ -210,12 +210,7 @@ def _render_fields(s, game, rec, cfg, case):
     """Screenshot of the game window (python-xlib) + scan of the game's logs, taken while the game is still running."""
     from . import png, render_check
     out = {"render": None, "gl_errors": 0}
-    texts = []
-    for root, _, files in os.walk(game.dir):
-        for f in files:
-            if f in ("out.log", "Latest.log"):
-                try: texts.append((f, open(os.path.join(root, f), errors="replace").read()))
-                except OSError: pass
+    texts = game_log.texts(game, ("out.log", "Latest.log"))
     n, first = render_check.scan_logs(texts); out["gl_errors"] = n
     req = next((r for r in (preconditions.requested_window(t) for f, t in texts if f == "Latest.log") if r), None)
     if req: out["requested_w"], out["requested_h"] = req
@@ -316,7 +311,8 @@ class FreshGame:
         return self.finish()
 
     def shoot(self, stage):
-        """With --ui-shots: <env>-<build>-run<N>-<stage>.png of the whole compositor output (headed), else of the game window."""
+        """With --ui-shots: <env>-<build>-run<N>-<test>-<stage>.png of the whole compositor output (headed), else of the game window. The
+        test is in the name because two tests run F12 in the same run (#42)."""
         from . import png
         d = self.request.config.getoption("--ui-shots")
         if not d: return
@@ -326,7 +322,8 @@ class FreshGame:
             shot = grab(w) if grab and w else None
         if shot:
             os.makedirs(d, exist_ok=True); c = self.case
-            png.write_png(os.path.join(d, "%s-%s-run%d-%s.png" % (c.env, c.label, c.run, stage)), shot[0], shot[1], shot[2])
+            test = self.request.node.originalname.replace("test_", "", 1)
+            png.write_png(os.path.join(d, "%s-%s-run%d-%s-%s.png" % (c.env, c.label, c.run, test, stage)), shot[0], shot[1], shot[2])
 
     def finish(self):
         cfg = self.request.config; c = self.case

@@ -95,6 +95,15 @@ def test_a_key_is_released_as_soon_as_the_highlight_moves():
     assert a.session.keys == ["Down"] and t[1] - t[0] < 0.1       # released on the first look after the highlight moved, not after a fixed hold
 
 
+def test_highlight_bar_next_to_a_row_does_not_merge_with_it():
+    """Exit Game highlighted: the red bar is taller than the text and came within the row gap of Manage Expansion Packs, so the two read as
+    one row (5 rows, nothing selected) and a key test that overshot to the last row failed (#42)."""
+    import os
+    from oolite_ui_test_framework import png
+    a = make([screen.Shot(*png.read_png(os.path.join(os.path.dirname(__file__), "fixtures", "title-menu-exit-selected-1280x720.png")))])
+    assert a.title_menu.menu.visible_count == 6 and a.title_menu.selected_item == "Exit Game"
+
+
 def test_where_a_look_is_slower_than_the_game_repeat_the_key_is_tapped():
     """Native KWin: a grab takes about a second, so holding the key until the highlight is seen to move ran it past the row (#38 smoke).
     Each press is a short tap, looked at after; a tap the game did not see (no move) is repeated."""
@@ -107,6 +116,25 @@ def test_where_a_look_is_slower_than_the_game_repeat_the_key_is_tapped():
     assert a.title_menu.selected_item == "Load Commander" and a.session.keys == ["Down", "Down"]   # the first tap moved nothing
     holds = [u[1] - d[1] for d, u in zip(t[0::2], t[1::2])]
     assert all(h < appmod.App.GAME_KEY_REPEAT for h in holds), holds                              # never held into the game's repeat
+
+
+def test_a_tap_the_game_did_not_see_is_held_longer_and_remembered():
+    """sway, 3836x1053: a frame takes longer than a 0.08 s tap, so down and up arrive in one frame and the game never sees the key (#42).
+    Each tap the game ignored is held twice as long; the one that worked is where the next press starts."""
+    a = make([with_bar(1280, 720, 1)])
+    grab = a.session.backend.grab
+    a.session.backend.grab = lambda w: (setattr(a.clock, "t", a.clock.t + 0.6), grab(w))[1]      # slow looks: tapping
+    holds = []; t = {}; frame = 0.3                                                              # the game sees a key held >= one frame
+    a.session.key_down = lambda k: t.update(d=a.clock.t)
+    def up(k):
+        holds.append(round(a.clock.t - t["d"], 2))
+        if holds[-1] >= frame: a.session.backend.frames = [with_bar(1280, 720, len([h for h in holds if h >= frame]) + 1)]
+    a.session.key_up = up
+    page = a.title_menu.wait_until_displayed()
+    page.menu.move_down()
+    assert holds == [0.08, 0.16, 0.32] and page.selected_item == "Load Commander"
+    page.menu.move_down()
+    assert holds[3:] == [0.32] and page.selected_item == "View Ship Library"                  # started at the tap that worked
 
 
 def test_no_key_reached_the_game_says_so(tmp_path):

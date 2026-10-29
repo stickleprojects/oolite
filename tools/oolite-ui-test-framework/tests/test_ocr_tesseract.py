@@ -45,3 +45,10 @@ def test_a_wrong_screen_is_rejected_by_the_text():
     p = title_page(); p.app.ocr = lambda crop: "Credits"
     ok, why = p.shows_expected_items()
     assert not ok and "menu text read as" in why
+
+
+def test_descenders_are_not_cut_off_kwin_x11():
+    """KWin X11 rendering where the row box ended above the tail of the "p": tesseract read "Game Gntions", outside the tolerance (#42).
+    With room above and below every row is read."""
+    s = screen.Shot(*png.read_png(os.path.join(os.path.dirname(__file__), "fixtures", "title-menu-kwin-x11-1280x720.png")))
+    assert pages.TitleMenuPage(Still(s, read)).shows_expected_items() == (True, "")

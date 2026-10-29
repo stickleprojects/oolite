@@ -11,7 +11,8 @@ from . import window_probes
 
 def observe(backend):
     o = window_probes.X11Probe(backend).observe()
-    return None if o is None else {"win": o.win, "framed": o.framed, "focused": o.focused, "outer": o.outer, "client": o.client}
+    return None if o is None else {"win": o.win, "framed": o.framed, "focused": o.focused, "outer": o.outer, "client": o.client,
+                                   "fullscreen": o.fullscreen}
 
 
 def call(b, cmd, args):
