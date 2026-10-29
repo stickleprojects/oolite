@@ -75,6 +75,10 @@ symptom, cause, fix, and where (PR / issue). Open questions go under [Still open
   reached an existing image (sway-native failed every input test with `PRECONDITION input_tool`). Images are labelled with a hash of
   their Dockerfile and `docker/`, and rebuilt on a mismatch (#44).
 - **A partial run says so**: `--tests` adds "PARTIAL RUN" to the purpose so it is never read as a full pass.
+- **Long runs are unattended, so nothing may stop them part-way.** One `uitest` call for the whole matrix lost every later cell to
+  a hung container (no timeout) or a crash. `--cell-timeout` stops a cell (`docker kill` on a named container) and records a HARD line;
+  `run_unattended.sh` runs each build x environment x screen as its own `uitest run`, resumes, and keeps the machine awake. Docker
+  names allow only `[A-Za-z0-9_.-]`, so the container name is not `safe_name()` (which keeps `+`) (#61).
 
 ## Coverage write-ups
 
