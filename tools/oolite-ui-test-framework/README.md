@@ -15,6 +15,7 @@ pinned Docker images. `uitest` is plain stdlib Python, so it can later be hooked
 | Path | What it is |
 |---|---|
 | `uitest` | the command |
+| `run_unattended.sh` | the full comparison, unattended: every environment x screen x build, resumable (see [Unattended runs](#unattended-runs-run_unattendedsh)) |
 | [`LESSONS.md`](LESSONS.md) | what we learnt making the tests reliable: each environment quirk, its cause and fix (read before "fixing" something odd; add to it) |
 | `environments.toml` | the test environments: one `[env.<name>]` table per window manager or compositor |
 | `docker/` | one Dockerfile per family of environments (see its README) |
@@ -66,6 +67,7 @@ once, `--report PATH`, `--desc`, `--minruns`, `--strict` and `-q`; a result set 
 | `--minruns N` / `--tol PX` | runs needed for a verdict (default 10) / centring tolerance in pixels (default 40) |
 | `--out DIR` / `--report PATH` | results directory / exact report path (the other files take the same stem) |
 | `--report-only RAW` | re-make a report from an existing `.raw` file, e.g. with another `--tol`, without re-running |
+| `--cell-timeout MIN` | stop a Docker environment x screen that runs longer than MIN minutes, write a HARD line (the report lists it), keep the runs it finished and go on to the next (default 0 = no limit) |
 | `--no-prompt` | host mode: do not ask questions; unanswerable checks are recorded as not tested |
 
 Images are built on first use (1-2 GB each, a few minutes; the build log goes into the results directory). AppImages run with
@@ -75,6 +77,55 @@ still works.
 **Headed KWin.** `--env kwin-xwayland-headed` runs KWin as a window on your desktop (the GPU and your X display are passed into the
 container), so screenshots include KWin's own title bars; the F12 test saves before / fullscreen / after screenshots. It is not part of
 `--wayland`. Do not touch the mouse or keyboard while it runs.
+
+## Unattended runs (`run_unattended.sh`)
+
+For the full comparison, which takes many hours (#14), start it and leave it:
+
+        ./run_unattended.sh                                         # defaults: stock vs pr774, every environment, 5 runs, --toggle
+        tail -f results/unattended-<date>/run.log                   # progress
+        OUT=results/unattended-20261029-2200 ./run_unattended.sh    # the same folder again resumes: finished cells are not rerun
+
+It runs three stages: a 1-run `--quick` smoke per environment and build, then every build x environment x screen with `--toggle`, then
+one result set per build (`<OUT>/<label>.raw` and `.md`) and the comparison (`<OUT>/compare.md`). Settings are environment variables:
+
+| Variable | Default | What it is |
+|---|---|---|
+| `BUILDS` | `stock:appimages/stock.AppImage pr774:appimages/pr774.AppImage` | `label:path` builds, space separated; the first is the control |
+| `RUNS` | 5 | runs per cell |
+| `X11_ENVS` / `WAYLAND_ENVS` | the six X11 window managers / the eight headless Wayland environments | environments to run |
+| `X11_SCREENS` / `WAYLAND_SCREENS` | `3840x1080 2head 1920x1080` / `3840x1080 1920x1080` | screen sizes (the headless compositors have one output, so no `2head`) |
+| `CELL_TIMEOUT` | 60 | minutes one environment x screen may take (`--cell-timeout`) |
+| `SMOKE` | 1 | 0 skips the smoke stage |
+| `OUT` | `results/unattended-<date-time>` | results folder; relative paths are relative to this folder |
+| `DESC` | a summary of the settings | the reports' Purpose |
+
+**What it does so that it does not stop part-way**
+- Each build x environment x screen is its own `uitest run`: a crash or hang loses that cell only, and the next one starts.
+- uitest stops a container that runs past `CELL_TIMEOUT` and records a HARD line, and `timeout` stops a uitest that hangs anyway
+  (`CELL_TIMEOUT` + 10 min). Nothing is fatal: the script has no `set -e` and does not stop on a failed cell.
+- One row per finished cell in `<OUT>/cells.tsv` (build, environment, screen, uitest's exit code, minutes). rc 0 = passed, 1 = a test
+  failed (a measurement, not a problem with the run); anything else, or "TIMED OUT" in `run.log`, is worth a look.
+- Run it again with the same `OUT` after an interruption: cells with results are skipped; a cell that timed out before its first run
+  is tried again. To redo a cell, delete its `<OUT>/cells/<label>-<env>-<screen>.raw`.
+
+**What you need to look after**
+- **Screensaver and screen lock: nothing to do.** Every environment runs inside Docker on its own virtual display (Xvfb for the X11
+  window managers, headless compositors for Wayland); the game never draws on your screen, so blanking or locking it changes nothing.
+  Host mode and the headed KWin environment, the only ones that use your desktop, are not part of this script.
+- **Sleep, idle suspend and closing the lid: handled.** The script holds a `systemd-inhibit` lock (`idle:sleep:handle-lid-switch`) for
+  the whole run; `systemd-inhibit --list` shows it as `uitest`. Without `systemd-inhibit` (or without permission to take the lock) it
+  runs anyway, unprotected: then switch off automatic suspend yourself.
+- **Battery: keep it plugged in.** At critical battery the desktop's emergency suspend or hibernate can override the lock.
+- **Updates: switch off automatic restarts** for the night.
+- **Terminal and logout.** Closing the terminal is safe (the script ignores SIGHUP), logging out of the desktop is not; to survive
+  that too, start it with `setsid nohup ./run_unattended.sh > /dev/null 2>&1 &`.
+- **Load and disk.** Leave the machine otherwise idle (the game renders in software and the bug is a race, see
+  [Time and machine load](#time-and-machine-load)). Screenshots and logs take some space in `OUT`; Docker images are built in the smoke
+  stage the first time (1-2 GB each).
+
+**How long.** About 34 cells per build with the defaults (6 X11 environments x 3 screens + 8 Wayland x 2), 5 runs each, so roughly
+68 cells for two builds. At the usual 1-2 min per run with `--toggle`, that is about 6-12 hours. Lower `RUNS`, or narrow the environments or screens, for a shorter run.
 
 ## Output files (`results/<name>.*`)
 

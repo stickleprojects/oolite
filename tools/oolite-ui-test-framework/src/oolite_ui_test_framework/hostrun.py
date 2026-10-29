@@ -27,6 +27,7 @@ from .session import Session, SessionError
 
 PKG = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))      # the framework folder (holds src/, docker/, environments.toml)
 GAME_TESTS = os.path.join(os.path.dirname(os.path.dirname(PKG)), "tests", "ui")             # the tests of the game: tests/ui/ at the repo root
+TIMED_OUT = -1000   # Runner.follow's returncode when it stopped a pytest that ran past --cell-timeout
 DEFAULT_ENVS = "marco,openbox,xfwm4,muffin,kwin,mutter"
 WAYLAND_ENVS = "kwin-xwayland,kwin-native,sway-xwayland,sway-native,mutter-xwayland,mutter-native,weston-xwayland,weston-native"
 
@@ -191,26 +192,41 @@ class Runner:
                   "-v", "%s:/app:ro" % os.path.dirname(self.path)]
         app = "/app/" + os.path.basename(self.path)
         # --init: the container's first process passes signals on, so stopping uitest stops the container (a shell as PID 1 ignored them)
-        cmd = ["docker", "run", "--rm", "--init"] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, app)
-        self.collect(env, screen, part, *self.follow(cmd, part))
+        cname = re.sub(r"[^A-Za-z0-9_.-]", "_", "uitest-%d-%s-%s" % (os.getpid(), self.name, part[:-4]))   # Docker's name rules
+        cmd = ["docker", "run", "--rm", "--init", "--name", cname] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, app)
+        limit = (self.a.cell_timeout or 0) * 60
+        r, done = self.follow(cmd, part, timeout=limit, stop=lambda: subprocess.run(["docker", "kill", cname], capture_output=True, timeout=60))
+        if r.returncode == TIMED_OUT:
+            # a HARD line, so the report lists it; the runs finished before the timeout stay in the result set
+            with open(os.path.join(self.parts, part), "a") as f:
+                f.write("HARD wm=%s screen=%s build=%s reason=timed out after %g min (--cell-timeout); the container was stopped\n" % (env, screen, self.label, self.a.cell_timeout))
+        self.collect(env, screen, part, r, done)
 
-    def follow(self, cmd, part, poll=2.0, **kw):
+    def follow(self, cmd, part, poll=2.0, timeout=0, stop=None, **kw):
         """Run one pytest (container or host) and copy its raw part into the result set as its lines arrive, so <name>.raw grows during
         the run and a run that is stopped keeps what it measured. Stopping uitest stops the pytest too (SIGTERM, which `docker run`
-        passes on to the container). -> (CompletedProcess, bytes of the part already copied)."""
-        path = os.path.join(self.parts, part); done = 0
+        passes on to the container). After `timeout` s (0 = never) it calls stop() and terminates the pytest; the returncode is then
+        TIMED_OUT. -> (CompletedProcess, bytes of the part already copied)."""
+        path = os.path.join(self.parts, part); done = 0; t0 = time.monotonic(); late = False
         with tempfile.TemporaryFile("w+") as out, tempfile.TemporaryFile("w+") as err:
             p = subprocess.Popen(cmd, stdout=out, stderr=err, text=True, **kw)
             try:
                 while p.poll() is None:
-                    done = self.copy_part(path, done); time.sleep(poll)
+                    done = self.copy_part(path, done)
+                    if timeout and time.monotonic() - t0 > timeout:
+                        late = True; say("  TIMED OUT after %d s: stopping it, then on to the next cell" % timeout)
+                        if stop:
+                            try: stop()
+                            except (OSError, subprocess.SubprocessError): pass
+                        break
+                    time.sleep(poll)
             finally:
                 if p.poll() is None:
                     p.terminate()
                     try: p.wait(30)
                     except subprocess.TimeoutExpired: p.kill()
             done = self.copy_part(path, done); out.seek(0); err.seek(0)
-            return subprocess.CompletedProcess(cmd, p.returncode, out.read(), err.read()), done
+            return subprocess.CompletedProcess(cmd, TIMED_OUT if late else p.returncode, out.read(), err.read()), done
 
     def copy_part(self, path, done):
         """Append the whole lines of the part file past byte `done` to the result set -> the new `done`."""
@@ -347,6 +363,7 @@ def build_parser():
     p.add_argument("--tests", default="", help="run only these tests, comma separated, with or without the test_ prefix (e.g. has_frame,gets_focus); see the tests folder next to the framework")
     p.add_argument("--quick", action="store_true", help="smoke run: 1 run, first screen size only, and (unless --tests is given) only %s" % QUICK_TESTS)
     p.add_argument("--minruns", type=int, default=10); p.add_argument("--tol", type=int, default=40); p.add_argument("--equiv", default="")
+    p.add_argument("--cell-timeout", type=float, default=0, metavar="MIN", help="stop a Docker environment x screen that runs longer than this and go on to the next (0 = no limit)")
     p.add_argument("--registry", default=""); p.add_argument("--list", action="store_true", help="list the registry and exit")
     p.add_argument("--report", metavar="PATH", help="markdown report path (raw and env files take the same stem); default results/uitest-<date>-<label>.md")
     p.add_argument("--desc", default="", help="REQUIRED (or --desc-file): what this run is for (shown as Purpose at the top of the report)")

@@ -1,6 +1,9 @@
 """Host mode (#15): the pytest tests run on the host with a venv's pytest, X measured by the helper container. No desktop, no Docker:
 the helper, the venv commands and pytest are replaced by fakes."""
 import os
+import re
+import subprocess
+import types
 
 import pytest
 
@@ -147,3 +150,27 @@ def test_image_hash_changes_with_the_dockerfile_or_anything_in_docker(tmp_path):
     (tmp_path / "docker" / "tool.c").write_text("int main(){return 1;}\n")
     h1 = hostrun.image_hash("docker/Dockerfile.x", root=str(tmp_path)); assert h1 != h0
     df.write_text("FROM b\n"); assert hostrun.image_hash("docker/Dockerfile.x", root=str(tmp_path)) != h1
+
+
+def test_a_cell_past_its_timeout_is_stopped_and_its_runs_are_kept(tmp_path, monkeypatch):
+    """--cell-timeout: a hung container must not stall an unattended run. stop() (docker kill) is called, the
+    returncode is TIMED_OUT and what was written before stays in the result set."""
+    r = runner(tmp_path); seen = {}; stopped = []
+    fake_popen(monkeypatch, r, "p.raw", seen); open(os.path.join(r.parts, "p.raw"), "w").close()
+    t = iter([0.0, 5.0, 100.0]); monkeypatch.setattr(hostrun.time, "monotonic", lambda: next(t))
+    res, done = r.follow(["pytest"], "p.raw", timeout=60, stop=lambda: stopped.append(1))
+    assert res.returncode == hostrun.TIMED_OUT and stopped == [1]
+    assert "RESULT wm=host-x11 build=x run=1" in open(r.raw).read()
+
+
+def test_a_timed_out_container_leaves_a_hard_line(tmp_path, monkeypatch):
+    r = runner(tmp_path, "--cell-timeout", "45"); seen = {}
+    r.images = {"wayland": {"tag": "img"}}; r.envs = {"kwin-native": types.SimpleNamespace(image="wayland", kind="wayland")}
+    def follow(cmd, part, timeout=0, stop=None):
+        seen.update(cmd=cmd, timeout=timeout); return subprocess.CompletedProcess(cmd, hostrun.TIMED_OUT, "", ""), 0
+    monkeypatch.setattr(r, "follow", follow)
+    r.run_container("kwin-native", "1920x1080")
+    c = seen["cmd"]; name = c[c.index("--name") + 1]
+    assert seen["timeout"] == 45 * 60 and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", name)
+    raw = open(r.raw).read()
+    assert "HARD wm=kwin-native screen=1920x1080 build=x reason=timed out after 45 min" in raw and "SKIP" not in raw
