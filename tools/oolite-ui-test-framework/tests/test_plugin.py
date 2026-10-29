@@ -107,6 +107,22 @@ def test_raw_file_is_result_compatible_and_has_test_lines(project):
     assert os.path.exists(tmp / "j.xml")
 
 
+def test_a_runs_lines_are_written_as_soon_as_its_last_test_finishes(project):
+    """Not batched at the end: while run 2 is going, run 1's RESULT and TEST lines are already in the raw file."""
+    pt, args, tmp = project
+    raw = str(tmp / "out.raw")
+    pt.makepyfile(test_gamecopy="""
+import os
+def test_has_frame(launched_game): pass
+def test_raw_so_far(case):
+    so_far = open(%r).read() if os.path.exists(%r) else ""
+    assert ("build=x run=1" in so_far and "test=test_has_frame" in so_far) == (case.run == 2)
+""" % (raw, raw))
+    pt.runpytest(*args, "--ui-label", "x").assert_outcomes(passed=4)
+    lines = open(raw).read().splitlines()
+    assert [l.split()[0] for l in lines if " run=1 " in l + " "].count("RESULT") == 1 and sum(l.startswith("RESULT") for l in lines) == 2
+
+
 def test_app_only_runs_still_get_a_result_line(project):
     """A run of only `app` tests (no shared launch) still writes RESULT lines, with the title-menu outcome as the renders criterion."""
     pt, args, tmp = project

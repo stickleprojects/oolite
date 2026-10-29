@@ -2,6 +2,8 @@
 the helper, the venv commands and pytest are replaced by fakes."""
 import os
 
+import pytest
+
 from oolite_ui_test_framework import hostrun, registry, session as sessmod, window_probes
 
 
@@ -70,16 +72,31 @@ def runner(tmp_path, *extra):
     return hostrun.Runner(hostrun.build_parser().parse_args(["x:%s" % a, "--out", str(tmp_path / "res"), "--host-runs", "2", "--toggle"] + list(extra)), ("x", str(a)))
 
 
+class FakePopen:
+    """pytest as seen by Runner.follow: it writes its raw part a line and a half at a time while running, then exits 0."""
+    def __init__(self, r, part, seen, cmd, stdout, stderr, text, **kw):
+        seen["cmd"] = cmd; seen["env"] = kw.get("env"); stdout.write("3 passed\n")
+        self.r, self.part, self.seen, self.n, self.returncode, self.terminated = r, os.path.join(r.parts, part), seen, 0, None, False
+    def poll(self):
+        self.n += 1
+        if self.n == 1: open(self.part, "a").write("RESULT wm=host-x11 build=x run=1\nTEST wm=host-x11 bu")   # second line half written
+        elif self.n == 2:
+            self.seen["raw_mid_run"] = open(self.r.raw).read(); open(self.part, "a").write("ild=x run=1 test=t outcome=passed\n")
+        else: self.returncode = 0
+        return self.returncode
+    def terminate(self): self.terminated = True; self.returncode = -15
+    def wait(self, t=None): return self.returncode
+
+
+def fake_popen(monkeypatch, r, part, seen):
+    monkeypatch.setattr(hostrun.time, "sleep", lambda s: None)
+    monkeypatch.setattr(hostrun.subprocess, "Popen", lambda cmd, **k: seen.setdefault("p", FakePopen(r, part, seen, cmd, **k)))
+
+
 def test_host_cell_runs_every_pytest_test_on_the_host(tmp_path, monkeypatch):
     r = runner(tmp_path, "--no-prompt"); seen = {}
     monkeypatch.setattr(hostrun, "host_python", lambda log: ("/venv/bin/python", ""))
-    class Done:
-        returncode = 0; stdout = "3 passed"; stderr = ""
-    def run(cmd, **k):
-        seen["cmd"] = cmd; seen["env"] = k["env"]
-        open(os.path.join(r.parts, "host-x11-2560x1440.raw"), "a").write("RESULT wm=host-x11 build=x run=1\n")
-        return Done()
-    monkeypatch.setattr(hostrun.subprocess, "run", run)
+    fake_popen(monkeypatch, r, "host-x11-2560x1440.raw", seen)
     r.host_cell("host-x11", "2560x1440", "uitest-helper")
     c = seen["cmd"]
     assert c[:3] == ["/venv/bin/python", "-m", "pytest"] and hostrun.GAME_TESTS in c and "--ui-toggle" in c and "--ui-no-prompt" in c
@@ -87,6 +104,28 @@ def test_host_cell_runs_every_pytest_test_on_the_host(tmp_path, monkeypatch):
     assert c[c.index("--ui-raw") + 1] == os.path.join(r.out, "%s.parts/host-x11-2560x1440.raw" % r.name)
     assert seen["env"]["PYTHONPATH"] == os.path.join(hostrun.PKG, "src") and seen["env"]["PYTHONDONTWRITEBYTECODE"] == "1"   # no __pycache__ in tests/ui
     assert "RESULT wm=host-x11" in open(r.raw).read()
+
+
+def test_results_reach_the_result_set_while_pytest_runs(tmp_path, monkeypatch):
+    """Whole lines are copied in as they appear, a half-written line waits, and nothing is copied twice."""
+    r = runner(tmp_path); seen = {}
+    fake_popen(monkeypatch, r, "p.raw", seen); open(os.path.join(r.parts, "p.raw"), "w").close()
+    res, done = r.follow(["pytest"], "p.raw")
+    r.collect("host-x11", "2560x1440", "p.raw", res, done)
+    assert "RESULT wm=host-x11 build=x run=1" in seen["raw_mid_run"] and "TEST" not in seen["raw_mid_run"]
+    raw = open(r.raw).read()
+    assert raw.count("RESULT wm=host-x11") == 1 and raw.count("TEST wm=host-x11 build=x run=1 test=t outcome=passed\n") == 1
+    assert res.returncode == 0 and res.stdout == "3 passed\n"
+
+
+def test_stopping_uitest_stops_its_pytest(tmp_path, monkeypatch):
+    """Ctrl-C in uitest: the pytest (docker run, which passes the signal to the container) is terminated, and what it wrote is kept."""
+    r = runner(tmp_path); seen = {}
+    fake_popen(monkeypatch, r, "p.raw", seen); open(os.path.join(r.parts, "p.raw"), "w").close()
+    def interrupt(s): raise KeyboardInterrupt
+    monkeypatch.setattr(hostrun.time, "sleep", interrupt)
+    with pytest.raises(KeyboardInterrupt): r.follow(["pytest"], "p.raw")
+    assert seen["p"].terminated and "RESULT wm=host-x11" in open(r.raw).read()
 
 
 def test_host_cell_without_the_venv_runs_the_startup_checks_and_says_so(tmp_path, monkeypatch):

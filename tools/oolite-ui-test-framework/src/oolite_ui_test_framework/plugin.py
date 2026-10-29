@@ -22,6 +22,8 @@ class State:
     def __init__(self):
         self.launches = {}; self.toggles = {}; self.outcomes = collections.defaultdict(dict); self.hard = []; self.wmver = {}; self.screen = ""; self.warnings = []
         self.timing = {}   # (env, build, run, test) -> [start, seconds over setup + call + teardown]
+        self.raw = ""; self.left = collections.Counter()   # --ui-raw; tests still to finish per (env, build, run)
+        self.written = set(); self.n_wmver = self.n_hard = self.n_warn = 0   # what is already in the raw file
 
 
 STATE = State()
@@ -137,6 +139,14 @@ class SharedLaunchFirst:
         items.sort(key=lambda i: (_run(i), "launched_game" not in getattr(i, "fixturenames", ())))
 
 
+def pytest_collection_finish(session):
+    """How many tests each run has, so its lines are written to the raw file as soon as its last test finishes (not at the end)."""
+    STATE.raw = session.config.getoption("--ui-raw")
+    for i in session.items:
+        cs = getattr(i, "callspec", None); c = cs.params.get("case") if cs else None
+        if c is not None: STATE.left[(c.env, c.label, c.run)] += 1
+
+
 def _run(item):
     cs = getattr(item, "callspec", None); c = cs.params.get("case") if cs else None
     return c.run if c is not None else 0
@@ -153,10 +163,10 @@ class SessionManager:
         s = sessmod.Session(self.env, self.screen, probe_kw={"no_prompt": self.no_prompt}, helper=self.helper or None)
         try: s.start()
         except sessmod.SessionError as e:
-            s.stop(); STATE.hard.append((self.env.name, self.screen, self.label, str(e)))
+            s.stop(); STATE.hard.append((self.env.name, self.screen, self.label, str(e))); _write(_new_lines())
             pytest.fail("environment %s did not start: %s" % (self.env.name, e), pytrace=False)
         self.session = s
-        if s.version: STATE.wmver[self.env.name] = s.version
+        if s.version: STATE.wmver[self.env.name] = s.version; _write(_new_lines())
         return s
 
     def stop(self):
@@ -382,28 +392,50 @@ def pytest_runtest_makereport(item, call):
     elif rep.when == "setup" and rep.outcome == "failed" and _reason(rep).startswith("PRECONDITION"):
         STATE.outcomes[key][name] = ("failed", _reason(rep))
     elif rep.when == "setup" and rep.outcome == "failed":
-        STATE.hard.append((case.env, STATE.screen, case.label, _reason(rep) or "setup failed"))
+        STATE.hard.append((case.env, STATE.screen, case.label, _reason(rep) or "setup failed")); _write(_new_lines())
+    if rep.when == "teardown":
+        STATE.left[key] -= 1
+        if STATE.left[key] <= 0: _write(_new_lines() + _case_lines(key))
+
+
+def _write(lines):
+    """Append to the raw file now, so a run in progress (or killed) shows the results so far."""
+    if not STATE.raw or not lines: return
+    with open(STATE.raw, "a") as f: f.write("\n".join(lines) + "\n")
+
+
+def _new_lines():
+    """WMVER, WARN and HARD lines not yet written."""
+    wmver = list(STATE.wmver.items())
+    lines = [raw_results.format_kv("WMVER", wm=k, version=v) for k, v in wmver[STATE.n_wmver:]]
+    lines += ["WARN wm=%s build=%s run=%d text=%s" % w for w in STATE.warnings[STATE.n_warn:]]
+    lines += ["HARD wm=%s screen=%s build=%s reason=%s" % (env, screen, build, why.replace("\n", " ")[:300]) for env, screen, build, why in STATE.hard[STATE.n_hard:]]
+    STATE.n_wmver, STATE.n_warn, STATE.n_hard = len(wmver), len(STATE.warnings), len(STATE.hard)
+    return lines
+
+
+def _case_lines(key):
+    """The RESULT line and TEST lines of one run (env, build, run), once."""
+    if key in STATE.written or key not in set(STATE.launches) | set(STATE.toggles) | set(STATE.outcomes): return []
+    STATE.written.add(key); lines = []
+    if key in STATE.launches or key in STATE.toggles:
+        rec = dict(STATE.launches.get(key) or STATE.toggles[key])
+        if key in STATE.toggles: rec.update({k: v for k, v in STATE.toggles[key].items() if k.startswith("t_")})
+        lines.append(raw_results.format_result(pass_fail.apply_outcomes(rec, STATE.outcomes.get(key, {}))))
+    else:   # only `app` tests ran for this case: a RESULT line with just their criteria, so the report counts them
+        rec = dict(wm=key[0], build=key[1], screen=STATE.screen, run=key[2], exited=None, dx=None, dy=None)
+        lines.append(raw_results.format_result(pass_fail.apply_outcomes(rec, STATE.outcomes[key])))
+    for test, (o, why) in sorted(STATE.outcomes.get(key, {}).items()):
+        start, secs = STATE.timing.get(key + (test,), (None, None))
+        lines.append("TEST wm=%s build=%s run=%d test=%s outcome=%s start=%s secs=%s reason=%s" % (key[0], key[1], key[2], test, o,
+                     raw_results.stamp(start) if start else "NA", "NA" if secs is None else round(secs, 1), why.replace("\n", " ")))
+    return lines
 
 
 def pytest_sessionfinish(session, exitstatus):
-    path = session.config.getoption("--ui-raw")
-    if not path: return
-    lines = [raw_results.format_kv("WMVER", wm=k, version=v) for k, v in STATE.wmver.items()]
-    for key in sorted(set(STATE.launches) | set(STATE.toggles) | set(STATE.outcomes), key=lambda k: (k[1], k[2])):
-        if key in STATE.launches or key in STATE.toggles:
-            rec = dict(STATE.launches.get(key) or STATE.toggles[key])
-            if key in STATE.toggles: rec.update({k: v for k, v in STATE.toggles[key].items() if k.startswith("t_")})
-            lines.append(raw_results.format_result(pass_fail.apply_outcomes(rec, STATE.outcomes.get(key, {}))))
-        else:   # only `app` tests ran for this case: a RESULT line with just their criteria, so the report counts them
-            rec = dict(wm=key[0], build=key[1], screen=STATE.screen, run=key[2], exited=None, dx=None, dy=None)
-            lines.append(raw_results.format_result(pass_fail.apply_outcomes(rec, STATE.outcomes[key])))
-        for test, (o, why) in sorted(STATE.outcomes.get(key, {}).items()):
-            start, secs = STATE.timing.get(key + (test,), (None, None))
-            lines.append("TEST wm=%s build=%s run=%d test=%s outcome=%s start=%s secs=%s reason=%s" % (key[0], key[1], key[2], test, o,
-                         raw_results.stamp(start) if start else "NA", "NA" if secs is None else round(secs, 1), why.replace("\n", " ")))
-    for env, build, run, text in STATE.warnings: lines.append("WARN wm=%s build=%s run=%d text=%s" % (env, build, run, text))
-    for env, screen, build, why in STATE.hard: lines.append("HARD wm=%s screen=%s build=%s reason=%s" % (env, screen, build, why.replace("\n", " ")[:300]))
-    with open(path, "a") as f: f.write("\n".join(lines) + "\n")
+    """Whatever was not written as it happened: runs cut short, and the WARN / HARD lines of the last moments."""
+    keys = sorted(set(STATE.launches) | set(STATE.toggles) | set(STATE.outcomes), key=lambda k: (k[1], k[2]))
+    _write([l for k in keys for l in _case_lines(k)] + _new_lines())
 
 
 def pytest_terminal_summary(terminalreporter):

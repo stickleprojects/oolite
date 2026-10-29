@@ -19,6 +19,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import time
 
 from . import envinfo, raw_results, registry, scenarios, report
@@ -186,15 +187,45 @@ class Runner:
                   "-v", "%s:/app:ro" % os.path.dirname(self.path)]
         app = "/app/" + os.path.basename(self.path)
         cmd = ["docker", "run", "--rm"] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, app)
-        self.collect(env, screen, part, subprocess.run(cmd, capture_output=True, text=True))
+        self.collect(env, screen, part, *self.follow(cmd, part))
 
-    def collect(self, env, screen, part, r):
-        """After one pytest run (container or host): its output's last line, its raw part into the result set, or a SKIP row if it never ran."""
+    def follow(self, cmd, part, poll=2.0, **kw):
+        """Run one pytest (container or host) and copy its raw part into the result set as its lines arrive, so <name>.raw grows during
+        the run and a run that is stopped keeps what it measured. Stopping uitest stops the pytest too (SIGTERM, which `docker run`
+        passes on to the container). -> (CompletedProcess, bytes of the part already copied)."""
+        path = os.path.join(self.parts, part); done = 0
+        with tempfile.TemporaryFile("w+") as out, tempfile.TemporaryFile("w+") as err:
+            p = subprocess.Popen(cmd, stdout=out, stderr=err, text=True, **kw)
+            try:
+                while p.poll() is None:
+                    done = self.copy_part(path, done); time.sleep(poll)
+            finally:
+                if p.poll() is None:
+                    p.terminate()
+                    try: p.wait(30)
+                    except subprocess.TimeoutExpired: p.kill()
+            done = self.copy_part(path, done); out.seek(0); err.seek(0)
+            return subprocess.CompletedProcess(cmd, p.returncode, out.read(), err.read()), done
+
+    def copy_part(self, path, done):
+        """Append the whole lines of the part file past byte `done` to the result set -> the new `done`."""
+        try:
+            with open(path, "rb") as f: f.seek(done); data = f.read()
+        except OSError: return done
+        data = data[:data.rfind(b"\n") + 1]
+        if data:
+            with open(self.raw, "ab") as f: f.write(data)
+        return done + len(data)
+
+    def collect(self, env, screen, part, r, done=0):
+        """After one pytest run (container or host): its output's last line, the rest of its raw part into the result set (follow() copied
+        the lines that came earlier), or a SKIP row if it never ran."""
         tail = [l for l in r.stdout.splitlines() if l.strip()][-1:] or [r.stderr.strip()[-200:]]
         say("  %s" % tail[0])
-        # copy the parts in; a failed pytest (hard failure) leaves a SKIP row with the reason
+        # a failed pytest (hard failure) leaves a SKIP row with the reason
         data = open(os.path.join(self.parts, part)).read()
-        if data: open(self.raw, "a").write(data)
+        rest = open(os.path.join(self.parts, part), "rb").read()[done:]
+        if rest: open(self.raw, "ab").write(rest)
         # failing tests are measurements (pytest rc 1); hard failures are HARD lines in the raw file (report.py lists them) or an unusable pytest run
         if r.returncode not in (0, 1, 5) and "RESULT" not in data and "HARD" not in data:
             self.skip(env, screen, "hard failure: pytest rc=%d: %s" % (r.returncode, (r.stdout.strip().splitlines() or r.stderr.strip().splitlines() or [""])[-1][:160]))
@@ -263,7 +294,7 @@ class Runner:
         cmd += ["--ui-helper", helper] if helper else []
         cmd += ["--ui-no-prompt"] if self.a.no_prompt else []
         # output captured as for the containers; the ask probe's questions still reach the user, it talks to /dev/tty directly
-        self.collect(env, scr, part, subprocess.run(cmd, capture_output=True, text=True, env=dict(os.environ, PYTHONPATH=os.path.join(PKG, "src"), PYTHONDONTWRITEBYTECODE="1")))
+        self.collect(env, scr, part, *self.follow(cmd, part, env=dict(os.environ, PYTHONPATH=os.path.join(PKG, "src"), PYTHONDONTWRITEBYTECODE="1")))
 
     def host_inprocess(self, env, scr, helper=None):
         """Runs ON THE HOST (host libraries and drivers), pure stdlib. X rows: measured through the helper container; native Wayland:
