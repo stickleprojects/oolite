@@ -186,7 +186,8 @@ class Runner:
         mounts = ["-v", "%s:/uitest:ro" % PKG, "-v", "%s:/gametests:ro" % GAME_TESTS, "-v", "%s:/out" % self.out, "-e", "PYTHONPATH=/uitest/src",
                   "-v", "%s:/app:ro" % os.path.dirname(self.path)]
         app = "/app/" + os.path.basename(self.path)
-        cmd = ["docker", "run", "--rm"] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, app)
+        # --init: the container's first process passes signals on, so stopping uitest stops the container (a shell as PID 1 ignored them)
+        cmd = ["docker", "run", "--rm", "--init"] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, app)
         self.collect(env, screen, part, *self.follow(cmd, part))
 
     def follow(self, cmd, part, poll=2.0, **kw):

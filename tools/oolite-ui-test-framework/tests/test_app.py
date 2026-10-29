@@ -238,3 +238,45 @@ def test_settled_item_waits_for_a_highlight_that_is_still_moving():
     assert a.title_menu.wait_until_displayed().settled_item() == "Start New Commander"
     a = make([with_bar(1280, 720, 2), with_bar(1280, 720, 3)] + [with_bar(1280, 720, 4)] * 12)
     assert a.title_menu.settled_item() == "Game Options"
+
+
+def test_keys_follow_pointer_puts_the_pointer_on_the_game_first():
+    """Headless weston gives no window keyboard focus (PointerRoot): keys go to the window under the pointer, so it goes to the game's
+    middle before each key. Elsewhere the pointer is left alone (#47)."""
+    import types
+    from oolite_ui_test_framework import session as sessmod
+
+    class XBackend:
+        def __init__(self): self.calls = []
+        def find_window(self): return 42
+        def abs_geom(self, w): return (1472, 92, 1280, 720)
+        def mouse_move(self, w, x, y): self.calls.append(("move", w, x, y))
+        def key_down(self, k): self.calls.append(("down", k))
+        def send_key(self, k, w=None): self.calls.append(("key", k))
+
+    for follow, want in ((True, [("move", 42, 640, 360), ("down", "Down"), ("move", 42, 640, 360), ("key", "F12")]), (False, [("down", "Down"), ("key", "F12")])):
+        s = sessmod.Session(types.SimpleNamespace(kind="wayland", keys="xtest", keys_follow_pointer=follow))
+        s.backend = XBackend()
+        s.key_down("Down"); s.send_key("F12")
+        assert s.backend.calls == want
+
+
+def test_keys_follow_pointer_puts_the_pointer_on_the_game_first():
+    """Headless weston gives no window keyboard focus (PointerRoot): keys go to the window under the pointer, so it goes to the game's
+    middle before each key. Elsewhere the pointer is left alone (#47)."""
+    import types
+    from oolite_ui_test_framework import session as sessmod
+
+    class XBackend:
+        def __init__(self): self.calls = []
+        def find_window(self): return 42
+        def abs_geom(self, w): return (1472, 92, 1280, 720)
+        def mouse_move(self, w, x, y): self.calls.append(("move", w, x, y))
+        def key_down(self, k): self.calls.append(("down", k))
+        def send_key(self, k, w=None): self.calls.append(("key", k))
+
+    for follow, want in ((True, [("move", 42, 640, 360), ("down", "Down"), ("move", 42, 640, 360), ("key", "F12")]), (False, [("down", "Down"), ("key", "F12")])):
+        s = sessmod.Session(types.SimpleNamespace(kind="wayland", keys="xtest", keys_follow_pointer=follow))
+        s.backend = XBackend()
+        s.key_down("Down"); s.send_key("F12")
+        assert s.backend.calls == want

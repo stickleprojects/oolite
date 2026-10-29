@@ -15,6 +15,7 @@ pinned Docker images. `uitest` is plain stdlib Python, so it can later be hooked
 | Path | What it is |
 |---|---|
 | `uitest` | the command |
+| [`LESSONS.md`](LESSONS.md) | what we learnt making the tests reliable: each environment quirk, its cause and fix (read before "fixing" something odd; add to it) |
 | `environments.toml` | the test environments: one `[env.<name>]` table per window manager or compositor |
 | `docker/` | one Dockerfile per family of environments (see its README) |
 | `src/oolite_ui_test_framework/` | the framework itself (see its README) |

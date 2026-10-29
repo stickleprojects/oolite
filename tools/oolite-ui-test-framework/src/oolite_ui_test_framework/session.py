@@ -203,15 +203,25 @@ class Session:
 
     def send_key(self, key, window=None):
         if self.env.keys == "fakeinput": return fakeinput.tap(key)
+        self._pointer_on_game()
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).send_key(key, window)
 
     def key_down(self, key):
         if self.env.keys == "fakeinput": return fakeinput.key_down(key)
+        self._pointer_on_game()
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).key_down(key)
 
     def key_up(self, key):
         if self.env.keys == "fakeinput": return fakeinput.key_up(key)
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).key_up(key)
+
+    def _pointer_on_game(self):
+        """keys_follow_pointer (headless weston): no window manager gives the game keyboard focus, the X focus is PointerRoot and keys go
+        to the window under the pointer. The keys are still tested there; the pointer just goes to the middle of the game window first (the
+        title screen's ship, not a menu row). In run 1 nothing had put it there yet and the keys test failed (#47)."""
+        if not self.env.keys_follow_pointer or self.backend is None or not hasattr(self.backend, "abs_geom"): return
+        w = self.window_id(); g = self.backend.abs_geom(w) if w else None
+        if g: self.backend.mouse_move(w, g[2] // 2, g[3] // 2)
 
     # ---- mouse (XTEST through xdotool, or KWin fake-input where the keys need it)
     def mouse_ok(self):

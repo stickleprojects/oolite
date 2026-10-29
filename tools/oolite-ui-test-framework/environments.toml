@@ -11,6 +11,8 @@
 # optional  version_cmd/version_re (shown in the report), settle (s before readiness polling, default 4), settle_after (default 3),
 #           ready_timeout (default 20), ready_socket (wayland socket to wait for, default wl0), files {path = text} (~ expands, folders are made), env {VAR = value},
 #           post_start (commands run once the socket is up), focus_na (true if no keyboard focus can exist, e.g. headless weston), keys (how keys and the mouse are injected: xtest, or fakeinput = KWin fake-input protocol, needed on headless kwin), keys_na (true if no way to inject keys exists),
+#           keys_follow_pointer (true = no window gets keyboard focus, the X focus is PointerRoot, so keys go to the window under the pointer:
+#           keys are still tested, with the pointer put on the game window before each key; headless weston),
 #           tiling (true = a tiling compositor that sizes every window itself, so the saved-size test does not apply),
 #           headed (true = the compositor is a window on the host X display, with the GPU passed in; screenshots then show its decorations)
 #           devices (host devices passed into the container, e.g. ["/dev/udmabuf"]: KWin needs a render device, and udmabuf is one without a
@@ -178,17 +180,18 @@ family = "weston"
 session = "XWayland"
 image = "wayland"
 kind = "wayland"
-start = ["weston --backend=headless --width={w} --height={h} --socket=wl0 --xwayland"]
+start = ["weston --backend=headless --idle-time=0 --width={w} --height={h} --socket=wl0 --xwayland"]   # no idle timeout: injected input goes to XWayland, not weston, so after 300 s weston idled and new windows opened at (0,0) (#47)
 version_cmd = "weston --version"
 version_re = "[0-9][0-9.]+"
 probes = ["x11"]
-focus_na = true
+keys_follow_pointer = true   # keys go to the window under the pointer (see focus_na)
+focus_na = true   # headless weston has no keyboard, so it never activates a window: _NET_ACTIVE_WINDOW stays 0 and the X focus is PointerRoot (checked 2026-10-29)
 [env.weston-native]
 family = "weston"
 session = "Wayland native"
 image = "wayland"
 kind = "wayland"
-start = ["weston --backend=headless --width={w} --height={h} --socket=wl0"]
+start = ["weston --backend=headless --idle-time=0 --width={w} --height={h} --socket=wl0"]   # no idle timeout: injected input goes to XWayland, not weston, so after 300 s weston idled and new windows opened at (0,0) (#47)
 version_cmd = "weston --version"
 version_re = "[0-9][0-9.]+"
 probes = ["none"]
