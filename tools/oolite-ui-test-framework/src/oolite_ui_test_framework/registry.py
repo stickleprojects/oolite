@@ -33,7 +33,7 @@ class Environment:
     env: dict = field(default_factory=dict)
     post_start: list = field(default_factory=list)
     focus_na: bool = False
-    keys: str = "xtest"            # how keys and the mouse are injected: xtest (xdotool) | fakeinput (KWin fake-input, for headless kwin)
+    keys: str = "xtest"            # how keys and the mouse are injected: xtest (xdotool) | fakeinput (KWin fake-input, for headless kwin) | virtual (virtual keyboard + pointer, sway native)
     keys_follow_pointer: bool = False   # no window has keyboard focus (X focus is PointerRoot, headless weston): keys go to the window under the pointer
     keys_na: bool = False          # injected (XTEST) keys never reach X clients, e.g. headless kwin-xwayland
     tiling: bool = False           # a tiling compositor (sway): it sizes and places every window itself, so saved sizes and centring do not apply

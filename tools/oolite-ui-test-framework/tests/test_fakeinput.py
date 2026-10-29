@@ -63,3 +63,13 @@ def test_session_moves_the_pointer_to_the_window_position_plus_the_point(monkeyp
     monkeypatch.setattr(fakeinput, "send", lambda c, **kw: sent.append(c))
     s.mouse_move(10, 20); s.mouse_down(); s.mouse_up()
     assert sent == ["move 110 70", "down 272", "up 272"]
+
+
+def test_virtual_mode_uses_the_wlroots_injector_with_the_same_commands(started, monkeypatch):
+    """keys = "virtual" (sway native, #44): uitest-wlrinput takes the same commands; switching mode stops the other process."""
+    monkeypatch.setattr(fakeinput, "_binary", fakeinput.BINARY)
+    p = P(); p.wait = lambda timeout=None: 0; popen = lambda cmd, **kw: started.append(cmd) or p
+    fakeinput.select("virtual"); fakeinput.key_down("F12", popen=popen)
+    fakeinput.select("virtual"); fakeinput.mouse_move(10, 20, popen=popen)
+    assert started == [["uitest-wlrinput"]] and p.stdin.getvalue().splitlines() == ["press 88", "move 10 20"]
+    fakeinput.select("fakeinput"); assert fakeinput._proc is None and fakeinput._binary == "uitest-fakeinput"

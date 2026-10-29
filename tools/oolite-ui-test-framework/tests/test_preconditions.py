@@ -25,6 +25,7 @@ def test_input_tool_names_the_tool_this_environment_needs():
     assert "uitest-fakeinput is not installed" in pre.input_tool(env(), which=lambda t: None)
     assert "xdotool is not installed" in pre.input_tool(env(keys="xtest"), which=lambda t: None)
     assert pre.input_tool(env(keys_na=True), which=lambda t: None) is None          # no input by design: NOT MEASURABLE, not this
+    assert "uitest-wlrinput is not installed" in pre.input_tool(env(keys="virtual"), which=lambda t: None)   # sway native (#44)
 
 
 def test_fake_input_offered_reports_the_missing_global_and_the_fix():
@@ -119,3 +120,10 @@ def test_set_window_size_rewrites_the_saved_size_and_keeps_the_rest(tmp_path):
     sc.set_window_size(str(fresh), (800, 600))                                          # no plist yet: one is written
     t = (fresh / "GameData" / "oolite.plist").read_text()
     assert t.strip().startswith("{") and t.strip().endswith("}") and '"window_width" = 800;' in t
+
+
+def test_the_wlroots_injector_is_checked_like_fake_input_without_the_kwin_hint():
+    done = lambda rc, err="": (lambda *a, **kw: subprocess.CompletedProcess(a, rc, "", err))
+    why = pre.fake_input_offered(env(keys="virtual"), run=done(3, "missing zwp_virtual_keyboard_manager_v1"))
+    assert why == "missing zwp_virtual_keyboard_manager_v1"
+    assert pre.fake_input_offered(env(keys="xtest"), run=done(3)) is None

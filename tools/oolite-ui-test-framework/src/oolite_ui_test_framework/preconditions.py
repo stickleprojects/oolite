@@ -2,7 +2,7 @@
 "PRECONDITION <name>: <what was expected, what was found>", never with its own (misleading) assertion. Each check returns None if the
 precondition holds, else the reason; checks that do not apply in an environment return None. Each was learnt the hard way:
 
-  input_tool          the image lacks uitest-fakeinput / xdotool (a failed image build left every Wayland env without it, #29)
+  input_tool          the image lacks uitest-fakeinput / uitest-wlrinput / xdotool (a failed image build left every Wayland env without it, #29)
   fake_input_offered  KWin started without KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 offers no fake-input, so keys and clicks go nowhere (#30)
   key_repeat_off      X / XWayland key repeat turns one held key into many presses (F12 toggled about 10 times); on native Wayland
                       the game repeats keys itself at the rate the compositor advertises (KWin: kcminputrc KeyRepeat), which
@@ -43,18 +43,21 @@ def check(name, reason):
 
 def input_tool(env, which=shutil.which):
     if env.keys_na or env.kind == "host": return None
-    tool = fakeinput.BINARY if env.keys == "fakeinput" else "xdotool"
+    tool = fakeinput.BINARIES.get(env.keys, "xdotool")
     return None if which(tool) else "%s is not installed in this image (needed to send keys and clicks in %s)" % (tool, env.name)
 
 
 def fake_input_offered(env, run=subprocess.run):
-    """Asks uitest-fakeinput to do nothing: it exits 3 if the compositor offers no org_kde_kwin_fake_input."""
-    if env.keys != "fakeinput": return None
-    try: p = run([fakeinput.BINARY, "sleep", "0"], capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.TimeoutExpired) as e: return "could not run %s: %s" % (fakeinput.BINARY, e)
+    """Asks the injector to do nothing: it exits 3 if the compositor does not offer its protocol (uitest-fakeinput: KWin's
+    org_kde_kwin_fake_input; uitest-wlrinput: the virtual-keyboard and virtual-pointer managers)."""
+    tool = fakeinput.BINARIES.get(env.keys)
+    if tool is None: return None
+    try: p = run([tool, "sleep", "0"], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired) as e: return "could not run %s: %s" % (tool, e)
     if p.returncode == 0: return None
     why = (p.stderr or p.stdout).strip() or "exit %d" % p.returncode
-    return "%s (KWin must be started with KWIN_WAYLAND_NO_PERMISSION_CHECKS=1)" % why
+    if env.keys == "fakeinput": why += " (KWin must be started with KWIN_WAYLAND_NO_PERMISSION_CHECKS=1)"
+    return why
 
 
 def key_repeat_off(session, run=subprocess.run):
@@ -64,13 +67,13 @@ def key_repeat_off(session, run=subprocess.run):
     if session.backend is not None and hasattr(session.backend, "autorepeat_on"):
         on = session.backend.autorepeat_on()
         return "X key repeat is on, so a held key reaches the game as many presses" if on else None
-    if e.kind != "wayland" or e.session != "Wayland native" or e.keys != "fakeinput": return None
+    if e.kind != "wayland" or e.session != "Wayland native" or e.keys not in fakeinput.BINARIES: return None
     try: p = run(["wayland-info"], capture_output=True, text=True, timeout=10)
     except (OSError, subprocess.TimeoutExpired): return None
     m = re.search(r"keyboard repeat rate: (\d+)", p.stdout) if p.returncode == 0 else None
     if p.returncode != 0 or not m or int(m[1]) == 0: return None
     return ("the compositor advertises key repeat (%s/s), so the game repeats a held key itself (KWin: KeyRepeat=nothing in "
-            "~/.config/kcminputrc, see environments.toml)" % m[1])
+            "~/.config/kcminputrc; sway: repeat_rate 0 for type:keyboard; see environments.toml)" % m[1])
 
 
 def screenshot_support(session):

@@ -61,5 +61,5 @@ def test_f12_runs_where_a_probe_sees_the_full_screen_state_and_keys_reach_the_ga
     sessions with no way to inject keys say so (keys_na), rather than failing F12."""
     envs = registry.load()[0]
     runs_f12 = {n for n, e in envs.items() if e.sees_window_state and not e.keys_na and e.kind != "host"}
-    assert {"kwin-native", "kwin-xwayland", "sway-xwayland", "marco"} <= runs_f12
-    assert not {"sway-native", "mutter-native", "weston-native"} & runs_f12
+    assert {"kwin-native", "kwin-xwayland", "sway-xwayland", "sway-native", "marco"} <= runs_f12   # sway-native: virtual keys (#44)
+    assert not {"mutter-native", "weston-native"} & runs_f12

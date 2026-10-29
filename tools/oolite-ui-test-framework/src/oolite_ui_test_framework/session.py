@@ -143,6 +143,10 @@ class Session:
         # without a render device (KWin would crash on the first grab; the render_device precondition test says so instead)
         if self.backend is None and e.kind == "wayland" and e.session == "Wayland native" and kwin is not None and preconditions.render_device(e) is None:
             self.backend = window_probes.KWinBackend(kwin, dict(os.environ))
+        sway = next((p for p, _ in self.probes if p.name == "sway"), None)
+        # the same for sway: the window from its tree, screenshots with grim (wlroots screencopy)
+        if self.backend is None and e.kind == "wayland" and e.session == "Wayland native" and sway is not None:
+            self.backend = window_probes.SwayBackend(sway, dict(os.environ))
         if e.session == "XWayland" and self.backend is not None:
             # XWayland generates the key repeat itself (from KWin's fake-input keys too), as release + press pairs: off, as in the X11 sessions
             self.backend.autorepeat_off()
@@ -201,18 +205,23 @@ class Session:
     def window_id(self):
         return self.backend.find_window() if self.backend else None
 
+    def _injected(self):
+        """Keys and the mouse go through a Wayland injector (fakeinput.py), not XTEST."""
+        if self.env.keys not in fakeinput.BINARIES: return False
+        fakeinput.select(self.env.keys); return True
+
     def send_key(self, key, window=None):
-        if self.env.keys == "fakeinput": return fakeinput.tap(key)
+        if self._injected(): return fakeinput.tap(key)
         self._pointer_on_game()
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).send_key(key, window)
 
     def key_down(self, key):
-        if self.env.keys == "fakeinput": return fakeinput.key_down(key)
+        if self._injected(): return fakeinput.key_down(key)
         self._pointer_on_game()
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).key_down(key)
 
     def key_up(self, key):
-        if self.env.keys == "fakeinput": return fakeinput.key_up(key)
+        if self._injected(): return fakeinput.key_up(key)
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).key_up(key)
 
     def _pointer_on_game(self):
@@ -232,23 +241,23 @@ class Session:
         PRECONDITION if that point is off the screen (a window larger than the screen) or, for fake-input, the window cannot be found."""
         g = self.backend.abs_geom(self.window_id()) if self.backend is not None and hasattr(self.backend, "abs_geom") else None
         if g: preconditions.check("point_on_screen", preconditions.point_on_screen(g[0] + x, g[1] + y, self.primary))
-        if self.env.keys == "fakeinput":   # fake-input takes output coordinates: the window's position on the output plus (x, y)
+        if self._injected():   # fake-input takes output coordinates: the window's position on the output plus (x, y)
             preconditions.check("window_position_known", None if g else "cannot find the game window's position on the screen, which fake-input clicks need")
             return fakeinput.mouse_move(g[0] + x, g[1] + y)
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).mouse_move(self.window_id(), x, y)
 
     def mouse_down(self):
-        if self.env.keys == "fakeinput": return fakeinput.mouse_down()
+        if self._injected(): return fakeinput.mouse_down()
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).mouse_down()
 
     def mouse_up(self):
-        if self.env.keys == "fakeinput": return fakeinput.mouse_up()
+        if self._injected(): return fakeinput.mouse_up()
         (self.backend or window_probes.XToolsBackend(dict(os.environ))).mouse_up()
 
     def stop(self):
         if self.repeat_was and self.backend is not None: self.backend.autorepeat_restore()
         if hasattr(self.backend, "close"): self.backend.close()
-        if self.env.keys == "fakeinput": fakeinput.close()
+        if self._injected(): fakeinput.close()
         for p, _ in self.probes: p.close()
         for p in reversed(self.procs):
             try: os.killpg(p.pid, 15)

@@ -1,10 +1,13 @@
-"""Keys and the mouse for compositors where XTEST (xdotool) events never reach clients, e.g. headless kwin: one `uitest-fakeinput` process,
-fed commands on stdin, sends them through KWin's fake-input protocol (docker/fakeinput.c, built into the wayland image). It is kept running
-because KWin releases whatever a fake-input client still holds when it disconnects."""
+"""Keys and the mouse for compositors where XTEST (xdotool) events never reach clients: one process, fed commands on stdin, kept running
+because the compositor releases whatever a client still holds when it disconnects. Two injectors, built into the wayland image, with the
+same commands (`keys` in environments.toml picks one):
+  fakeinput  uitest-fakeinput, KWin's fake-input protocol (docker/fakeinput.c): headless KWin
+  virtual    uitest-wlrinput, the standard virtual-keyboard and virtual-pointer protocols (docker/wlrinput.c): sway (native Wayland)"""
 import subprocess
 import time
 
 BINARY = "uitest-fakeinput"
+BINARIES = {"fakeinput": BINARY, "virtual": "uitest-wlrinput"}   # keys mode -> injector
 BTN_LEFT = 0x110
 
 # xdotool key names -> Linux evdev codes
@@ -13,6 +16,13 @@ CODES = {"Escape": 1, "Return": 28, "space": 57, "Up": 103, "Left": 105, "Right"
          **{c: n for c, n in zip("1234567890", range(2, 12))}}
 
 _proc = None
+_binary = BINARY
+
+
+def select(mode):
+    """Use the injector for `keys` mode `mode` (a key of BINARIES) from the next command on."""
+    global _binary
+    if BINARIES[mode] != _binary: close(); _binary = BINARIES[mode]
 
 
 def code(key):
@@ -21,13 +31,13 @@ def code(key):
 
 
 def send(command, popen=subprocess.Popen):
-    """One command line to the running uitest-fakeinput (started on first use); returns once KWin has it."""
+    """One command line to the running injector (started on first use); returns once the compositor has it."""
     global _proc
     if _proc is None or _proc.poll() is not None:
-        _proc = popen([BINARY], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, start_new_session=True)
+        _proc = popen([_binary], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, start_new_session=True)
     _proc.stdin.write(command + "\n"); _proc.stdin.flush()
     reply = _proc.stdout.readline().strip()
-    if reply != "ok": raise RuntimeError("%s: %r -> %r" % (BINARY, command, reply or "exited"))
+    if reply != "ok": raise RuntimeError("%s: %r -> %r" % (_binary, command, reply or "exited"))
 
 
 def close():

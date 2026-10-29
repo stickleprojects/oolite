@@ -458,6 +458,28 @@ class KWinBackend:
         return crop_rgba(data, meta, tuple(int(round(v * s)) for v in g))
 
 
+def grim_capture(box, env=None, run=subprocess.run):
+    """(w, h, rgb bytes) of box (x, y, w, h) in output coordinates, grabbed with grim (wlroots screencopy) as a binary PPM, or None."""
+    x, y, w, h = box
+    try: p = run(["grim", "-t", "ppm", "-g", "%d,%d %dx%d" % (x, y, w, h), "-"], capture_output=True, env=env, timeout=15)
+    except (OSError, subprocess.TimeoutExpired): return None
+    m = re.match(rb"P6\s+(\d+)\s+(\d+)\s+255\s", p.stdout) if p.returncode == 0 else None
+    if not m: return None
+    pw, ph = int(m[1]), int(m[2]); data = p.stdout[m.end():m.end() + pw * ph * 3]
+    return (pw, ph, data) if len(data) == pw * ph * 3 else None
+
+
+class SwayBackend(KWinBackend):
+    """Native Wayland under sway: the window found and placed through the sway probe (its tree), grabbed with grim. Keys and the mouse go
+    through the virtual-keyboard and virtual-pointer protocols (keys = "virtual")."""
+    def __init__(self, probe, env=None, max_age=1.0, clock=time.monotonic, capture=grim_capture):
+        super().__init__(probe, env, max_age, clock, capture)
+
+    def grab(self, w):
+        g = self.abs_geom(w)
+        return self.capture(g, self.env) if g else None
+
+
 def parse_sway_tree(tree, outputs=None):
     """sway get_tree JSON (dict) -> Obs for the oolite window, or None."""
     def walk(n):
@@ -469,6 +491,8 @@ def parse_sway_tree(tree, outputs=None):
             fr = int((n.get("deco_rect") or {}).get("height", 0) > 0 or n.get("current_border_width", 0) > 0)
             o = Obs(framed=fr, focused=int(bool(n.get("focused"))), outer=(r["x"], r["y"], r["width"], r["height"]),
                     fullscreen=int((n.get("fullscreen_mode") or 0) > 0), source="compositor")
+            w = n.get("window_rect")   # the client area, relative to rect
+            if w: o.client = (r["x"] + w["x"], r["y"] + w["y"], w["width"], w["height"])
             for out in outputs or []:
                 if out.get("focused") or o.mon is None: q = out["rect"]; o.mon = (q["x"], q["y"], q["width"], q["height"])
             return o

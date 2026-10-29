@@ -9,5 +9,5 @@ set by `image =` in `../environments.toml`.
 
     docker build -f docker/Dockerfile.debian -t oolite-uitest-debian .
 
-Also here: `fakeinput.c` (sends keys and the mouse through KWin's fake-input protocol; built into the Wayland image as `uitest-fakeinput`) and `run-ocr-tests.sh [image]`
+Also here: `fakeinput.c` (sends keys and the mouse through KWin's fake-input protocol; built into the Wayland image as `uitest-fakeinput`), `wlrinput.c` (the same for sway, through the standard virtual-keyboard and virtual-pointer protocols; built as `uitest-wlrinput`, with `virtual-keyboard-unstable-v1.xml` from wlroots 0.19.0, which no Arch package ships) and `run-ocr-tests.sh [image]`
 (runs the OCR tests inside an image).

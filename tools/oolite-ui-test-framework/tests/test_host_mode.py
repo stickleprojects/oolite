@@ -136,3 +136,14 @@ def test_host_cell_without_the_venv_runs_the_startup_checks_and_says_so(tmp_path
     assert ran == [("host-x11", "uitest-helper")]
     warn = [l for l in open(r.raw).read().splitlines() if l.startswith("WARN ")]
     assert len(warn) == 1 and "only the startup checks ran" in warn[0] and "no network" in warn[0]
+
+
+def test_image_hash_changes_with_the_dockerfile_or_anything_in_docker(tmp_path):
+    """A changed Dockerfile or docker/ file (a new injector, #44) makes the image stale, so ensure_image rebuilds it."""
+    (tmp_path / "docker").mkdir(); df = tmp_path / "docker" / "Dockerfile.x"; df.write_text("FROM a\n")
+    (tmp_path / "docker" / "tool.c").write_text("int main(){}\n")
+    h0 = hostrun.image_hash("docker/Dockerfile.x", root=str(tmp_path))
+    assert h0 == hostrun.image_hash("docker/Dockerfile.x", root=str(tmp_path)) and len(h0) == 16
+    (tmp_path / "docker" / "tool.c").write_text("int main(){return 1;}\n")
+    h1 = hostrun.image_hash("docker/Dockerfile.x", root=str(tmp_path)); assert h1 != h0
+    df.write_text("FROM b\n"); assert hostrun.image_hash("docker/Dockerfile.x", root=str(tmp_path)) != h1

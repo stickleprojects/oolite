@@ -155,14 +155,18 @@ class Runner:
         say("  skipped %s (%s): %s" % (wm, screen, why))
 
     def ensure_image(self, image):
+        """Build the image if it is missing or was built from other sources: it is labelled with image_hash(), so a change to its
+        Dockerfile or to docker/ (e.g. a new injector) rebuilds it rather than running with a stale image."""
         if image in self.img_ok: return self.img_ok[image]
-        spec = self.images[image]; tag = spec["tag"]
-        ok = subprocess.run(["docker", "image", "inspect", tag], capture_output=True).returncode == 0
+        spec = self.images[image]; tag = spec["tag"]; want = image_hash(spec["dockerfile"])
+        r = subprocess.run(["docker", "image", "inspect", "-f", '{{index .Config.Labels "uitest.hash"}}', tag], capture_output=True, text=True)
+        ok = r.returncode == 0 and r.stdout.strip() == want
         if not ok:
             log = os.path.join(self.out, "build-%s.log" % tag)
-            say("Building Docker image %s (first use only; several minutes). Log: %s" % (tag, log))
+            say("Building Docker image %s (%s; several minutes the first time). Log: %s" % (tag, "its sources changed" if r.returncode == 0 else "first use", log))
             with open(log, "w") as lf:
-                ok = subprocess.run(["docker", "build", "-f", os.path.join(PKG, spec["dockerfile"]), "-t", tag, PKG], stdout=lf, stderr=subprocess.STDOUT).returncode == 0
+                ok = subprocess.run(["docker", "build", "--label", "uitest.hash=" + want, "-f", os.path.join(PKG, spec["dockerfile"]), "-t", tag, PKG],
+                                    stdout=lf, stderr=subprocess.STDOUT).returncode == 0
             if not ok: say("  image build FAILED (see log)")
         self.img_ok[image] = ok; return ok
 
@@ -374,6 +378,17 @@ def host_python(log, venv=None, run=subprocess.run):
 def device_args(e, exists=os.path.exists):
     """docker run options for the host devices an environment declares (`devices`), the ones the host has."""
     return [a for d in e.devices if exists(d) for a in ("--device", d)]
+
+
+def image_hash(dockerfile, root=PKG):
+    """sha256 (16 hex) of an image's Dockerfile and every file in docker/ (what its COPY lines can take): the label that tells a stale
+    image from a current one."""
+    h = hashlib.sha256()
+    files = sorted({os.path.join(root, dockerfile)} | {os.path.join(d, f) for d, _, fs in os.walk(os.path.join(root, "docker")) for f in fs})
+    for f in files:
+        h.update(os.path.relpath(f, root).encode() + b"\0")
+        with open(f, "rb") as fh: h.update(fh.read() + b"\0")
+    return h.hexdigest()[:16]
 
 
 def headed_args(environ=None, exists=os.path.exists, hostname=socket.gethostname):

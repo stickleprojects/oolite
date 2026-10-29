@@ -177,3 +177,18 @@ def test_xtool_observe_uses_x11_probe():
         def focus_id(self): return 0
     d = xtool.observe(B())
     assert d["win"] == 3 and d["framed"] == 0 and d["focused"] == 0
+
+
+def test_sway_client_area_and_grim_screenshots():
+    """sway native (#44): the client area from window_rect (relative to rect), and grim's binary PPM cropped to it."""
+    tree = {"nodes": [{"pid": 7, "app_id": "oolite", "rect": {"x": 1280, "y": 150, "width": 1284, "height": 750},
+                       "window_rect": {"x": 2, "y": 28, "width": 1280, "height": 720}, "focused": True}]}
+    assert window_probes.parse_sway_tree(tree).client == (1282, 178, 1280, 720)
+    seen = []
+    def run(cmd, **kw):
+        seen.append(cmd); import subprocess
+        return subprocess.CompletedProcess(cmd, 0, b"P6\n2 1\n255\n" + bytes([1, 2, 3, 4, 5, 6]), b"")
+    assert window_probes.grim_capture((1282, 178, 2, 1), run=run) == (2, 1, bytes([1, 2, 3, 4, 5, 6]))
+    assert seen[0][:5] == ["grim", "-t", "ppm", "-g", "1282,178 2x1"]
+    bad = lambda cmd, **kw: __import__("subprocess").CompletedProcess(cmd, 1, b"", b"failed")
+    assert window_probes.grim_capture((0, 0, 2, 1), run=bad) is None
