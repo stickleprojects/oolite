@@ -86,6 +86,13 @@ def test_window_fits_screen():
     assert pre.window_fits_screen(None, (0, 0, 1024, 768)) is None
 
 
+def test_window_size_as_requested():
+    assert pre.window_size_as_requested((1280, 720), (1280, 720)) is None
+    assert pre.window_size_as_requested((1280, 720), (1281, 719)) is None
+    assert "1280x720 window but the window manager made it 3836x1053" in pre.window_size_as_requested((1280, 720), (3836, 1053))
+    assert pre.window_size_as_requested(None, (3836, 1053)) is None and pre.window_size_as_requested((1280, 720), None) is None
+
+
 def test_point_on_screen():
     assert pre.point_on_screen(642, 681, (0, 0, 1280, 720)) is None
     assert "off the 1280x720 screen" in pre.point_on_screen(642, 740, (0, 0, 1280, 720))

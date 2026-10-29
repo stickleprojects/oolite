@@ -2,7 +2,7 @@
 says where each was learnt). A failure here explains a failure elsewhere; the tests that rely on one also check it before they run."""
 import pytest
 
-from oolite_ui_test_framework import preconditions as pre
+from oolite_ui_test_framework import geometry, preconditions as pre
 
 pytestmark = pytest.mark.game
 
@@ -38,3 +38,13 @@ def test_window_fits_screen(launched_game, env_session):
     w, h = launched_game.get("requested_w"), launched_game.get("requested_h")
     if not w: pytest.skip("NOT MEASURABLE: the game's log did not say what window size it asked for")
     pre.require("window_fits_screen", pre.window_fits_screen((w, h), env_session.primary))
+
+
+def test_window_size_as_requested(launched_game):
+    """The window manager gave the game window the size it asked for. The game maps the pointer with the size it asked for, so the click
+    tests rely on this (and check it again before they click): sway tiling stretched the window and clicks selected the wrong rows (#42)."""
+    w, h = launched_game.get("requested_w"), launched_game.get("requested_h")
+    if not w: pytest.skip("NOT MEASURABLE: the game's log did not say what window size it asked for")
+    c = geometry.parse_geom(launched_game.get("client"))
+    if not c: pytest.skip("NOT MEASURABLE: the game window's size cannot be observed in this environment")
+    pre.require("window_size_as_requested", pre.window_size_as_requested((int(w), int(h)), c[2:4]))

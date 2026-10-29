@@ -221,6 +221,18 @@ def test_a_click_that_does_not_move_the_highlight_fails():
         a.title_menu.select("Game Options")
 
 
+def test_no_click_in_a_window_resized_from_what_the_game_asked_for(tmp_path):
+    (tmp_path / "Latest.log").write_text("[display.initGL]: Requested a new surface of 1024 x 576, windowed.\n")
+    game = Game(); game.dir = str(tmp_path)
+    a = appmod.App(MouseSession(Backend([with_bar(1280, 720, 1)])), game, clock=Clock())
+    with pytest.raises(appmod.preconditions.PreconditionFailed, match="window_size_as_requested: the game asked for a 1024x576 window"):
+        a.title_menu.select("Game Options")
+    assert a.session.clicks == []
+    (tmp_path / "Latest.log").write_text("[display.initGL]: Requested a new surface of 1280 x 720, windowed.\n")
+    a.title_menu.select("Game Options")
+    assert len(a.session.clicks) == 1
+
+
 def test_settled_item_waits_for_a_highlight_that_is_still_moving():
     a = make([with_bar(1280, 720, 1)] * 3)
     assert a.title_menu.wait_until_displayed().settled_item() == "Start New Commander"

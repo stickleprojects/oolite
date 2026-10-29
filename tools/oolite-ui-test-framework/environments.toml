@@ -135,12 +135,11 @@ kind = "wayland"
 start = ["sway -c /tmp/sway.conf"]
 ready_socket = "wayland-1"
 post_start = ["ln -sf $XDG_RUNTIME_DIR/wayland-1 $XDG_RUNTIME_DIR/wl0"]
-files = { "/tmp/sway.conf" = "output * resolution {w}x{h}\nxwayland enable\n" }
+files = { "/tmp/sway.conf" = "output * resolution {w}x{h}\nxwayland enable\nfor_window [shell=\".*\"] floating enable\n" }   # floating: the game gets the size it asks for (tiled, sway stretches it to the output)
 env = { WLR_BACKENDS = "headless", WLR_RENDERER = "pixman", WLR_LIBINPUT_NO_DEVICES = "1" }
 version_cmd = "sway --version"
 version_re = "[0-9][0-9.]+"
 probes = ["sway:framed,focused", "x11"]
-tiling = true
 [env.sway-native]
 family = "sway"
 session = "Wayland native"
@@ -149,12 +148,11 @@ kind = "wayland"
 start = ["sway -c /tmp/sway.conf"]
 ready_socket = "wayland-1"
 post_start = ["ln -sf $XDG_RUNTIME_DIR/wayland-1 $XDG_RUNTIME_DIR/wl0"]
-files = { "/tmp/sway.conf" = "output * resolution {w}x{h}\nxwayland enable\n" }
+files = { "/tmp/sway.conf" = "output * resolution {w}x{h}\nxwayland enable\nfor_window [shell=\".*\"] floating enable\n" }   # floating: the game gets the size it asks for (tiled, sway stretches it to the output)
 env = { WLR_BACKENDS = "headless", WLR_RENDERER = "pixman", WLR_LIBINPUT_NO_DEVICES = "1" }
 version_cmd = "sway --version"
 version_re = "[0-9][0-9.]+"
 probes = ["sway"]
-tiling = true
 
 [env.mutter-xwayland]
 family = "mutter"

@@ -11,7 +11,7 @@ while the window is blank, frozen or transparent fails here. Waits return as soo
 import os
 import time
 
-from . import game_log, png, render_check, screen
+from . import game_log, png, preconditions, render_check, screen
 from .ui import pages
 
 
@@ -113,7 +113,8 @@ class App:
         """Point at (x, y) in window pixels and hold button 1 until cond() is true, then release it; at most `cap` seconds. The game reads the
         mouse once per frame like the keys, and works out which row is under the pointer when it draws, so the pointer is left there for
         `settle` seconds before the press. A held click does not repeat (unlike a key), so holding it for several frames is harmless.
-        Returns whether cond() became true."""
+        Returns whether cond() became true. Fails as PRECONDITION window_size_as_requested in a window not the size the game asked for."""
+        self._check_window_size()
         self.session.mouse_move(x + 1, y); self.session.mouse_move(x, y)     # two moves: the game ignores the first motion after it warps the pointer
         self.clock.sleep(settle)
         t0 = self.clock.monotonic()
@@ -125,6 +126,13 @@ class App:
                 self.clock.sleep(poll)
         finally:
             self.session.mouse_up()
+
+    def _check_window_size(self):
+        """The game maps the pointer with the window size it asked for, so a window the window manager resized gets clicks in the wrong place (#42)."""
+        req = next((r for r in (preconditions.requested_window(t) for n, t in game_log.texts(self.game) if n == "Latest.log") if r), None)
+        if req is None: return
+        s = self.last or self.screenshot()
+        preconditions.check("window_size_as_requested", preconditions.window_size_as_requested(req, s and (s.w, s.h)))
 
     def keys_received(self, flush=2.5):
         """How many key presses the game has logged so far (scenarios.add_key_logging turns that on), after waiting `flush` seconds: the game

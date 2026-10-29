@@ -12,6 +12,8 @@ precondition holds, else the reason; checks that do not apply in an environment 
                       no GPU needed). Without one KWin crashes on every screenshot (KDE 527906, WONTFIX: unsupported configuration)
   window_fits_screen  the game asks for a window larger than the screen; the WM fits or maximises it, which changes F12 and clicks (#10)
   point_on_screen     a click target outside the visible screen (native kwin showed the game taller than the output)
+  window_size_as_requested  the window manager gave the window another size than the game asked for (sway tiling stretched it to the
+                      output): the game still maps the pointer with the size it asked for, so clicks select the wrong rows (#42)
 """
 import os
 import re
@@ -100,6 +102,15 @@ def window_fits_screen(requested, screen):
     if w <= sw and h <= sh: return None
     return ("the game asks for a %dx%d window but the screen is %dx%d, so the window manager fits or maximises it "
             "(F12 and click results then depend on that)" % (w, h, sw, sh))
+
+
+def window_size_as_requested(requested, size, tol=2):
+    """requested: (w, h) from the game's log; size: (w, h) of the game window as drawn (its client area)."""
+    if not requested or not size: return None
+    (w, h), (cw, ch) = requested, size
+    if abs(cw - w) <= tol and abs(ch - h) <= tol: return None
+    return ("the game asked for a %dx%d window but the window manager made it %dx%d (a tiling layout?); the game still maps the pointer "
+            "with the size it asked for, so clicks land on the wrong rows (#42; sway: float the window, see environments.toml)" % (w, h, cw, ch))
 
 
 def point_on_screen(x, y, screen):
