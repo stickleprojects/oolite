@@ -2,7 +2,7 @@
 Fields a probe cannot measure stay None (reported as NA, never as a failure).
 
   X11Probe    X11 / XWayland: python-xlib, or xwininfo/xprop/xdotool subprocesses when python-xlib is missing
-  KWinProbe   KWin (X11 or Wayland) through its scripting D-Bus API (read-only script, loaded and unloaded)
+  KWinProbe   KWin (X11 or Wayland) through its scripting D-Bus API (read-only scripts: one per observation, plus a watcher kept loaded)
   SwayProbe   sway IPC (swaymsg get_tree)
   AskProbe    asks the user y/n questions for whatever is still unknown (interactive, host mode)
   NullProbe   measures nothing (compositors with no outside view)
@@ -275,6 +275,10 @@ class Probe:
     def observe(self, missing=None):
         return None
 
+    def quick_observe(self):
+        """What the startup sampling calls on a cheap probe; a probe whose full observe() is slow overrides it."""
+        return self.observe()
+
     def monitors(self):
         return []
 
@@ -314,18 +318,45 @@ class X11Probe(Probe):
         return self.b.wm_name()
 
 
-KWIN_SCRIPT = r"""
+KWIN_ROW_JS = r"""
+function ooMatch(w) { return /oolite/i.test(w.resourceClass + " " + w.resourceName + " " + w.caption); }
+function ooRow(w) {
+  var g = w.frameGeometry, c = w.clientGeometry, o = "NA NA NA NA";
+  try { var q = w.output.geometry; o = Math.round(q.x) + " " + Math.round(q.y) + " " + Math.round(q.width) + " " + Math.round(q.height); } catch (e2) {}
+  return (w.noBorder ? 0 : 1) + " " + (w.active ? 1 : 0) + " " + Math.round(g.x) + " " + Math.round(g.y) + " " + Math.round(g.width) + " " + Math.round(g.height) + " " + o +
+      " " + Math.round(c.x) + " " + Math.round(c.y) + " " + Math.round(c.width) + " " + Math.round(c.height) + " " + (w.fullScreen ? 1 : 0);
+}
+"""
+
+KWIN_SCRIPT = KWIN_ROW_JS + r"""
 var r = "none";
 try {
   var l = workspace.windowList();
-  for (var i = 0; i < l.length; i++) { var w = l[i];
-    if (/oolite/i.test(w.resourceClass + " " + w.resourceName + " " + w.caption)) {
-      var g = w.frameGeometry, c = w.clientGeometry, o = "NA NA NA NA";
-      try { var q = w.output.geometry; o = Math.round(q.x) + " " + Math.round(q.y) + " " + Math.round(q.width) + " " + Math.round(q.height); } catch (e2) {}
-      r = "OOPROBE " + (w.noBorder ? 0 : 1) + " " + (w.active ? 1 : 0) + " " + Math.round(g.x) + " " + Math.round(g.y) + " " + Math.round(g.width) + " " + Math.round(g.height) + " " + o +
-          " " + Math.round(c.x) + " " + Math.round(c.y) + " " + Math.round(c.width) + " " + Math.round(c.height) + " " + (w.fullScreen ? 1 : 0); } }
+  for (var i = 0; i < l.length; i++) { if (ooMatch(l[i])) r = "OOPROBE " + ooRow(l[i]); }
 } catch (e) { r = "ERR " + e; }
 callDBus("org.oolite.probe", "/p", "org.oolite.probe", "report", r);
+"""
+
+# Stays loaded for the whole session: reports the newest oolite window each time one appears, goes, moves, resizes or changes focus or
+# full-screen state, so a window that lives for less than a probe round trip (the splash, #46) is still seen. "OOWATCH none" = no window.
+KWIN_WATCH_SCRIPT = KWIN_ROW_JS + r"""
+function ooSend(gone) {
+  var r = "OOWATCH none";
+  try {
+    var l = workspace.windowList();
+    for (var i = 0; i < l.length; i++) { if (l[i] !== gone && ooMatch(l[i])) r = "OOWATCH " + ooRow(l[i]); }
+  } catch (e) { r = "OOWATCH ERR " + e; }
+  callDBus("org.oolite.probe", "/p", "org.oolite.probe", "watch", r);
+}
+function ooHook(w) {
+  if (!ooMatch(w)) return;
+  var f = function () { ooSend(null); };
+  try { w.frameGeometryChanged.connect(f); w.activeChanged.connect(f); w.fullScreenChanged.connect(f); } catch (e) {}
+  ooSend(null);
+}
+workspace.windowList().forEach(ooHook);
+workspace.windowAdded.connect(ooHook);
+workspace.windowRemoved.connect(function (w) { if (ooMatch(w)) ooSend(w); });
 """
 
 
@@ -343,40 +374,65 @@ def parse_kwin_row(row):
 
 
 class KWinProbe(Probe):
-    """KWin scripting over D-Bus. The script's callDBus goes to a service that does not exist; dbus-monitor sees the call."""
+    """KWin scripting over D-Bus. The script's callDBus goes to a service that does not exist; dbus-monitor sees the call.
+    A full observe() costs about `settle` s, too slow for the startup sampling, so a watcher script (KWIN_WATCH_SCRIPT) stays loaded and
+    quick_observe() reads its latest report from the dbus-monitor log; the probe is cheap only if the watcher loaded."""
     name = "kwin"
 
-    def __init__(self, env=None, settle=0.7):
+    def __init__(self, env=None, settle=0.7, watch=True):
         self.env = env; self.settle = settle; self.ok = bool(shutil.which("dbus-send") and shutil.which("dbus-monitor"))
-        self.mon = None; self.proc = None; self.js = None
+        self.mon = None; self.proc = None; self.js = None; self.watch_js = None; self.watch_sid = None
         if self.ok:
             fd, self.js = tempfile.mkstemp(suffix=".js"); os.write(fd, KWIN_SCRIPT.encode()); os.close(fd)
             fd2, self.mon = tempfile.mkstemp(); os.close(fd2)
             self.proc = subprocess.Popen(["dbus-monitor"], env=env, stdout=open(self.mon, "w"), stderr=subprocess.STDOUT)
+            if watch:
+                fd3, self.watch_js = tempfile.mkstemp(suffix=".js"); os.write(fd3, KWIN_WATCH_SCRIPT.encode()); os.close(fd3)
+                time.sleep(0.3)   # let dbus-monitor attach before the watcher's first report
+                sid = "kw%d" % int(time.time() * 1000)
+                if self._run_script(self.watch_js, sid): self.watch_sid = sid
+        self.cheap = self.watch_sid is not None
+
+    def _run_script(self, js, sid):
+        out = sh(["dbus-send", "--session", "--print-reply", "--dest=org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.loadScript",
+                  "string:" + js, "string:" + sid], self.env)
+        m = re.search(r"int32 (\d+)", out)
+        if not m: return False
+        sh(["dbus-send", "--session", "--print-reply", "--dest=org.kde.KWin", "/Scripting/Script" + m[1], "org.kde.kwin.Script.run"], self.env)
+        return True
+
+    def _unload(self, sid):
+        sh(["dbus-send", "--session", "--print-reply", "--dest=org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.unloadScript", "string:" + sid], self.env)
 
     def _count(self):
         try: return open(self.mon, errors="replace").read().count("OOPROBE")
         except OSError: return 0
 
+    def quick_observe(self):
+        """The watcher's latest report: None if no oolite window is there (or none has been seen yet), Obs() if the watcher failed."""
+        try: ln = [x for x in open(self.mon, errors="replace").read().splitlines() if "OOWATCH" in x]
+        except OSError: return Obs()
+        if not ln: return None
+        row = ln[-1].split("OOWATCH", 1)[1].strip().rstrip('"')
+        if row == "none": return None
+        return parse_kwin_row(row) or Obs()
+
     def observe(self, missing=None):
         if not self.ok: return Obs()
         n0 = self._count(); sid = "kp%d" % int(time.time() * 1000)
-        out = sh(["dbus-send", "--session", "--print-reply", "--dest=org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.loadScript",
-                  "string:" + self.js, "string:" + sid], self.env)
-        m = re.search(r"int32 (\d+)", out)
-        if not m: return Obs()
-        sh(["dbus-send", "--session", "--print-reply", "--dest=org.kde.KWin", "/Scripting/Script" + m[1], "org.kde.kwin.Script.run"], self.env)
+        if not self._run_script(self.js, sid): return Obs()
         time.sleep(self.settle)
         row = ""
         if self._count() != n0:
             ln = [x for x in open(self.mon, errors="replace").read().splitlines() if "OOPROBE" in x][-1]
             row = ln.split("OOPROBE", 1)[1].strip().rstrip('"')
-        sh(["dbus-send", "--session", "--print-reply", "--dest=org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.unloadScript", "string:" + sid], self.env)
+        self._unload(sid)
         return (parse_kwin_row(row) if row else None) or Obs()
 
     def close(self):
+        if self.watch_sid: self._unload(self.watch_sid); self.watch_sid = None
         if self.proc: self.proc.terminate()
-        for f in (self.js, self.mon):
+        for f in (self.js, self.mon, self.watch_js):
             if f:
                 try: os.unlink(f)
                 except OSError: pass

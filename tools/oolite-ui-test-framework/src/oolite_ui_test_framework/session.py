@@ -188,7 +188,9 @@ class Session:
         res = window_probes.Obs(); seen = False
         for p, fields in self.probes:
             if cheap_only and not p.cheap: continue
-            if p.name == "ask":
+            if cheap_only:
+                o = p.quick_observe()
+            elif p.name == "ask":
                 miss = [f for f in ("framed", "focused", "centred") if getattr(res, f) is None]
                 o = p.observe(missing=miss)
             else:

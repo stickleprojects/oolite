@@ -47,6 +47,32 @@ def test_crop_reads_rgbx_and_bgrx_rows_and_clips_to_the_image():
     assert window_probes.crop_rgba(data[:10], meta, (0, 0, 1, 1)) is None                          # short read
 
 
+def _watched(tmp_path, lines):
+    p = object.__new__(window_probes.KWinProbe); p.mon = str(tmp_path / "mon"); p.cheap = True
+    (tmp_path / "mon").write_text("".join('   string "%s"\n' % x for x in lines))
+    return p
+
+
+def test_kwin_watcher_reports_the_latest_window_and_none_once_it_has_gone(tmp_path):
+    """#46: the startup sampling reads the watcher's newest report, so the short-lived splash is seen on kwin-native."""
+    assert _watched(tmp_path, []).quick_observe() is None                                 # nothing reported yet
+    p = _watched(tmp_path, ["OOWATCH 1 1 576 156 768 768 0 0 1920 1080", "OOPROBE 0 0 1 1 1 1", "OOWATCH 1 0 320 162 1280 756 0 0 1920 1080"])
+    assert p.quick_observe().outer == (320, 162, 1280, 756)                               # newest OOWATCH row, OOPROBE rows ignored
+    assert _watched(tmp_path, ["OOWATCH 1 1 0 0 10 10", "OOWATCH none"]).quick_observe() is None
+    assert _watched(tmp_path, ["OOWATCH ERR TypeError"]).quick_observe() == window_probes.Obs()
+
+
+def test_session_samples_cheap_probes_through_quick_observe():
+    from oolite_ui_test_framework import session as sessmod
+    import types
+    class Slow(window_probes.Probe):
+        name = "kwin"; cheap = True
+        def observe(self, missing=None): raise AssertionError("the full observe is too slow for sampling")
+        def quick_observe(self): return window_probes.Obs(outer=(1, 2, 3, 4))
+    s = object.__new__(sessmod.Session); s.env = types.SimpleNamespace(focus_na=False); s.probes = [(Slow(), None)]
+    assert s.observe(cheap_only=True).outer == (1, 2, 3, 4)
+
+
 def test_kwin_backend_finds_places_and_grabs_through_kwin():
     class Probe:
         n = 0; obs = window_probes.Obs(outer=(0, 0, 4, 3), client=(1, 1, 2, 1))
