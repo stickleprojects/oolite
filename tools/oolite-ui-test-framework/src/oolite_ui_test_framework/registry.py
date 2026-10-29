@@ -7,6 +7,7 @@ DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.p
 SESSIONS = ("X11", "XWayland", "Wayland native", "live desktop")
 KINDS = ("x11", "wayland", "host")
 PROBES = ("x11", "kwin", "sway", "ask", "none")
+WINDOW_PROBES = ("x11", "kwin", "sway")   # probes that see the window's size and full-screen state, which F12 is judged by
 
 
 class RegistryError(ValueError):
@@ -48,6 +49,11 @@ class Environment:
             n, _, f = p.partition(":")
             out.append((n, tuple(f.split(",")) if f else None))
         return out
+
+    @property
+    def sees_window_state(self):
+        """A probe here reports the window's size and full-screen state (X11, KWin or sway), which the F12 tests are judged by."""
+        return any(n in WINDOW_PROBES for n, _ in self.probe_specs)
 
     @property
     def mouse_na(self):

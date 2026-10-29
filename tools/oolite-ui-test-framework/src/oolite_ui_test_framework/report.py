@@ -3,7 +3,7 @@ Values that are NA / not tested (anything other than 0 or 1) are NOT MEASURED: t
 shown as NA in the tables. They are never failures. SKIP lines in the raw file ("not available: ...") are listed in their own table."""
 import sys, argparse, json, re
 
-from . import geometry
+from . import geometry, registry
 from math import comb
 
 ALPHA = 0.05
@@ -254,7 +254,7 @@ def combine(items):
     return top, det
 
 
-def cell_outcomes(ctl, bld, minruns, has_x=True):
+def cell_outcomes(ctl, bld, minruns, has_probe=True):
     """-> {'frame':(outcome, detail), 'focus':.., 'centred':.., 'toggle':.., 'cell': (outcome, detail)}"""
     fa, fb = fails(ctl), fails(bld); res = {}; allitems = []
     def go(crits):
@@ -269,7 +269,7 @@ def cell_outcomes(ctl, bld, minruns, has_x=True):
     if tog:
         t = go(tog); res["toggle"] = combine(t); allitems += t
     else:
-        res["toggle"] = ("NOT TESTED", "toggle not run in this data (no --toggle)" if has_x else "no X11 probe for F12 in this environment")
+        res["toggle"] = ("NOT TESTED", "toggle not run in this data (no --toggle)" if has_probe else "no probe sees the window's full-screen state in this environment")
     res["cell"] = combine(allitems)
     return res
 
@@ -320,9 +320,9 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
     cand = [c for c in cand.split(",") if c] or [b for b in builds if b not in (control, equiv_label)]
     mr = lambda wm: (host_minruns or minruns) if wm.startswith("host-") or REG.get(wm, {}).get("where") == "host" else minruns
     multi = len({k[1] for k in order if not k[0].startswith("host-")}) > 1
-    def has_x(wm):
+    def has_probe(wm):
         e = REG.get(wm)
-        if e is not None and "probes" in e: return any(p.split(":")[0] == "x11" for p in e["probes"])
+        if e is not None and "probes" in e: return any(p.split(":")[0] in registry.WINDOW_PROBES for p in e["probes"])
         return not wm.endswith("-native")
     reason = {}
     for w_, sc_, b_, why in SKIPS: reason.setdefault(w_, why)
@@ -335,7 +335,7 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
             for b in builds:
                 if b == control: continue
                 bld = cells.get((wm, sc, b), [])
-                if ctl and bld: outs[(wm, sc, b)] = cell_outcomes(ctl, bld, mr(wm), has_x(wm)); tested.append((wm, sc, b))
+                if ctl and bld: outs[(wm, sc, b)] = cell_outcomes(ctl, bld, mr(wm), has_probe(wm)); tested.append((wm, sc, b))
                 else:
                     why = reason.get(wm) or ("control `%s` has no runs here" % control if bld else "not requested")
                     nt = ("NOT TESTED", why); outs[(wm, sc, b)] = {k: nt for k in MAIN_CRITS + ("toggle", "cell")}

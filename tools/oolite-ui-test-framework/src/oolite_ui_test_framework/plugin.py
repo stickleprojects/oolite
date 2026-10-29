@@ -69,7 +69,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "needs_toggle: run only with --ui-toggle (reason recorded as NOT TESTED)")
     config.addinivalue_line("markers", "needs_keys: needs injected keys to reach the game (else NOT MEASURABLE where the environment cannot deliver them)")
     config.addinivalue_line("markers", "needs_mouse: needs injected mouse clicks to reach the game (else NOT MEASURABLE where the environment cannot deliver them)")
-    config.addinivalue_line("markers", "needs_x11: needs an X11 probe in the environment (else NOT MEASURABLE)")
+    config.addinivalue_line("markers", "needs_window_probe: needs a probe that sees the window's full-screen state, X11, KWin or sway (else NOT MEASURABLE)")
     config.addinivalue_line("markers", "saved_window_larger_than_screen: start the game (fresh_game) with a saved window size larger than the screen")
     config.addinivalue_line("markers", "once_per_build: run for run 1 only (environment / AppImage sanity checks)")
     try: envs = registry.load(config.getoption("--ui-registry"))[0]
@@ -120,8 +120,8 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.skip(reason="NOT MEASURABLE: injected keys do not reach the game in %s" % env.name))
         if item.get_closest_marker("needs_mouse") and env is not None and env.mouse_na:
             item.add_marker(pytest.mark.skip(reason="NOT MEASURABLE: injected mouse clicks do not reach the game in %s" % env.name))
-        if item.get_closest_marker("needs_x11") and env is not None and not any(n == "x11" for n, _ in env.probe_specs):
-            item.add_marker(pytest.mark.skip(reason="NOT MEASURABLE: no X11 probe for F12 in %s" % env.name))
+        if item.get_closest_marker("needs_window_probe") and env is not None and not env.sees_window_state:
+            item.add_marker(pytest.mark.skip(reason="NOT MEASURABLE: no probe sees the window's full-screen state in %s" % env.name))
         if env is not None:
             item.add_marker(getattr(pytest.mark, "env_" + _slug(env.name)))
             item.add_marker(getattr(pytest.mark, "family_" + _slug(env.family)))

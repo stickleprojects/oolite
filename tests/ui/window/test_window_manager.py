@@ -38,14 +38,14 @@ def test_saved_window_size_restored(launched_game, env_session):
 
 
 @pytest.mark.needs_toggle
-@pytest.mark.needs_x11
+@pytest.mark.needs_window_probe
 @pytest.mark.needs_keys
 def test_f12_toggle(fresh_game):
     enforce(pass_fail.check_f12_toggle(fresh_game.toggle()))
 
 
 @pytest.mark.needs_toggle
-@pytest.mark.needs_x11
+@pytest.mark.needs_window_probe
 @pytest.mark.needs_keys
 @pytest.mark.saved_window_larger_than_screen
 def test_f12_toggle_with_saved_window_larger_than_screen(fresh_game):

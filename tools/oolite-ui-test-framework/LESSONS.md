@@ -22,6 +22,8 @@ symptom, cause, fix, and where (PR / issue). Open questions go under [Still open
 | X11 / XWayland: one held key became many presses (F12 toggled about 10 times) | X autorepeat | Autorepeat off in every session (and on the host for a host run); precondition `key_repeat_off` | #26 |
 | weston (headless): `gets_focus` NOT MEASURABLE | Headless weston has no keyboard, so it never activates a window: in a running weston-xwayland `_NET_ACTIVE_WINDOW` stays `0x0` and the X input focus is PointerRoot (`1`). Measuring it anyway (focus_na off) gave focus=0 every run while keys still worked. Not a detection bug | `focus_na = true` kept, now with that evidence in `environments.toml` | #45 |
 | weston-xwayland: keys test fails in run 1 only (3 stock runs in a row) | With PointerRoot focus, keys go to the window under the pointer. Our keys never pass through weston: XTEST creates them inside XWayland. The keys test runs before the click test, so in run 1 the pointer was not on the game yet; later runs inherited the pointer the previous click test left over it | `keys_follow_pointer = true` (a setting of its own, not hidden behind `focus_na`): keys are still tested, with the pointer put on the middle of the game window before each key (verified: stock keys passed run 1 in 3/3 runs). Stopgap: #53 gives weston a real seat (VNC backend or weston's test plugin) | #47, #53 |
+| F12 not tested on any native Wayland session | The F12 tests were gated on an X11 probe, from when F12 was judged by window size. Since #42 it is judged by full-screen state, which the KWin and sway probes report too | Gate `needs_window_probe` (X11, KWin or sway). kwin-native: both F12 tests pass 3/3 (1280x720 -> 3840x1080 -> 1280x720). sway-, mutter- and weston-native set `keys_na`: they have no way to inject keys (no X server, no fake-input), which the old gate had hidden | #43 |
+| A partial run with only the F12 tests reported `centred` failing | Both F12 tests share one record per run, so the RESULT line took the oversized-window launch's geometry. The TEST lines were right | Recorded | #55 |
 | kwin-xwayland: window 36 px lower after the F12 round trip | About KWin's title-bar height; within the 40 px tolerance | Not fixed, recorded | #11 (open) |
 | mutter 2head: F12 did nothing (no focus) | Harness problem in both builds, not a game difference | Re-checked once the Debian image had `cvt` | #10 |
 | kwin X11 did not start | kglobalaccel crashed | Recorded in the run; later runs start | #36 |
@@ -78,7 +80,7 @@ symptom, cause, fix, and where (PR / issue). Open questions go under [Still open
 ## Still open
 
 - **weston input**: `keys_follow_pointer` is a stopgap. #53 moves weston to a real seat (VNC backend, already in the image, or weston's test plugin), which would make focus measurable and let weston-native run the keys, mouse and screenshot tests.
-- **Coverage gaps**, tracked as issues: F12 on native Wayland (#43), screenshots on sway/mutter/weston native (#44), window observation on
+- **Coverage gaps**, tracked as issues: F12 on sway-native once keys reach it (#43 done for kwin-native), screenshots on sway/mutter/weston native (#44), window observation on
   mutter/weston native (#45), splash on native Wayland (#46), software rendering only, and headed sway does not start (#48), nothing
   past the title menu (#49), precondition reasons inside a test (#50). A full re-baseline is #14; real desktops #13.
 - **#27**: on kwin, openbox and xfwm4 the game sometimes ignored or delayed a key press it had received (closed; reopen if it returns).

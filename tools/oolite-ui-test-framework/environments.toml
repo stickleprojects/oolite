@@ -155,6 +155,7 @@ env = { WLR_BACKENDS = "headless", WLR_RENDERER = "pixman", WLR_LIBINPUT_NO_DEVI
 version_cmd = "sway --version"
 version_re = "[0-9][0-9.]+"
 probes = ["sway"]
+keys_na = true   # native Wayland: no X server to inject into (XTEST) and no fake-input protocol, so keys and clicks cannot reach the game (#44, #53)
 
 [env.mutter-xwayland]
 family = "mutter"
@@ -174,6 +175,7 @@ start = ["mutter --headless --wayland --virtual-monitor {w}x{h} --wayland-displa
 version_cmd = "mutter --version"
 version_re = "[0-9][0-9.]+"
 probes = ["none"]
+keys_na = true   # native Wayland: no X server to inject into (XTEST) and no fake-input protocol, so keys and clicks cannot reach the game (#44, #53)
 
 [env.weston-xwayland]
 family = "weston"
@@ -197,6 +199,7 @@ version_re = "[0-9][0-9.]+"
 probes = ["none"]
 
 # ---------------------------------------------------------------- the live desktop (host mode; see README)
+keys_na = true   # native Wayland: no X server to inject into (XTEST) and no fake-input protocol, so keys and clicks cannot reach the game (#44, #53)
 [env.host-x11]
 family = "host"
 session = "X11"

@@ -54,3 +54,12 @@ def test_missing_required_key():
 def test_mouse_is_not_available_where_keys_need_fake_input():
     envs, _ = registry.load(TOML)
     assert not envs["marco"].mouse_na and not envs["kwin-xwayland"].mouse_na   # kwin-xwayland clicks through fake-input
+
+
+def test_f12_runs_where_a_probe_sees_the_full_screen_state_and_keys_reach_the_game():
+    """F12 is judged by full-screen state, which the X11, KWin and sway probes all report, so it is no longer X11-only (#43). Native
+    sessions with no way to inject keys say so (keys_na), rather than failing F12."""
+    envs = registry.load()[0]
+    runs_f12 = {n for n, e in envs.items() if e.sees_window_state and not e.keys_na and e.kind != "host"}
+    assert {"kwin-native", "kwin-xwayland", "sway-xwayland", "marco"} <= runs_f12
+    assert not {"sway-native", "mutter-native", "weston-native"} & runs_f12
