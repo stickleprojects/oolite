@@ -75,6 +75,13 @@ symptom, cause, fix, and where (PR / issue). Open questions go under [Still open
   their Dockerfile and `docker/`, and rebuilt on a mismatch (#44).
 - **A partial run says so**: `--tests` adds "PARTIAL RUN" to the purpose so it is never read as a full pass.
 
+## Coverage write-ups
+
+- [docs/weston.md](docs/weston.md): what can and cannot be tested on weston, why (headless weston has no input devices), and the VNC
+  spike (#53).
+- Every report has a **"What cannot be tested where"** table, built from the run's own skip reasons: a limit that is fixed drops off
+  by itself.
+
 ## Rules of thumb
 
 - **Never mount `/tmp/.X11-unix`**; mount only the X0 socket file. A compositor container once replaced the host's socket.

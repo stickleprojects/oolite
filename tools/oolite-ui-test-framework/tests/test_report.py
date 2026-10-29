@@ -115,3 +115,27 @@ def test_grid_lists_environments_that_never_ran(tmp_path):
     report.load(str(raw))
     g = "\n".join(report.test_grid(report.TESTS, ["b"]))
     assert "| – |" in g.split("kwin", 1)[1] and "- hard failure: kwin failed to start: every test (kwin)" in g
+
+
+def test_limits_table_lists_what_an_environment_cannot_measure_and_drops_fixed_ones(tmp_path):
+    """'What cannot be tested where': built from the skip reasons, so a limit drops off once the test is measured there; a run choice
+    (NOT TESTED) is not a limit."""
+    raw = tmp_path / "l.raw"
+    raw.write_text("\n".join([
+        "TEST wm=marco build=b run=1 test=test_gets_focus outcome=passed start=NA secs=1 reason=",
+        "TEST wm=weston-xwayland build=b run=1 test=test_gets_focus outcome=skipped start=NA secs=0 reason=NOT MEASURABLE: keyboard focus cannot be observed",
+        "TEST wm=weston-native build=b run=1 test=test_gets_focus outcome=skipped start=NA secs=0 reason=NOT MEASURABLE: keyboard focus cannot be observed",
+        "TEST wm=weston-native build=b run=1 test=test_has_frame outcome=skipped start=NA secs=0 reason=NOT MEASURABLE: no probe",
+        "TEST wm=marco build=b run=1 test=test_f12_toggle outcome=skipped start=NA secs=0 reason=NOT TESTED: no --ui-toggle",
+        "TEST wm=kwin build=b run=1 test=test_has_frame outcome=skipped start=NA secs=0 reason=NOT MEASURABLE: flaky probe",
+        "TEST wm=kwin build=b run=2 test=test_has_frame outcome=passed start=NA secs=1 reason="]) + "\n")
+    report.load(str(raw))
+    t = "\n".join(report.limits_table(report.TESTS))
+    rows = [l for l in t.splitlines() if l.startswith("| ") and not l.startswith("| test |")]
+    assert "## What cannot be tested where" in t and not [l for l in rows if "f12_toggle" in l]   # NOT TESTED is a run choice
+    row = [l for l in t.splitlines() if l.startswith("| gets_focus |")][0]
+    assert row.count("L") == 2 and row.endswith("| 1 of 4 |")             # weston-xwayland and weston-native; measured on marco
+    assert "- **L1** NOT MEASURABLE: keyboard focus cannot be observed" in t
+    header = [l for l in t.splitlines() if l.startswith("| test |")][0]
+    assert report.wm_info("kwin")[1] not in header and report.wm_info("weston-native")[1] in header   # kwin measured has_frame in run 2
+    assert not [l for l in t.splitlines() if l.startswith("| has_frame |") and l.count("L") != 1]

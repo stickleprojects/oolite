@@ -306,6 +306,35 @@ def test_grid(tests, builds):
     return L
 
 
+LIMITS = ("NOT MEASURABLE", "NOT APPLICABLE")   # skips that are a limit of the environment, not a choice of the run (NOT TESTED)
+
+
+def limits_table(tests):
+    """'What cannot be tested where': each test some environment cannot measure, the environments that cannot (with a numbered reason)
+    and how many environments did measure it. Built from the run's own skip reasons, so a limit that is fixed drops off by itself."""
+    lim = {}   # (test, wm) -> reason
+    for wm, b, n, o, r in tests:
+        if o == "skipped" and (r or "").startswith(LIMITS): lim.setdefault((n, wm), r.replace(wm, "this environment"))   # one reason, not one per environment
+    if not lim: return []
+    measured = {}
+    for wm, b, n, o, r in tests:
+        if o != "skipped": measured.setdefault(n, set()).add(wm)
+    lim = {k: r for k, r in lim.items() if k[1] not in measured.get(k[0], set())}   # measured in another run here: not a limit
+    if not lim: return []
+    names = sorted({n for n, _ in lim}); wms = sort_wms(uniq([w for _, w in lim]))
+    reasons = sorted(set(lim.values())); ref = {r: "L%d" % (i + 1) for i, r in enumerate(reasons)}
+    every = uniq([t[0] for t in tests])
+    L = ["## What cannot be tested where", "",
+         "Tests an environment cannot measure, from this run's skip reasons (NOT TESTED, a choice of the run, is not listed). A limit that is "
+         "fixed drops off this table by itself. See LESSONS.md and the issues for each.", "",
+         "| test | " + " | ".join(wm_info(w)[1] for w in wms) + " | measured in |", "|---|" + "---|" * (len(wms) + 1)]
+    for n in names:
+        cells = [ref[lim[(n, w)]] if (n, w) in lim else "" for w in wms]
+        L.append("| %s | %s | %d of %d |" % (n[5:] if n.startswith("test_") else n, " | ".join(cells), len(measured.get(n, ())), len(every)))
+    L += [""] + ["- **%s** %s" % (ref[r], r) for r in reasons] + [""]
+    return L
+
+
 def cell_name(wm, sc, multi):
     return wm_info(wm)[1] + (" " + sc if multi and sc not in ("-", "host") and not wm.startswith("host") else "")
 
@@ -410,6 +439,7 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
         L.append("| %s | %s | %s |" % (k[0], k[1], " | ".join("%d/%d" % clean_runs(cells[(k[0], k[1], b)]) if (k[0], k[1], b) in cells else "-" for b in builds)))
     L.append("")
     L += test_grid(TESTS, builds)
+    L += limits_table([t for t in TESTS if t[1] in builds])
     L += ["## Outcomes (control `%s` v candidate, per cell)" % control,
           "- **WORKS** tested, both pass every criterion. **FIXED** control fails, candidate passes (significant). **STILL BROKEN** both fail the same criterion. **REGRESSED** control passes, candidate fails (significant).",
           "- **SUSPECT** candidate fails where control passes, too few runs to be sure. **NEEDS MORE RUNS** nothing failed but fewer than MINRUNS runs (or too few to be significant). **NOT MEASURABLE** this criterion cannot be observed here (NA). **NOT TESTED** the environment was not run (reason given).",

@@ -21,7 +21,7 @@ pinned Docker images. `uitest` is plain stdlib Python, so it can later be hooked
 | `src/oolite_ui_test_framework/` | the framework itself (see its README) |
 | `tests/` | the framework's own offline tests (see its README) |
 | `examples/` | an example report |
-| `docs/` | investigations the tests were built for, e.g. [`773-splash-window-investigation.md`](docs/773-splash-window-investigation.md) (upstream PR #774) |
+| `docs/` | investigations the tests were built for, e.g. [`773-splash-window-investigation.md`](docs/773-splash-window-investigation.md) (upstream PR #774), and coverage write-ups, e.g. [`weston.md`](docs/weston.md) |
 | `results/` | where runs write their results (not in git) |
 
 The tests of the game are in [`tests/ui/`](../../tests/ui/) at the repo root.
@@ -80,7 +80,7 @@ container), so screenshots include KWin's own title bars; the F12 test saves bef
 
 | File | Contents |
 |---|---|
-| `<name>.md` | the report: Purpose, Builds, headline, **What ran where** (environment x test grid: passed / measured runs, `–` = not run, then each skip reason and where it applied), verdicts, counts per environment, live-desktop table |
+| `<name>.md` | the report: Purpose, Builds, headline, **What ran where** (environment x test grid: passed / measured runs, `–` = not run, then each skip reason and where it applied), **What cannot be tested where** (each test an environment cannot measure, with the reason, built from the run's skips so fixed limits drop off), verdicts, counts per environment, live-desktop table |
 | `<name>.raw` | one RESULT line per run (with `start`, a UTC timestamp, and `startup_secs`), one TEST line per test (outcome, `start`, `secs` over setup + call + teardown, reason), plus WMVER / HOSTENV / SKIP lines |
 | `<name>-env.txt` | the machine and tool versions |
 | `<name>.parts/` | raw output and JUnit XML per container |
