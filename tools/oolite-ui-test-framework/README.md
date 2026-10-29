@@ -20,6 +20,7 @@ pinned Docker images. `uitest` is plain stdlib Python, so it can later be hooked
 | `src/oolite_ui_test_framework/` | the framework itself (see its README) |
 | `tests/` | the framework's own offline tests (see its README) |
 | `examples/` | an example report |
+| `docs/` | investigations the tests were built for, e.g. [`773-splash-window-investigation.md`](docs/773-splash-window-investigation.md) (upstream PR #774) |
 | `results/` | where runs write their results (not in git) |
 
 The tests of the game are in [`tests/ui/`](../../tests/ui/) at the repo root.
