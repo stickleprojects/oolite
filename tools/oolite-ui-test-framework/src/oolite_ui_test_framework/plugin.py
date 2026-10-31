@@ -387,12 +387,15 @@ def pytest_runtest_makereport(item, call):
     if case is None: return
     key = (case.env, case.label, case.run); name = item.originalname
     t = STATE.timing.setdefault(key + (name,), [call.start, 0.0]); t[1] += call.duration
+    reason = _reason(rep)
+    if call.excinfo is not None and isinstance(call.excinfo.value, preconditions.PreconditionFailed):
+        reason = str(call.excinfo.value)
     if rep.when == "call" or (rep.when == "setup" and rep.outcome == "skipped"):
-        STATE.outcomes[key][name] = (rep.outcome, _reason(rep) if rep.outcome != "passed" else "")
-    elif rep.when == "setup" and rep.outcome == "failed" and _reason(rep).startswith("PRECONDITION"):
-        STATE.outcomes[key][name] = ("failed", _reason(rep))
+        STATE.outcomes[key][name] = (rep.outcome, reason if rep.outcome != "passed" else "")
+    elif rep.when == "setup" and rep.outcome == "failed" and reason.startswith("PRECONDITION"):
+        STATE.outcomes[key][name] = ("failed", reason)
     elif rep.when == "setup" and rep.outcome == "failed":
-        STATE.hard.append((case.env, STATE.screen, case.label, _reason(rep) or "setup failed")); _write(_new_lines())
+        STATE.hard.append((case.env, STATE.screen, case.label, reason or "setup failed")); _write(_new_lines())
     if rep.when == "teardown":
         STATE.left[key] -= 1
         if STATE.left[key] <= 0: _write(_new_lines() + _case_lines(key))

@@ -242,3 +242,26 @@ def test_a_precondition_failing_in_setup_is_that_tests_failure_not_a_hard_error(
     tests = [l for l in open(tmp / "out.raw").read().splitlines() if l.startswith("TEST") and "test=test_keys" in l]
     assert tests and all("outcome=failed" in l and "reason=PRECONDITION input_tool: xdotool is not installed" in l for l in tests), out
     assert "setup failed" not in out
+
+
+@pytest.mark.parametrize("phase", ["setup", "call"])
+def test_precondition_exception_keeps_its_message_and_counts_as_a_test_failure(project, phase):
+    pt, args, tmp = project
+    check = "preconditions.check('window_size_as_requested', 'expected 1280x720, got 1920x1080')"
+    source = "import pytest\nfrom oolite_ui_test_framework import preconditions\n"
+    if phase == "setup":
+        source += "@pytest.fixture\ndef sized_window(case): " + check + "\ndef test_click(sized_window): pass\n"
+    else:
+        source += "def test_click(case): " + check + "\n"
+    pt.makepyfile(test_pre=source)
+
+    out = pt.runpytest(*args, "--ui-label", "base", "-k", "test_click").stdout.str()
+
+    raw = (tmp / "out.raw").read_text()
+    tests = [l for l in raw.splitlines() if l.startswith("TEST") and "test=test_click" in l]
+    assert len(tests) == 2, out
+    assert all("outcome=failed" in l and
+               "reason=PRECONDITION window_size_as_requested: expected 1280x720, got 1920x1080" in l
+               for l in tests), out
+    assert not any(l.startswith("HARD") for l in raw.splitlines()), raw
+    assert "test_click" in out and "0 passed, 2 failed, 0 skipped" in out
