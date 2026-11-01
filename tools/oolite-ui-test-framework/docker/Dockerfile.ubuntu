@@ -1,0 +1,9 @@
+# Ubuntu 26.04: a multiarch (/usr/lib/x86_64-linux-gnu) host, to run our AppImages on Ubuntu (#74). openbox only for now. Pinned tag.
+FROM ubuntu:26.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xvfb xauth x11-utils x11-xserver-utils xdotool x11-apps xserver-xorg-core xserver-xorg-video-dummy xserver-xephyr \
+    libxcvt0 xcvt procps dbus dbus-x11 libgl1-mesa-dri libglx-mesa0 libgl1 libegl1 ca-certificates \
+    tesseract-ocr python3-pil fonts-dejavu-core \
+    python3 python3-pytest python3-xlib openbox 2>&1 | tail -3
+ENV LIBGL_ALWAYS_SOFTWARE=1 PYTHONPATH=/uitest PYTHONDONTWRITEBYTECODE=1

@@ -40,6 +40,7 @@ class Environment:
     devices: list = field(default_factory=list)   # host devices passed into the container, e.g. /dev/udmabuf (KWin's render device, no GPU)
     headed: bool = False           # the compositor runs as a window on the host X display (GPU passed in); $UITEST_HOST_DISPLAY names it
     where: str = "docker"
+    distro: str = ""               # the host distribution, when an image exists to test one (Fedora, Ubuntu): shown in report rows (#74)
 
     @property
     def probe_specs(self):
@@ -89,4 +90,4 @@ def load(path=None):
 
 def display_info(envs):
     """{name: {family, session, where}} for the report (report.py)."""
-    return {n: {"family": e.family, "session": e.session, "where": e.where} for n, e in envs.items()}
+    return {n: {"family": e.family, "session": e.session, "where": e.where, "distro": e.distro} for n, e in envs.items()}

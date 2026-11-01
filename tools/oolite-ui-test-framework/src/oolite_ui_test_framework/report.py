@@ -79,7 +79,7 @@ REG = {}   # raw wm id -> {family, session, where} from environments.toml (set b
 
 def set_registry(envs):
     REG.clear()
-    for n, e in envs.items(): REG[n] = {"family": e.family, "session": e.session, "where": e.where, "probes": list(e.probes), "image": e.image}
+    for n, e in envs.items(): REG[n] = {"family": e.family, "session": e.session, "where": e.where, "probes": list(e.probes), "image": e.image, "distro": e.distro}
 
 def load(raw, tol=geometry.DEFAULT_TOL):
     cells, order = {}, []
@@ -157,7 +157,8 @@ def wm_info(wm):
         ver = HOSTENV.get("version", "") if fam == HOSTENV.get("wm", fam) else ver
     ver = "" if ver == "unknown" else ver
     base = ("%s %s" % (fam, ver or "?")).strip()
-    return (host, fam.lower(), vkey(ver), SESS_ORDER[ses], wm), "%s (%s)" % (base, ses), base, ses
+    ses_l = ses + (", " + REG[wm]["distro"] if REG.get(wm, {}).get("distro") else "")   # openbox on Fedora is not the Arch openbox row
+    return (host, fam.lower(), vkey(ver), SESS_ORDER[ses], wm), "%s (%s)" % (base, ses_l), base, ses_l
 
 def where(wm):
     return "host" if (REG[wm]["where"] == "host" if wm in REG else wm.startswith("host-")) else "docker"
@@ -438,7 +439,8 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
             if not ctl: continue
             f = fails(ctl); bad_c = [c for c in MAIN_CRITS if f[c][0]]
             if bad_c: bro.append("%s %s" % (cell_name(wm, sc, multi), "+".join(bad_c)))
-    HL.append("- %s%s fails on: %s" % (control, "" if single else " (control)", "; ".join(bro) or "nothing measured"))
+    ctl_measured = sum(clean_runs(v)[1] for kk, v in cells.items() if kk[2] == control)
+    HL.append("- %s%s fails on: %s" % (control, "" if single else " (control)", "; ".join(bro) or ("nothing" if ctl_measured else "nothing measured")))
     test_failures = {}
     for b in builds:
         test_failures[b] = sum(fails(rs)[c][0] for (wm, sc, build), rs in cells.items() if build == b for c in CRIT)
