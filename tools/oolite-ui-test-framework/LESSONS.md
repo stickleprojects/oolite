@@ -93,6 +93,9 @@ symptom, cause, fix, and where (PR / issue). Open questions go under [Still open
 - **Compare against stock.** Several "regressions" were the environment or an existing game bug (the sway clicks, the weston (0,0)).
   Run the stock build under the same probe before blaming a PR.
 - **Look at timing when failures cluster.** The weston (0,0) looked random until the run start times showed a 5-minute cliff.
+- **A pass is only what was tested.** "PASS" or "2 passed" is a statement about the tests and environments listed under
+  *What a pass covers* in the report (and on the `Scope:` line), never "the build works". Say what passed, and where, when quoting a result.
+  Lesson of upstream #777/#778: a green CI step was reported as a working fix and the AppImage it built did not work (#67, #68).
 - **Software rendering hides timing**: every headless environment uses llvmpipe; frame times are not what users see (#48).
 
 ## Still open

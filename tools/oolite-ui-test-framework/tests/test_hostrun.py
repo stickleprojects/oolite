@@ -32,7 +32,7 @@ def run(tmp_path, *extra):
 
 def test_exit_pass(tmp_path, monkeypatch, capsys):
     fake_cells(monkeypatch, (0, 0), (0, 0)); assert run(tmp_path) == 0
-    assert capsys.readouterr().out.strip().splitlines()[-1].startswith("PASS  report: ")
+    assert capsys.readouterr().out.strip().splitlines()[-1].startswith("PASS (only what 'What a pass covers' lists)  report: ")
 
 
 
