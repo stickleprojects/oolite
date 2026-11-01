@@ -131,7 +131,7 @@ one result set per build (`<OUT>/<label>.raw` and `.md`) and the comparison (`<O
 
 | File | Contents |
 |---|---|
-| `<name>.md` | the report: Purpose, Builds, headline, **What ran where** (environment x test grid: passed / measured runs, `–` = not run, then each skip reason and where it applied), **What cannot be tested where** (each test an environment cannot measure, with the reason, built from the run's skips so fixed limits drop off), verdicts, counts per environment, live-desktop table |
+| `<name>.md` | the report: Purpose, Builds, headline, **What a pass covers** (the tests measured, where, and what no test covers: a PASS means only that), **What ran where** (environment x test grid: passed / measured runs, `–` = not run, then each skip reason and where it applied), **What cannot be tested where** (each test an environment cannot measure, with the reason, built from the run's skips so fixed limits drop off), verdicts, counts per environment, live-desktop table |
 | `<name>.raw` | one RESULT line per run (with `start`, a UTC timestamp, and `startup_secs`), one TEST line per test (outcome, `start`, `secs` over setup + call + teardown, reason), plus WMVER / HOSTENV / SKIP lines |
 | `<name>-env.txt` | the machine and tool versions |
 | `<name>.parts/` | raw output and JUnit XML per container |

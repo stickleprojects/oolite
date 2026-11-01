@@ -79,7 +79,7 @@ REG = {}   # raw wm id -> {family, session, where} from environments.toml (set b
 
 def set_registry(envs):
     REG.clear()
-    for n, e in envs.items(): REG[n] = {"family": e.family, "session": e.session, "where": e.where, "probes": list(e.probes)}
+    for n, e in envs.items(): REG[n] = {"family": e.family, "session": e.session, "where": e.where, "probes": list(e.probes), "image": e.image}
 
 def load(raw, tol=geometry.DEFAULT_TOL):
     cells, order = {}, []
@@ -335,6 +335,39 @@ def limits_table(tests):
     return L
 
 
+# what no test here checks, whatever the run: a pass never says anything about these (#68)
+NEVER_COVERED = [
+    "gameplay beyond the title menu: flying, docking, trading, saving and loading (#49)",
+    "networking and HTTPS, e.g. the Expansions Manager's downloads",
+    "sound (the containers have no sound device)",
+    "GPU rendering: containers render in software, llvmpipe (#48)",
+    "real desktops and hardware, unless a host-* environment is listed above (#13)",
+    "host distributions other than the test images the environments run in",
+]
+
+
+def scope_section(tests, builds):
+    """'What a pass covers': the tests that were measured (passed or failed, not skipped) and where, from the run's own TEST lines,
+    then what no test covers. Returns (markdown lines, one console line). A pass is only ever a statement about this list."""
+    meas = [t for t in tests if t[1] in builds and t[3] in ("passed", "failed")]
+    names = uniq(n[5:] if n.startswith("test_") else n for _, _, n, _, _ in meas)
+    envs = sort_wms(uniq(t[0] for t in meas))
+    hosts = [w for w in envs if where(w) == "host"]
+    imgs = uniq(REG[w].get("image", "?") for w in envs if w in REG and where(w) == "docker")
+    where_ = "%d environment(s): %s" % (len(envs), ", ".join(wm_info(w)[1] for w in envs)) if envs else "no environment (nothing was measured)"
+    L = ["## What a pass covers", "",
+         "PASS (or a passing count) means only that these tests passed, in these environments, for the builds named above. "
+         "It is not a statement that the build works.", "",
+         "- **Tests measured:** " + (", ".join(names) or "none"),
+         "- **Where:** " + where_,
+         "- **Hosts:** " + "; ".join(x for x in ("Docker images %s, software rendering" % "/".join(imgs) if imgs else "",
+                                                 "live desktop" if hosts else "") if x) if envs else "- **Hosts:** none",
+         "", "**Never covered by these tests, whatever the result:**", ""] + ["- " + x for x in NEVER_COVERED] + [""]
+    line = "Scope: %d test(s) in %d environment(s)%s; not covered: gameplay, HTTPS, sound, GPU%s (see 'What a pass covers' in the report)" % (
+        len(names), len(envs), " (containers, software rendering)" if imgs and not hosts else "", "" if hosts else ", real desktops")
+    return L, line
+
+
 def cell_name(wm, sc, multi):
     return wm_info(wm)[1] + (" " + sc if multi and sc not in ("-", "host") and not wm.startswith("host") else "")
 
@@ -414,6 +447,8 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
     tot = {b: [sum(clean_runs(v)[i] for kk, v in cells.items() if kk[2] == b) for i in (0, 1)] for b in builds}
     HL.append("- Runs with every measured criterion passing: " + ", ".join("%s %d/%d" % (b, *tot[b]) for b in builds))
     L += ["## Headline", ""] + HL + [""]
+    SL, scope_line = scope_section(TESTS, builds)
+    L += SL
     if WARNINGS:
         L += ["## Warnings", ""] + ["- %s %s run %s: %s (the game was relaunched before the next test)" % (w[0], w[1], w[2], w[3]) for w in WARNINGS] + [""]
     # ---- coverage table(s)
@@ -475,6 +510,7 @@ def report(raw, outp, control, cand, minruns, tol, equiv_label, name, header="",
         n, bad_runs = LAST["measured"], LAST["regressed"]
         print("Result: %d passed" % (n - bad_runs) + (", %d failed" % bad_runs if bad_runs else ""))   # pytest style: counts, no "X of Y"
     else: print("FINAL: %d candidate cell(s) REGRESSED" % len(bad))
+    print(scope_line)
     return 1 if bad else 0
 
 
