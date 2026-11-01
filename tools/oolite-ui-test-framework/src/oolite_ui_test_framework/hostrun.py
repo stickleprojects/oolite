@@ -495,7 +495,7 @@ def exit_code(L, md, quiet=False, strict=False, failed=None):
 
 def finish(rc, md, quiet):
     if quiet and rc != EXIT_ERROR: print("PASS" if rc == EXIT_PASS else "FAIL")
-    elif not quiet: print({EXIT_PASS: "PASS", EXIT_FAIL: "FAIL", EXIT_ERROR: "ERROR (could not run)"}[rc] + "  report: " + md)
+    elif not quiet: print({EXIT_PASS: "PASS (only what 'What a pass covers' lists)", EXIT_FAIL: "FAIL", EXIT_ERROR: "ERROR (could not run)"}[rc] + "  report: " + md)   # #68
     return rc
 
 

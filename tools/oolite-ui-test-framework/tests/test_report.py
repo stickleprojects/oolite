@@ -139,3 +139,32 @@ def test_limits_table_lists_what_an_environment_cannot_measure_and_drops_fixed_o
     header = [l for l in t.splitlines() if l.startswith("| test |")][0]
     assert report.wm_info("kwin")[1] not in header and report.wm_info("weston-native")[1] in header   # kwin measured has_frame in run 2
     assert not [l for l in t.splitlines() if l.startswith("| has_frame |") and l.count("L") != 1]
+
+
+def test_every_report_states_what_a_pass_covers(tmp_path, capsys):
+    """#68: a pass is only a statement about the tests and environments listed, so every report says which, and what is never covered."""
+    rc, md = render(tmp_path, "matrix2-arch.raw", candidates="opt1")
+    head = md.split("## Coverage")[0]
+    assert "## What a pass covers" in head and "It is not a statement that the build works." in head   # straight after the Headline
+    sec = md.split("## What a pass covers")[1].split("\n## ")[0]
+    assert "- **Tests measured:** " in sec and "- **Where:** " in sec
+    for never in ("gameplay beyond the title menu", "HTTPS", "sound", "GPU rendering", "real desktops"):
+        assert never in sec
+    out = capsys.readouterr().out
+    assert re.search(r"^Scope: \d+ test\(s\) in \d+ environment\(s\).*not covered: gameplay, HTTPS, sound, GPU", out, re.M)
+
+
+def test_scope_lists_only_measured_tests_and_environments(tmp_path):
+    raw = tmp_path / "s.raw"
+    raw.write_text("\n".join([
+        "TEST wm=openbox build=b run=1 test=test_has_frame outcome=passed start=NA secs=1 reason=",
+        "TEST wm=openbox build=b run=1 test=test_gets_focus outcome=failed start=NA secs=1 reason=no focus",
+        "TEST wm=weston-native build=b run=1 test=test_has_frame outcome=skipped start=NA secs=0 reason=NOT MEASURABLE: no probe"]) + "\n")
+    report.set_registry(registry.load(registry.DEFAULT_PATH)[0])
+    report.load(str(raw))
+    L, line = report.scope_section(report.TESTS, ["b"])
+    sec = "\n".join(L)
+    assert "- **Tests measured:** has_frame, gets_focus" in sec
+    assert "1 environment(s): " + report.wm_info("openbox")[1] in sec and report.wm_info("weston-native")[1] not in sec   # skipped: not covered
+    assert "Docker images arch, software rendering" in sec
+    assert line.startswith("Scope: 2 test(s) in 1 environment(s) (containers, software rendering)")
