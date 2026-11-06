@@ -57,8 +57,12 @@ jobs:
       - name: Framework tests (offline, no Docker)
         working-directory: tools/oolite-ui-test-framework
         run: |
+          sudo apt-get update -q && sudo apt-get install -y -q tesseract-ocr
           pip install pytest pillow
-          python3 -m pytest tests -q
+          set -o pipefail
+          python3 -m pytest tests -q -rs | tee pytest.out
+          # the OCR tests skip without tesseract; here that is a gap, not a pass (#71)
+          ! grep -E 'SKIPPED.*(tesseract|Pillow)' pytest.out
 
   ui-tests:
     # after a successful build of master, or by hand
