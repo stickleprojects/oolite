@@ -241,3 +241,21 @@ def test_device_args_pass_only_the_declared_devices_the_host_has():
     e = lambda d: type("E", (), {"devices": d})()
     assert hostrun.device_args(e(["/dev/udmabuf"]), exists=lambda p: True) == ["--device", "/dev/udmabuf"]
     assert hostrun.device_args(e(["/dev/udmabuf"]), exists=lambda p: False) == [] and hostrun.device_args(e([])) == []
+
+
+def test_driver_imports_without_pytest_or_pillow():
+    """#78: `uitest` runs on the host with only python3 and docker (CI runs it with the runner's bare python3), so importing
+    hostrun must not pull in pytest or Pillow. preconditions.py used to import pytest at the top, and every CI job failed."""
+    import os
+    import sys
+    src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+    code = ("import builtins, sys\n"
+            "real = builtins.__import__\n"
+            "def guard(name, *a, **k):\n"
+            "    if name.split('.')[0] in ('pytest', '_pytest', 'PIL'): raise ModuleNotFoundError(name)\n"
+            "    return real(name, *a, **k)\n"
+            "builtins.__import__ = guard\n"
+            "sys.path.insert(0, %r)\n"
+            "from oolite_ui_test_framework import hostrun\n" % src)
+    r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
