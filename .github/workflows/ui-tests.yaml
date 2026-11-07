@@ -20,7 +20,7 @@ on:
   workflow_run:
     workflows: ["Build Oolite package for various platforms", "Test Oolite package on various platforms"]
     types: [completed]
-    branches: [master]
+    branches: [master, stickleprojects]   # stickleprojects: this fork's default branch, where its builds run (#78)
   workflow_dispatch:
     inputs:
       source:

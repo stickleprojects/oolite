@@ -20,8 +20,6 @@ import re
 import shutil
 import subprocess
 
-import pytest
-
 from . import fakeinput
 
 REQUESTED = re.compile(r"Requested a new surface of (\d+) x (\d+), windowed")
@@ -33,7 +31,9 @@ class PreconditionFailed(AssertionError):
 
 def require(name, reason):
     """Fail as PRECONDITION <name> if `reason` (a check's result) is set."""
-    if reason: pytest.fail("PRECONDITION %s: %s" % (name, reason), pytrace=False)
+    if reason:
+        import pytest   # here, not at the top: the `uitest` driver imports this module and must run without pytest (#78)
+        pytest.fail("PRECONDITION %s: %s" % (name, reason), pytrace=False)
 
 
 def check(name, reason):
