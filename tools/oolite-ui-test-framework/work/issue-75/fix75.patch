@@ -1,0 +1,43 @@
+diff --git a/ShellScripts/Linux/install_package_fn.sh b/ShellScripts/Linux/install_package_fn.sh
+index 0f2fb6b7c..3b252499a 100644
+--- a/ShellScripts/Linux/install_package_fn.sh
++++ b/ShellScripts/Linux/install_package_fn.sh
+@@ -144,9 +144,9 @@ install_package() {
+ 
+         "appimage")
+             case "$CURRENT_DISTRO" in
+-                debian) pkg_name="file fuse3 patchelf desktop-file-utils" ;;
+-                redhat) pkg_name="file fuse3 desktop-file-utils patchelf which zsync" ;;
+-                arch) pkg_name="file fuse3 desktop-file-utils patchelf zsync" ;;
++                debian) pkg_name="file fuse3 patchelf desktop-file-utils libdecor-0-0" ;;
++                redhat) pkg_name="file fuse3 desktop-file-utils patchelf which zsync libdecor" ;;
++                arch) pkg_name="file fuse3 desktop-file-utils patchelf zsync libdecor" ;;
+             esac ;;
+ 
+         "flatpak") pkg_name="flatpak flatpak-builder" ;;
+diff --git a/ShellScripts/Linux/install_packages_root.sh b/ShellScripts/Linux/install_packages_root.sh
+index 61ee08ab4..744ff493c 100755
+--- a/ShellScripts/Linux/install_packages_root.sh
++++ b/ShellScripts/Linux/install_packages_root.sh
+@@ -100,7 +100,7 @@ run_script() {
+         echo "📦 Installing AppImage Tools..."
+         install_package appimage
+         BIN="/usr/local/bin"
+-        download "https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/quick-sharun.sh" "$BIN" "+x"
++        download "https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/7cb538a024588e29de89c2cea19cee8c9eca31c7/useful-tools/quick-sharun.sh" "$BIN" "+x"
+         download "https://raw.githubusercontent.com/AppImage/AppImages/master/appdir-lint.sh" "$BIN" "+x"
+         download "https://raw.githubusercontent.com/AppImage/AppImages/master/excludelist" "$BIN"
+         download "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage" "$BIN" "+x"
+diff --git a/installers/appimage/create_appimage_fn.sh b/installers/appimage/create_appimage_fn.sh
+index fb886778d..f0828f02f 100755
+--- a/installers/appimage/create_appimage_fn.sh
++++ b/installers/appimage/create_appimage_fn.sh
+@@ -37,6 +37,8 @@ create_appimage() {
+     export DEPLOY_OPENGL
+     local DEPLOY_VULKAN=0
+     export DEPLOY_VULKAN
++    local DEPLOY_SDL=1
++    export DEPLOY_SDL
+     local DEPLOY_LOCALE=0
+     export DEPLOY_LOCALE
+     local STRACE_MODE=0
