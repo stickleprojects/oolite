@@ -79,6 +79,10 @@ symptom, cause, fix, and where (PR / issue). Open questions go under [Still open
   a hung container (no timeout) or a crash. `--cell-timeout` stops a cell (`docker kill` on a named container) and records a HARD line;
   `run_unattended.sh` runs each build x environment x screen as its own `uitest run`, resumes, and keeps the machine awake. Docker
   names allow only `[A-Za-z0-9_.-]`, so the container name is not `safe_name()` (which keeps `+`) (#61).
+- **The `uitest` driver must import with the standard library only.** CI runs it with the runner's plain python3. `preconditions.py` imported pytest at the top, so every CI job failed with `No module named 'pytest'`;
+  locally pytest was installed and it never showed. pytest is now imported inside `require()`, and `test_driver_imports_without_pytest_or_pillow` imports `hostrun`
+  with pytest and Pillow blocked. The job had never run before: `workflow_run` listed only `master`, and this fork builds on
+  `stickleprojects` (#78).
 
 ## Coverage write-ups
 
