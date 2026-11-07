@@ -1,0 +1,8 @@
+# Fedora 44: a /usr/lib64 host, to run our AppImages on Fedora (#74). openbox only for now. Pinned tag.
+FROM fedora:44
+RUN dnf -y install --setopt=install_weak_deps=False \
+    xorg-x11-server-Xvfb xorg-x11-server-Xephyr xorg-x11-server-Xorg xorg-x11-drv-dummy xorg-x11-xauth \
+    xwininfo xprop xev xrandr xdotool libxcvt procps-ng dbus dbus-x11 mesa-dri-drivers mesa-libGL mesa-libEGL ca-certificates \
+    tesseract tesseract-langpack-eng python3-pillow dejavu-sans-fonts \
+    python3 python3-pytest python3-xlib openbox >/tmp/dnf.log 2>&1 || (tail -25 /tmp/dnf.log; false)
+ENV LIBGL_ALWAYS_SOFTWARE=1 PYTHONPATH=/uitest PYTHONDONTWRITEBYTECODE=1

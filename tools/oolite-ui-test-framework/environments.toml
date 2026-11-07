@@ -17,6 +17,7 @@
 #           headed (true = the compositor is a window on the host X display, with the GPU passed in; screenshots then show its decorations)
 #           devices (host devices passed into the container, e.g. ["/dev/udmabuf"]: KWin needs a render device, and udmabuf is one without a
 #           GPU (KDE 527906). A device the host lacks is not passed and the render_device precondition test fails)
+#           distro (the host distribution, for an environment that exists to test one, e.g. "Fedora 44": shown in report rows)
 
 [images.arch]
 dockerfile = "docker/Dockerfile.arch"
@@ -27,6 +28,12 @@ tag = "oolite-uitest-debian"
 [images.wayland]
 dockerfile = "docker/Dockerfile.wayland"
 tag = "oolite-uitest-wayland"
+[images.fedora]
+dockerfile = "docker/Dockerfile.fedora"
+tag = "oolite-uitest-fedora"
+[images.ubuntu]
+dockerfile = "docker/Dockerfile.ubuntu"
+tag = "oolite-uitest-ubuntu"
 
 # ---------------------------------------------------------------- X11 window managers
 [env.marco]
@@ -58,6 +65,29 @@ start = ["openbox"]
 version_cmd = "openbox --version"
 version_re = "[0-9][0-9.]+"
 probes = ["x11"]
+
+# openbox again, on other host distributions: our AppImages must run on any distro, not only the ones the images above use (#74)
+[env.openbox-fedora]
+family = "openbox"
+session = "X11"
+image = "fedora"
+kind = "x11"
+start = ["openbox"]
+version_cmd = "openbox --version"
+version_re = "[0-9][0-9.]+"
+probes = ["x11"]
+distro = "Fedora 44"
+
+[env.openbox-ubuntu]
+family = "openbox"
+session = "X11"
+image = "ubuntu"
+kind = "x11"
+start = ["openbox"]
+version_cmd = "openbox --version"
+version_re = "[0-9][0-9.]+"
+probes = ["x11"]
+distro = "Ubuntu 26.04"
 
 [env.muffin]
 family = "muffin"

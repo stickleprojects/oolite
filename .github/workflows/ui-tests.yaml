@@ -86,6 +86,10 @@ jobs:
             envs: kwin,mutter
           - image: wayland
             envs: kwin-xwayland,sway-xwayland,mutter-xwayland,weston-xwayland
+          - image: fedora      # other host distributions: our AppImages must run there too (#74)
+            envs: openbox-fedora
+          - image: ubuntu
+            envs: openbox-ubuntu
     env:
       FLAVOUR: ${{ inputs.flavour || 'deployment' }}
       # the triggering workflow decides which AppImage; the Ubuntu job builds deployment only

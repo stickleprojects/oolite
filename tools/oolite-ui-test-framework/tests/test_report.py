@@ -168,3 +168,19 @@ def test_scope_lists_only_measured_tests_and_environments(tmp_path):
     assert "1 environment(s): " + report.wm_info("openbox")[1] in sec and report.wm_info("weston-native")[1] not in sec   # skipped: not covered
     assert "Docker images arch, software rendering" in sec
     assert line.startswith("Scope: 2 test(s) in 1 environment(s) (containers, software rendering)")
+
+
+def test_a_clean_control_fails_on_nothing_not_nothing_measured(tmp_path, capsys):
+    """'fails on: nothing measured' read as if no test ran; with measured, passing runs it is 'nothing'."""
+    raw = tmp_path / "c.raw"
+    raw.write_text("RESULT wm=openbox build=b screen=1920x1080 run=1 frame=1 focus=1 dx=0 dy=0 centred=1 exited=0 tol=40 crashed=0 "
+                   "gl_errors=0 renders=1 splash_centred=1\n")
+    report.main([str(raw), str(tmp_path / "c.md"), "--control", "b", "--minruns", "1", "--registry", registry.DEFAULT_PATH])
+    assert "- b fails on: nothing\n" in capsys.readouterr().out
+
+
+def test_distro_is_shown_in_the_environment_name():
+    """#74: openbox on the Fedora host must not read as the Arch openbox row."""
+    report.set_registry(registry.load(registry.DEFAULT_PATH)[0])
+    assert report.wm_info("openbox-fedora")[1].endswith("(X11, Fedora 44)")
+    assert report.wm_info("openbox")[1].endswith("(X11)")
