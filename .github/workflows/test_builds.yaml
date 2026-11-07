@@ -57,6 +57,12 @@ jobs:
       - name: Build AppImage
         run: |
           ./mk.sh pkg-appimage deployment
+      - name: Keep the AppImage for the UI tests (#73)
+        uses: actions/upload-artifact@v6
+        with:
+          name: oolite-linux-appimage-ubuntu
+          path: build/Oolite*.AppImage
+          retention-days: 7
       - name: Build Oolite (dev, compile check only)
         run: |
           ./mk.sh build dev
