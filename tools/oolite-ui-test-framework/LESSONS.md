@@ -30,6 +30,7 @@ symptom, cause, fix, and where (PR / issue). Open questions go under [Still open
 | sway-native: F12 with a saved window larger than the screen fails `centred` in run 1 only | Not known. The window is 4096x1336 in every run; sway's tree after the round trip reports 4100x1338 in run 1 and 3844x1082 later | Open | #57 |
 | kwin-xwayland: window 36 px lower after the F12 round trip | About KWin's title-bar height; within the 40 px tolerance | Not fixed, recorded | #11 (open) |
 | mutter 2head: F12 did nothing (no focus) | Harness problem in both builds, not a game difference | Re-checked once the Debian image had `cvt` | #10 |
+| Ubuntu 26.04 GNOME 50: game window has no title bar (upstream #793) | The AppImage does not bundle libdecor, so quick-sharun renames SDL3's `libdecor-0.so` reference to a library that does not exist. GNOME does not draw title bars for Wayland apps, and SDL3 uses native Wayland only when the compositor offers `fifo-v1` (GNOME 50 does, GNOME 46 does not). On 24.04 SDL3 runs through XWayland and GNOME draws the title bar, which hid the problem | Build: install libdecor, `DEPLOY_SDL=1`, quick-sharun pinned. Workaround: `SDL_VIDEODRIVER=x11`. Verified on headless and headed GNOME 50 in an `ubuntu-desktop` container (3/3 launches, Arch and Ubuntu builds) and GNOME 46 for the before case. Our harness has no mutter-native window probe (#45), so this was measured by hand with `org.gnome.Shell.Eval` | #75 |
 | kwin X11 did not start | kglobalaccel crashed | Recorded in the run; later runs start | #36 |
 
 ## The game and how it reads input
