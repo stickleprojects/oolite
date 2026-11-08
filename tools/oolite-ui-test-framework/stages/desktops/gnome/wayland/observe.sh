@@ -9,7 +9,7 @@
 # frame is the window as GNOME places it, including its title bar however it is drawn (by mutter for an X11 client, by the
 # game through libdecor for a native Wayland one: GNOME draws none for Wayland clients, #75). A title bar shows as frame
 # height minus the window height the game asked for (GAME_WINDOW).
-. "$UITEST_STAGES/common/lib.sh"
+. "${UITEST_STAGES:?UITEST_STAGES is not set: run stages through \`stage.sh NAME\` inside the container started by \`uitest stages shell DISTRO DESKTOP SESSION --build APPIMAGE\`}/common/lib.sh"
 . "$UITEST_STAGES/desktops/gnome/wayland/gnome.sh"
 wait=60 settle=5 shot=
 while [ $# -gt 0 ]; do

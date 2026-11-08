@@ -6,7 +6,7 @@
 #   state.env           the state file
 # Safe to run at any point, and more than once. For each item that is not there it prints one line with the reason and the stage
 # that creates it. Exit 0 if anything was collected; exit 1 if nothing was (with what to run first).
-. "$UITEST_STAGES/common/lib.sh"
+. "${UITEST_STAGES:?UITEST_STAGES is not set: run stages through \`stage.sh NAME\` inside the container started by \`uitest stages shell DISTRO DESKTOP SESSION --build APPIMAGE\`}/common/lib.sh"
 case ${1:-} in -*) die "unknown option $1. Usage: collect.sh [DEST]" ;; esac
 dest=${1:-$UITEST_OUT}
 got=() missing=()

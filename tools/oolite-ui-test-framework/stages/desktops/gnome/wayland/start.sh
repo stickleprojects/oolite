@@ -3,7 +3,7 @@
 # $UITEST_SCREEN (default 1920x1080), with software rendering. XWayland comes up for X11 clients (the game in x11 mode).
 # Needs logind: in a container a combo's start.sh provides a fake one, then runs this.
 # Saves the session's variables (WAYLAND_DISPLAY, DISPLAY, XAUTHORITY, DBUS_SESSION_BUS_ADDRESS ...) for later stages.
-. "$UITEST_STAGES/common/lib.sh"
+. "${UITEST_STAGES:?UITEST_STAGES is not set: run stages through \`stage.sh NAME\` inside the container started by \`uitest stages shell DISTRO DESKTOP SESSION --build APPIMAGE\`}/common/lib.sh"
 . "$UITEST_STAGES/desktops/gnome/wayland/gnome.sh"
 screen=${UITEST_SCREEN:-1920x1080}
 [[ $screen =~ ^[0-9]+x[0-9]+$ ]] || die "UITEST_SCREEN must be WxH, e.g. 1920x1080, not '$screen'"

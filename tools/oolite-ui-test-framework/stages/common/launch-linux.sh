@@ -7,7 +7,7 @@
 #   APPIMAGE       default $UITEST_APPIMAGE, else /app/oolite.AppImage.
 # The AppImage runs from a fresh copy of its folder (it reads the GameData folder next to it), with APPIMAGE_EXTRACT_AND_RUN=1
 # because a container has no FUSE. Saves GAME_PID, GAME_DIR, GAME_MODE, GAME_WINDOW and GAME_OUT for later stages.
-. "$UITEST_STAGES/common/lib.sh"
+. "${UITEST_STAGES:?UITEST_STAGES is not set: run stages through \`stage.sh NAME\` inside the container started by \`uitest stages shell DISTRO DESKTOP SESSION --build APPIMAGE\`}/common/lib.sh"
 mode=native window=1280x720 app=${UITEST_APPIMAGE:-/app/oolite.AppImage}
 while [ $# -gt 0 ]; do
     case $1 in

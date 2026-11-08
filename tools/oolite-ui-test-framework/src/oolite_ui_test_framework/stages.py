@@ -110,14 +110,16 @@ def parser() -> argparse.ArgumentParser:
 
 # ---- validation: everything here runs before Docker is started, and raises StagesError with the fix
 
-def distros(root: str = STAGES) -> list[str]:
+def distros(root: Optional[str] = None) -> list[str]:
     """The distros that can be built: a folder in distros/ with a non-empty Dockerfile."""
+    root = root or STAGES
     base = os.path.join(root, "distros")
     if not os.path.isdir(base): return []
     return sorted(d for d in os.listdir(base) if os.path.isfile(os.path.join(base, d, "Dockerfile")) and os.path.getsize(os.path.join(base, d, "Dockerfile")) > 0)
 
 
-def check_distro(distro: str, root: str = STAGES) -> None:
+def check_distro(distro: str, root: Optional[str] = None) -> None:
+    root = root or STAGES
     folder = os.path.join(root, "distros", distro)
     have = ", ".join(distros(root)) or "none"
     rel = os.path.relpath(folder, os.path.dirname(root))
@@ -133,15 +135,17 @@ def check_distro(distro: str, root: str = STAGES) -> None:
             raise StagesError("%s/Dockerfile has no FROM line, so it is not a Dockerfile: fix it (see stages/README.md, Add a distro) or use one of: %s" % (rel, have))
 
 
-def resolve_stage(distro: str, desktop: str, session: str, stage: str, root: str = STAGES) -> Optional[str]:
+def resolve_stage(distro: str, desktop: str, session: str, stage: str, root: Optional[str] = None) -> Optional[str]:
     """The script that runs `stage` for this cell, or None. Asks the same resolve.sh the container uses."""
+    root = root or STAGES
     env = {**os.environ, "UITEST_STAGES": root}
     r = subprocess.run([os.path.join(root, "resolve.sh"), distro, desktop, session, stage], capture_output=True, text=True, env=env)
     return r.stdout.strip() if r.returncode == 0 else None
 
 
-def known_cells(distro: str, root: str = STAGES) -> list[str]:
+def known_cells(distro: str, root: Optional[str] = None) -> list[str]:
     """'desktop session' pairs under desktops/ (and combos/<distro>+*/) that have every required stage for this distro."""
+    root = root or STAGES
     cand: set[tuple[str, str]] = set()
     for sub, prefix in (("desktops", ""), ("combos", distro + "+")):
         base = os.path.join(root, sub)
@@ -153,7 +157,8 @@ def known_cells(distro: str, root: str = STAGES) -> list[str]:
     return sorted("%s %s" % c for c in cand if all(resolve_stage(distro, c[0], c[1], st, root) for st in REQUIRED_STAGES))
 
 
-def check_cell(distro: str, desktop: str, session: str, root: str = STAGES) -> None:
+def check_cell(distro: str, desktop: str, session: str, root: Optional[str] = None) -> None:
+    root = root or STAGES
     missing = [s for s in REQUIRED_STAGES if not resolve_stage(distro, desktop, session, s, root)]
     if missing:
         cells = known_cells(distro, root)

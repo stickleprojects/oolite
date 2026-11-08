@@ -3,7 +3,7 @@
 # with python-dbusmock's logind, then GNOME's own start.sh. Also sets Ubuntu's XDG_CURRENT_DESKTOP (ubuntu:GNOME).
 # Whether GNOME on other distros needs the same is checked when they are added (#80 step 4); if so, the fake logind moves to
 # desktops/gnome/wayland/ (or a helper shared by the containers) and this combo shrinks to the XDG_CURRENT_DESKTOP line.
-. "$UITEST_STAGES/common/lib.sh"
+. "${UITEST_STAGES:?UITEST_STAGES is not set: run stages through \`stage.sh NAME\` inside the container started by \`uitest stages shell DISTRO DESKTOP SESSION --build APPIMAGE\`}/common/lib.sh"
 need_cmd sudo dbus-daemon gdbus python3
 [ -S /run/dbus/system_bus_socket ] || { sudo mkdir -p /run/dbus && sudo dbus-daemon --system --fork; } || die "cannot start the system bus: the user needs passwordless sudo (the stages image sets that up for player)"
 if ! gdbus introspect --system -d org.freedesktop.login1 -o /org/freedesktop/login1 >/dev/null 2>&1; then

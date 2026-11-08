@@ -10,7 +10,7 @@ for a in "$@"; do
     case $a in --all) all=1 ;; *) echo "tidyup.sh: unknown option '$a'. Usage: tidyup.sh [--all]" >&2; exit 1 ;; esac
 done
 [ $all = 1 ] && UITEST_LENIENT=1
-. "$UITEST_STAGES/common/lib.sh"
+. "${UITEST_STAGES:?UITEST_STAGES is not set: run stages through \`stage.sh NAME\` inside the container started by \`uitest stages shell DISTRO DESKTOP SESSION --build APPIMAGE\`}/common/lib.sh"
 pid=${GAME_PID:-} dir=${GAME_DIR:-} dpids=${DESKTOP_PIDS:-}
 if [ -z "$pid" ] && [ -z "$dir" ] && { [ $all = 0 ] || [ -z "$dpids" ]; }; then
     [ $all = 1 ] && : > "$UITEST_STATE"
