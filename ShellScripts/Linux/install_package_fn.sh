@@ -144,10 +144,19 @@ install_package() {
 
         "appimage")
             case "$CURRENT_DISTRO" in
-                debian) pkg_name="file fuse3 patchelf desktop-file-utils libdecor-0-0" ;;
-                redhat) pkg_name="file fuse3 desktop-file-utils patchelf which zsync libdecor" ;;
-                arch) pkg_name="file fuse3 desktop-file-utils patchelf zsync libdecor" ;;
+                debian) pkg_name="file fuse3 patchelf desktop-file-utils" ;;
+                redhat) pkg_name="file fuse3 desktop-file-utils patchelf which zsync" ;;
+                arch) pkg_name="file fuse3 desktop-file-utils patchelf zsync" ;;
             esac ;;
+
+        "libdecor")
+            case "$CURRENT_DISTRO" in
+                debian) pkg_name="libdecor-0-0" ;;
+                redhat) pkg_name="libdecor" ;;
+                arch) pkg_name="libdecor" ;;
+            esac ;;
+
+        "zstd") pkg_name="zstd" ;;
 
         "flatpak") pkg_name="flatpak flatpak-builder" ;;
 

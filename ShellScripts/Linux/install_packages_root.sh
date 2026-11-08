@@ -104,6 +104,8 @@ run_script() {
         download "https://raw.githubusercontent.com/AppImage/AppImages/master/appdir-lint.sh" "$BIN" "+x"
         download "https://raw.githubusercontent.com/AppImage/AppImages/master/excludelist" "$BIN"
         download "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage" "$BIN" "+x"
+        source ./install_libdecor_fn.sh
+        install_libdecor || return 1
     fi
 
     if [[ "$INSTALL_FLATPAK" == true ]]; then  # For building Flatpak
