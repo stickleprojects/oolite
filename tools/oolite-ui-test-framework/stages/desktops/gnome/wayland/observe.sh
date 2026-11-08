@@ -26,10 +26,10 @@ if [ -n "$shot" ]; then
     [ -d "$(dirname "$shot")" ] || die "cannot save the screenshot: folder $(dirname "$shot") does not exist; create it, or give another --screenshot path"
     [ -w "$(dirname "$shot")" ] || die "cannot save the screenshot: folder $(dirname "$shot") is not writable; give another --screenshot path, e.g. /tmp/shot.png"
 fi
-need_cmd gdbus python3
 need_desktop WAYLAND_DISPLAY
 [ -n "${GAME_PID:-}" ] || die "no game launched (GAME_PID not set in $UITEST_STATE): run \`stage.sh launch-linux\` first"
 kill -0 "$GAME_PID" 2>/dev/null || echo "observe.sh: the game (pid $GAME_PID) has exited; see ${GAME_OUT:-$UITEST_LOGS/game.out}. Run \`stage.sh tidyup\` and \`stage.sh launch-linux\` to start it again" >&2
+need_cmd gdbus python3
 js='(() => {
   const r = x => [x.x, x.y, x.width, x.height];
   const all = global.display.list_all_windows().map(w => ({title: w.get_title() || "", client: w.get_client_type() == 0 ? "wayland" : "x11",

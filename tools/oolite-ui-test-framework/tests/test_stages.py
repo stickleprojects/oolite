@@ -256,7 +256,6 @@ def test_observe_option_errors(box, args, msg):
 
 def test_observe_needs_a_launched_game(box, tmp_path):
     started(tmp_path)
-    if not shutil.which("gdbus"): pytest.skip("gdbus is in the Docker image, not on every host")
     rc, out = bash(box, stage_script("desktops/gnome/wayland/observe.sh"))
     assert rc == 1 and "no game launched (GAME_PID not set" in out and "stage.sh launch-linux" in out
 
