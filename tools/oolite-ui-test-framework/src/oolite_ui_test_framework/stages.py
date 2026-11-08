@@ -1,6 +1,6 @@
 """`uitest stages shell|run DISTRO DESKTOP SESSION`: run the stage scripts (stages/) in one container for one build.
-  shell  an interactive bash in the container, with `stage` on PATH, to run stages one at a time by hand;
-  run    stages-run in the container (start, then launch/observe/collect/tidyup per game mode and run), results in
+  shell  an interactive bash in the container, with `stage.sh` on PATH, to run stages one at a time by hand;
+  run    stages-run.py in the container (start, then launch/observe/collect/tidyup per game mode and run), results in
          results/stages-<date>-<label>/ .
 The container gets the stages folder (read-only), the AppImage (read-only) and an output folder. Nothing else of the host is
 mounted: no X socket, no home. Only results/ is written on the host."""
@@ -97,7 +97,7 @@ def run(a, label, app):
     raw = os.path.join(outdir, "stages-%s.raw" % safe)
     # The stages run as `player` and write to /tmp/res. /out is the host's folder: on a filesystem that ignores permissions (NTFS)
     # `player` cannot write there, so root copies the results over at the end and hands them to the host user (as give_back_output does).
-    script = ('mkdir -p /tmp/res; stages-run "$@" --out /tmp/res; rc=$?; sudo cp -r --no-preserve=all /tmp/res/. /out/; '
+    script = ('mkdir -p /tmp/res; stages-run.py "$@" --out /tmp/res; rc=$?; sudo cp -r --no-preserve=all /tmp/res/. /out/; '
               'sudo chown -R %d:%d /out 2>/dev/null; exit $rc' % (os.getuid(), os.getgid()))
     cmd = docker_cmd(a, app, outdir, False) + ["bash", "-c", script, "stages", "--game", a.game, "--runs", str(a.runs), "--label", safe]
     lines = []

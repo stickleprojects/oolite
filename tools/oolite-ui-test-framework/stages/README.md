@@ -1,7 +1,7 @@
 # stages: the UI-test steps as scripts you can run by hand
 
 Issue #80. Each step of a run is one bash script: start the desktop, launch the game, observe its window, collect logs, tidy up.
-Any stage can be run alone, in a container, for one build. `stages-run` (and `uitest stages run`) run the same scripts in order.
+Any stage can be run alone, in a container, for one build. `stages-run.py` (and `uitest stages run`) run the same scripts in order.
 
 Only one cell is covered so far: Ubuntu 26.04, GNOME, Wayland, with the game in `native` or `x11` mode.
 
@@ -24,14 +24,14 @@ Only one cell is covered so far: Ubuntu 26.04, GNOME, Wayland, with the game in 
 3. `sessions/<session>/<stage>.sh`
 4. `common/<stage>.sh`
 
-It exits 1 and prints nothing if no folder has the stage. `stage which NAME` shows the choice for the current container.
+It exits 1 and prints nothing if no folder has the stage. `stage.sh which NAME` shows the choice for the current container.
 A combo is only for a real exception of one distro and desktop (today: the fake logind that GNOME needs in a container).
 
 ## The state file
 
 Stages hand over through `/tmp/uitest/state.env`. A stage saves what later stages need with `state_set NAME VALUE`
-(from `common/lib.sh`); every stage starts by sourcing the file. So `stage observe` works in any shell of the container
-after `stage start` and `stage launch-linux`, even a second shell. Stage logs go to `/tmp/uitest/logs/`.
+(from `common/lib.sh`); every stage starts by sourcing the file. So `stage.sh observe` works in any shell of the container
+after `stage.sh start` and `stage.sh launch-linux`, even a second shell. Stage logs go to `/tmp/uitest/logs/`.
 
 ## Run one stage by hand
 
@@ -42,14 +42,14 @@ uitest stages shell ubuntu-26.04 gnome wayland --build path/to/Oolite.AppImage
 This opens bash in a container (the image is built the first time: about 5 GB, 10 to 20 minutes). The stages are on `PATH`.
 
 ```
-stage start
-stage launch-linux --game native
-stage observe --screenshot /out/shot.png
-stage collect /out/mine
-stage tidyup --all
+stage.sh start
+stage.sh launch-linux --game native
+stage.sh observe --screenshot /out/shot.png
+stage.sh collect /out/mine
+stage.sh tidyup --all
 ```
 
-`/out` is `results/stages-shell/` on the host. The shell is `player`, and `uitest stages shell` makes `/out` writable for it. On a host filesystem that ignores permissions (NTFS) that does not work: write to `/tmp` and copy with `sudo cp`. `stage which observe` shows which script a stage resolves to.
+`/out` is `results/stages-shell/` on the host. The shell is `player`, and `uitest stages shell` makes `/out` writable for it. On a host filesystem that ignores permissions (NTFS) that does not work: write to `/tmp` and copy with `sudo cp`. `stage.sh which observe` shows which script a stage resolves to.
 
 ## Run them in order
 

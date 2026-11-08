@@ -1,4 +1,4 @@
-"""stages/: the resolver (which script runs a stage), stages-run's argument parsing and RESULT line, and uitest stages' docker command.
+"""stages/: the resolver (which script runs a stage), stages-run.py's argument parsing and RESULT line, and uitest stages' docker command.
 No Docker, no game."""
 import importlib.machinery
 import importlib.util
@@ -62,13 +62,13 @@ def test_shipped_tree_resolves_ubuntu_gnome_wayland(stage, where):
 def test_shipped_scripts_are_valid_bash():
     for d, _, fs in os.walk(STAGES):
         for f in fs:
-            if f.endswith(".sh") or d.endswith("/bin") and f == "stage":
+            if f.endswith(".sh"):
                 assert subprocess.run(["bash", "-n", os.path.join(d, f)], capture_output=True).returncode == 0, f
 
 
-# stages-run (a Python script without .py)
+# stages-run.py
 def load_stages_run():
-    path = os.path.join(STAGES, "bin", "stages-run")
+    path = os.path.join(STAGES, "bin", "stages-run.py")
     loader = importlib.machinery.SourceFileLoader("stages_run", path)
     spec = importlib.util.spec_from_loader("stages_run", loader)
     m = importlib.util.module_from_spec(spec); loader.exec_module(m); return m

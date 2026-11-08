@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""stages-run --game native,x11 --runs N --label LABEL [--out /out]: inside the container, run the stages in order and print one
+"""stages-run.py --game native,x11 --runs N --label LABEL [--out /out]: inside the container, run the stages in order and print one
 RESULT line per run.
-  stage start (once); then for every game mode and run: launch-linux, observe, collect, tidyup; at the end tidyup --all.
+  stage.sh start (once); then for every game mode and run: launch-linux, observe, collect, tidyup; at the end tidyup --all.
 Per run it writes <out>/<mode>-<run>.json (what observe saw), .png (screenshot) and a folder of logs. A run whose game window never
 appears is a RESULT with found=0, not a skip."""
 import argparse
@@ -12,7 +12,7 @@ import sys
 
 
 def parse_args(argv):
-    p = argparse.ArgumentParser(prog="stages-run")
+    p = argparse.ArgumentParser(prog="stages-run.py")
     p.add_argument("--game", default="native,x11", help="comma-separated game modes: native, x11")
     p.add_argument("--runs", type=int, default=3)
     p.add_argument("--label", required=True, help="name of the build under test (the build= field)")
@@ -40,7 +40,7 @@ def result_line(obs, env, mode, label, run, window):
 
 
 def stage(*args, **kw):
-    return subprocess.run(["stage"] + list(args), **kw)
+    return subprocess.run(["stage.sh"] + list(args), **kw)
 
 
 def state_value(path, name):
@@ -60,14 +60,14 @@ def main(argv=None):
     state = os.environ.get("UITEST_STATE", "/tmp/uitest/state.env")
     os.makedirs(a.out, exist_ok=True)
     if stage("start").returncode != 0:
-        print("stages-run: stage start failed", file=sys.stderr); return 2
+        print("stages-run.py: stage start failed", file=sys.stderr); return 2
     rc = 0
     try:
         for mode in a.modes:
             for run in range(1, a.runs + 1):
                 stem = os.path.join(a.out, "%s-%d" % (mode, run))
                 if stage("launch-linux", "--game", mode).returncode != 0:
-                    print("stages-run: launch-linux failed", file=sys.stderr); rc = 2; stage("tidyup"); continue
+                    print("stages-run.py: launch-linux failed", file=sys.stderr); rc = 2; stage("tidyup"); continue
                 window = state_value(state, "GAME_WINDOW") or "1280x720"
                 r = stage("observe", "--screenshot", stem + ".png", stdout=subprocess.PIPE, text=True)
                 with open(stem + ".json", "w") as f: f.write(r.stdout)

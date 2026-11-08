@@ -6,7 +6,7 @@
 . "$UITEST_STAGES/common/lib.sh"
 . "$UITEST_STAGES/desktops/gnome/wayland/gnome.sh"
 screen=${UITEST_SCREEN:-1920x1080}
-shell_js 'String("up")' >/dev/null 2>&1 && die "GNOME Shell is already running: stage tidyup --all first"
+shell_js 'String("up")' >/dev/null 2>&1 && die "GNOME Shell is already running: stage.sh tidyup --all first"
 
 rt=/tmp/uitest/xdg; mkdir -p "$rt"; chmod 700 "$rt"
 state_set XDG_RUNTIME_DIR "$rt"

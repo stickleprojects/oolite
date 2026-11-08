@@ -20,7 +20,7 @@ done
 case $mode in native|x11) ;; *) die "--game must be native or x11, not '$mode'" ;; esac
 [[ $window =~ ^[0-9]+x[0-9]+$ ]] || die "--window must be WxH, not '$window'"
 [ -f "$app" ] || die "no AppImage at $app"
-[ -n "$GAME_PID" ] && kill -0 "$GAME_PID" 2>/dev/null && die "a game is already running (pid $GAME_PID): stage tidyup first"
+[ -n "$GAME_PID" ] && kill -0 "$GAME_PID" 2>/dev/null && die "a game is already running (pid $GAME_PID): stage.sh tidyup first"
 
 dir=$(mktemp -d /tmp/uitest/run.XXXXXX)
 src=$(dirname "$(realpath "$app")")
