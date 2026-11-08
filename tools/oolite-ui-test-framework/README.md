@@ -39,11 +39,11 @@ Three layers, each usable on its own:
    plus `.md`, `-env.txt`, `.shots/`, `.logs/`). It never compares.
 3. **Compare** (`uitest compare`): takes saved result sets, one as the control, and gives the verdicts (FIXED, REGRESSED, ...).
 
-        ./uitest run base:/path/Base.AppImage --name base            # one result set per build ...
-        ./uitest run fix:/path/Fix.AppImage --name fix
-        ./uitest compare --control results/base --candidate results/fix   # ... compared afterwards (results/compare-<date>-fix.md)
-        ./uitest base:/path/Base.AppImage fix:/path/Fix.AppImage        # shorthand: run each build, then compare; the first is the control
-        ./uitest --list                                                  # the environments
+        ./uitest.py run base:/path/Base.AppImage --name base            # one result set per build ...
+        ./uitest.py run fix:/path/Fix.AppImage --name fix
+        ./uitest.py compare --control results/base --candidate results/fix   # ... compared afterwards (results/compare-<date>-fix.md)
+        ./uitest.py base:/path/Base.AppImage fix:/path/Fix.AppImage        # shorthand: run each build, then compare; the first is the control
+        ./uitest.py --list                                                  # the environments
 
 Each build is `label:path`. Every run needs `--desc`; it is left out of the examples on this page. The shorthand with several builds
 writes `results/<name>-<label>.*` per build and the comparison as `results/<name>.*`. `uitest compare` takes `--candidate` more than
@@ -54,7 +54,7 @@ once, `--report PATH`, `--desc`, `--minruns`, `--strict` and `-q`; a result set 
 | `--desc TEXT` / `--desc-file PATH` | **required**: what the run is for; shown as Purpose at the top of the report |
 | `--name NAME` | name of the result files (`results/NAME.*`); default `uitest-<date>-<label>` (`uitest-<date>-<candidates>` for the shorthand) |
 | `--note LABEL=TEXT` | a note for one build in the report's Builds table (repeatable) |
-| `--env A,B` | environments to run (default: the six X11 window managers; `./uitest --list` shows all) |
+| `--env A,B` | environments to run (default: the six X11 window managers; `./uitest.py --list` shows all) |
 | `--wayland` | also the headless Wayland compositors |
 | `--host` | also your own desktop (see [Host mode](#host-mode)); `--env ""` runs only that |
 | `--toggle` | also run the F12 fullscreen round trip |
@@ -175,7 +175,7 @@ fails and says how to load it. Native KWin screenshots go through KWin's ScreenS
     version_cmd = "fvwm --version"
     probes = ["x11"]
 
-and run `./uitest mine:/path/Oolite.AppImage --env fvwm`. A compositor uses `kind = "wayland"`, a `start` command with `{w}`/`{h}`
+and run `./uitest.py mine:/path/Oolite.AppImage --env fvwm`. A compositor uses `kind = "wayland"`, a `start` command with `{w}`/`{h}`
 for the screen size, and optionally `files`, `env`, `ready_socket` and `probes = ["kwin:framed,focused", "x11"]`. The unit tests
 check that the file parses.
 

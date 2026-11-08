@@ -544,7 +544,7 @@ def selftest():
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["--selftest"]: return selftest()
-    ap = argparse.ArgumentParser(prog="uitest verdict"); ap.add_argument("raw"); ap.add_argument("out")
+    ap = argparse.ArgumentParser(prog="uitest.py verdict"); ap.add_argument("raw"); ap.add_argument("out")
     ap.add_argument("--control", default="base"); ap.add_argument("--candidates", default=""); ap.add_argument("--minruns", type=int, default=10)
     ap.add_argument("--tol", default="40"); ap.add_argument("--equiv", default=""); ap.add_argument("--header", default="")
     ap.add_argument("--host-minruns", type=int, default=0); ap.add_argument("--brief", action="store_true"); ap.add_argument("--versions", default="")

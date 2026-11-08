@@ -96,7 +96,7 @@ def folder_name(text: str) -> str:
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="uitest stages", description=(__doc__ or "").split("\n")[0])
+    p = argparse.ArgumentParser(prog="uitest.py stages", description=(__doc__ or "").split("\n")[0])
     p.add_argument("action", type=enum_arg(Action), metavar="{shell,run}")
     p.add_argument("distro", type=folder_name, help="a folder in stages/distros/ that has a Dockerfile, e.g. ubuntu-26.04")
     p.add_argument("desktop", type=folder_name, help="e.g. gnome")

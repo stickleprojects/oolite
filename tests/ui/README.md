@@ -27,15 +27,15 @@ those check what the game does; these check what ends up on the screen.
 
 | I want to know... | Run | Roughly |
 |---|---|---|
-| Does my build start and draw? (smoke test) | `./uitest mine:/path/Oolite.AppImage --env marco --quick --desc "..." --name smoke` | 1 min |
-| Does the title menu appear and respond to keys and clicks? | `./uitest mine:/path/Oolite.AppImage --env marco --tests title_menu_is_displayed,title_menu_responds_to_keys,title_menu_item_can_be_clicked --runs 1 --desc "..." --name menu` | 1 min |
-| Does my build behave under every window manager? | `./uitest mine:/path/Oolite.AppImage --toggle --desc "..." --name all-wms` (add `--wayland` for the Wayland compositors) | about 1 min per run; 10 runs per environment by default |
-| Does my change fix the bug without breaking anything? | `./uitest base:/path/Base.AppImage fix:/path/Fix.AppImage --toggle --desc "..." --name fix-vs-base` | the above, twice |
-| What does KWin actually draw (title bars, fullscreen)? | `./uitest mine:/path/Oolite.AppImage --env kwin-xwayland-headed --tests f12_toggle --toggle --runs 1 --desc "..." --name kwin-look` (opens a window on your desktop) | 1 min |
-| Does it work on my own desktop, with my drivers? | `./uitest mine:/path/Oolite.AppImage --env "" --host --toggle --desc "..." --name my-desktop` (opens game windows and presses keys; `--env ""` = no Docker environments; the same tests as in Docker) | about 1 min per run, 5 runs |
+| Does my build start and draw? (smoke test) | `./uitest.py mine:/path/Oolite.AppImage --env marco --quick --desc "..." --name smoke` | 1 min |
+| Does the title menu appear and respond to keys and clicks? | `./uitest.py mine:/path/Oolite.AppImage --env marco --tests title_menu_is_displayed,title_menu_responds_to_keys,title_menu_item_can_be_clicked --runs 1 --desc "..." --name menu` | 1 min |
+| Does my build behave under every window manager? | `./uitest.py mine:/path/Oolite.AppImage --toggle --desc "..." --name all-wms` (add `--wayland` for the Wayland compositors) | about 1 min per run; 10 runs per environment by default |
+| Does my change fix the bug without breaking anything? | `./uitest.py base:/path/Base.AppImage fix:/path/Fix.AppImage --toggle --desc "..." --name fix-vs-base` | the above, twice |
+| What does KWin actually draw (title bars, fullscreen)? | `./uitest.py mine:/path/Oolite.AppImage --env kwin-xwayland-headed --tests f12_toggle --toggle --runs 1 --desc "..." --name kwin-look` (opens a window on your desktop) | 1 min |
+| Does it work on my own desktop, with my drivers? | `./uitest.py mine:/path/Oolite.AppImage --env "" --host --toggle --desc "..." --name my-desktop` (opens game windows and presses keys; `--env ""` = no Docker environments; the same tests as in Docker) | about 1 min per run, 5 runs |
 | I changed the framework itself: is it still right? | `python3 -m pytest tests -q` (no Docker, no game) | 40 s |
 
-`--env` takes one or more environment names (`./uitest --list` shows them all). `--tests` picks tests by name. `--runs` sets how
+`--env` takes one or more environment names (`./uitest.py --list` shows them all). `--tests` picks tests by name. `--runs` sets how
 many times each environment is repeated. The last line of the output is `PASS` or `FAIL`; `-q` prints only that.
 
 ## Why there are several kinds of run
