@@ -18,6 +18,7 @@ pinned Docker images. `uitest` is plain stdlib Python, so it can later be hooked
 | `run_unattended.sh` | the full comparison, unattended: every environment x screen x build, resumable (see [Unattended runs](#unattended-runs-run_unattendedsh)) |
 | [`LESSONS.md`](LESSONS.md) | what we learnt making the tests reliable: each environment quirk, its cause and fix (read before "fixing" something odd; add to it) |
 | `environments.toml` | the test environments: one `[env.<name>]` table per window manager or compositor |
+| [`stages/`](stages/README.md) | the steps of a run (start the desktop, launch, observe, collect, tidy up) as scripts you can run by hand in a container: `uitest stages shell` / `uitest stages run` (#80; Ubuntu 26.04 GNOME Wayland so far) |
 | `docker/` | one Dockerfile per family of environments (see its README) |
 | `src/oolite_ui_test_framework/` | the framework itself (see its README) |
 | `tests/` | the framework's own offline tests (see its README) |

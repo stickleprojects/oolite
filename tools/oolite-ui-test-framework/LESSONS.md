@@ -28,6 +28,11 @@ symptom, cause, fix, and where (PR / issue). Open questions go under [Still open
 | sway-native: no keys, clicks or screenshots | No X server for XTEST or for the X11 grab | `uitest-wlrinput` (`docker/wlrinput.c`), the standard virtual-keyboard and virtual-pointer protocols, `keys = "virtual"`; screenshots with `grim` cropped to the client area from sway's tree (`window_rect`); `repeat_rate 0` for the virtual keyboard. Verified 3 runs: title menu, keys, clicks and F12 pass | #44 |
 | sway-native: keys test failed in run 1 only ("the game logged no key presses") | The first key from a new virtual keyboard makes it the seat's keyboard and sends the game its keymap; that key was lost. Later runs reuse the running injector | `uitest-wlrinput` taps Shift once when it starts | #44 |
 | sway-native: F12 with a saved window larger than the screen fails `centred` in run 1 only | Not known. The window is 4096x1336 in every run; sway's tree after the round trip reports 4100x1338 in run 1 and 3844x1082 later | Open | #57 |
+| stages (#80): `gnome-shell` never answers on the session bus, `dbus-launch: command not found` | Ubuntu 26.04 has no `dbus-launch` (it is in `dbus-x11`, which `ubuntu-desktop` does not pull in) | `dbus-daemon --session --fork --print-address --print-pid` gives the address and pid | #80 |
+| stages (#80): `org.gnome.Shell.Eval '"up"'` fails with `ReferenceError: up is not defined` | A bare string literal is not accepted as the script's value | Evaluate `String("up")` | #80 |
+| stages (#80): observe prints `TypeError: w.get_maximized is not a function` | GNOME 50 / mutter 50 has `is_maximized()` (and `get_maximize_flags()`), not `get_maximized()` | `w.is_maximized()` | #80 |
+| stages (#80): Eval results come back with escaped quotes, so `"game":true` is never found | GNOME 50 JSON-encodes the returned string once more: `(true, '"{\\"a\\":1}"')` | `shell_js` decodes it with `json.loads` when the value is quoted | #80 |
+| stages (#80): `player` cannot write to the mounted `/out` (NTFS host) | NTFS ignores `chmod`: the folder stays 755 and owned by the host uid, which is not `player` (1001) | The stages write to `/tmp/res`; root copies it into `/out` at the end and chowns it to the host user | #80 |
 | kwin-xwayland: window 36 px lower after the F12 round trip | About KWin's title-bar height; within the 40 px tolerance | Not fixed, recorded | #11 (open) |
 | mutter 2head: F12 did nothing (no focus) | Harness problem in both builds, not a game difference | Re-checked once the Debian image had `cvt` | #10 |
 | Ubuntu 26.04 GNOME 50: game window has no title bar (upstream #793) | The AppImage does not bundle libdecor, so quick-sharun renames SDL3's `libdecor-0.so` reference to a library that does not exist. GNOME does not draw title bars for Wayland apps, and SDL3 uses native Wayland only when the compositor offers `fifo-v1` (GNOME 50 does, GNOME 46 does not). On 24.04 SDL3 runs through XWayland and GNOME draws the title bar, which hid the problem | Build: bundle libdecor-mini (`install_libdecor_fn.sh`, only with `OOLITE_DISPOSABLE_BUILD_MACHINE=true`), `DEPLOY_SDL=1`, quick-sharun pinned. Plain libdecor was not enough: it borrows the player's GTK plugin, so no title bar without it (3/3) and GTK3 loaded into the game with it. Workaround: `SDL_VIDEODRIVER=x11`. Verified on headless and headed GNOME 50 in an `ubuntu-desktop` container, Arch and Ubuntu builds, with and without the player's plugin. Our harness has no mutter-native window probe (#45), so this was measured by hand with `org.gnome.Shell.Eval`. Lesson: test a bundled library both with and without the matching host packages | #75 |
@@ -57,6 +62,10 @@ symptom, cause, fix, and where (PR / issue). Open questions go under [Still open
 
 ## Harness and runner
 
+- **Run the framework tests with `docker/run-framework-tests.sh`**, which mounts the whole repository read-only. Mounting only this
+  folder gave 18 errors, `FileNotFoundError: '/tests/ui/app/test_launch.py'`, because `test_plugin.py` reads the game's tests in
+  `<repo>/tests/ui`. On the host the OCR tests skip without tesseract, so a host run is not a full result (262 passed in Docker, none
+  skipped, 2026-11-08; #80).
 - **Preconditions fail with their own reason**, `PRECONDITION <name>: <expected, found>`, instead of a misleading assertion. Each one in
   `preconditions.py` says how it was learnt (#32).
 - **Results are written as each run finishes**, and copied into `<name>.raw` every 2 s, so a long run shows progress and a stopped run

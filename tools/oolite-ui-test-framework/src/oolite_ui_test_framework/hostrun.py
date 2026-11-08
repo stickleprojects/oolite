@@ -397,11 +397,13 @@ def device_args(e, exists=os.path.exists):
     return [a for d in e.devices if exists(d) for a in ("--device", d)]
 
 
-def image_hash(dockerfile, root=PKG):
+def image_hash(dockerfile, root=PKG, with_docker_dir=True):
     """sha256 (16 hex) of an image's Dockerfile and every file in docker/ (what its COPY lines can take): the label that tells a stale
-    image from a current one."""
+    image from a current one.
+    with_docker_dir=False: the Dockerfile alone (the stages' images copy nothing from docker/)."""
     h = hashlib.sha256()
-    files = sorted({os.path.join(root, dockerfile)} | {os.path.join(d, f) for d, _, fs in os.walk(os.path.join(root, "docker")) for f in fs})
+    extra = {os.path.join(d, f) for d, _, fs in os.walk(os.path.join(root, "docker")) for f in fs} if with_docker_dir else set()
+    files = sorted({os.path.join(root, dockerfile)} | extra)
     for f in files:
         h.update(os.path.relpath(f, root).encode() + b"\0")
         with open(f, "rb") as fh: h.update(fh.read() + b"\0")
@@ -527,6 +529,10 @@ def run_one(a, build, name=None, note=""):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["stages"]:
+        from . import stages
+        try: return stages.main(argv[1:])
+        except SystemExit as e: return e.code if isinstance(e.code, int) else EXIT_ERROR
     if argv[:1] == ["compare"]:
         try: return compare_main(argv[1:])
         except SystemExit as e: return e.code if isinstance(e.code, int) else EXIT_ERROR
