@@ -62,6 +62,10 @@ symptom, cause, fix, and where (PR / issue). Open questions go under [Still open
 
 ## Harness and runner
 
+- **Run the framework tests with `docker/run-framework-tests.sh`**, which mounts the whole repository read-only. Mounting only this
+  folder gave 18 errors, `FileNotFoundError: '/tests/ui/app/test_launch.py'`, because `test_plugin.py` reads the game's tests in
+  `<repo>/tests/ui`. On the host the OCR tests skip without tesseract, so a host run is not a full result (262 passed in Docker, none
+  skipped, 2026-11-08; #80).
 - **Preconditions fail with their own reason**, `PRECONDITION <name>: <expected, found>`, instead of a misleading assertion. Each one in
   `preconditions.py` says how it was learnt (#32).
 - **Results are written as each run finishes**, and copied into `<name>.raw` every 2 s, so a long run shows progress and a stopped run

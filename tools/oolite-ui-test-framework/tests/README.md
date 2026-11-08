@@ -5,8 +5,13 @@ the game are in [`tests/ui/`](../../../tests/ui/) at the repo root.
 
 Run from `tools/oolite-ui-test-framework/`:
 
-    python3 -m pytest tests -q            # about 40 s; the OCR tests skip without tesseract
-    docker/run-ocr-tests.sh [image]       # the OCR tests with real tesseract, inside one of the Docker images
+    docker/run-framework-tests.sh [image] # the whole suite inside a Docker image with tesseract: nothing skips (about 4 min)
+    python3 -m pytest tests -q            # on the host: about 1 min, but the OCR tests skip without tesseract
+    docker/run-ocr-tests.sh [image]       # only the OCR tests, inside a Docker image
+
+Use `run-framework-tests.sh` for a full result: a skipped OCR test is a gap, not a pass. It mounts the whole repository, because
+`test_plugin.py` reads the game's tests in `tests/ui/` at the repo root; mounting only this folder makes those tests fail with
+`FileNotFoundError: '/tests/ui/...'`.
 
 | Path | What it holds |
 |---|---|
