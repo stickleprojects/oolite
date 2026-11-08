@@ -100,10 +100,12 @@ run_script() {
         echo "📦 Installing AppImage Tools..."
         install_package appimage
         BIN="/usr/local/bin"
-        download "https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/quick-sharun.sh" "$BIN" "+x"
+        download "https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/7cb538a024588e29de89c2cea19cee8c9eca31c7/useful-tools/quick-sharun.sh" "$BIN" "+x"
         download "https://raw.githubusercontent.com/AppImage/AppImages/master/appdir-lint.sh" "$BIN" "+x"
         download "https://raw.githubusercontent.com/AppImage/AppImages/master/excludelist" "$BIN"
         download "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage" "$BIN" "+x"
+        source ./install_libdecor_fn.sh
+        install_libdecor || return 1
     fi
 
     if [[ "$INSTALL_FLATPAK" == true ]]; then  # For building Flatpak

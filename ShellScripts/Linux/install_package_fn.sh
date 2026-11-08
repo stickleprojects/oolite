@@ -149,6 +149,15 @@ install_package() {
                 arch) pkg_name="file fuse3 desktop-file-utils patchelf zsync" ;;
             esac ;;
 
+        "libdecor")
+            case "$CURRENT_DISTRO" in
+                debian) pkg_name="libdecor-0-0" ;;
+                redhat) pkg_name="libdecor" ;;
+                arch) pkg_name="libdecor" ;;
+            esac ;;
+
+        "zstd") pkg_name="zstd" ;;
+
         "flatpak") pkg_name="flatpak flatpak-builder" ;;
 
         *)

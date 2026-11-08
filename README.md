@@ -186,6 +186,20 @@ This action builds an AppImage for development which can be found in the `build`
 ./mk.sh pkg-appimage dev
 ```
 
+This needs the AppImage tools, installed with `sudo ShellScripts/Linux/install_packages_root.sh --appimage`
+(or `--core+appimage` for the build dependencies as well).
+
+The tools include libdecor, which the AppImage bundles so that the game can draw its own title bar on GNOME
+Wayland. On your machine this is your distribution's libdecor, and nothing on your system is replaced. An AppImage
+built this way shows a title bar on GNOME Wayland only if the player has libdecor's plugins installed.
+
+Published AppImages are built in CI containers with `OOLITE_DISPOSABLE_BUILD_MACHINE=true`. That flag makes the
+install script **replace** the system libdecor with
+[libdecor-mini](https://github.com/QaidVoid/libdecor-rs), which draws the title bar itself and does not depend
+on the player's system. Only set it on a throwaway build machine, never on one you keep. A separate flag is used
+rather than `CI=true` because CI systems also set `CI=true` on machines that are kept (self-hosted runners), and
+some developers set it in their shells. See `ShellScripts/Linux/install_libdecor_fn.sh`.
+
 This action builds a Flatpak which can be found in the `build` folder:
 
 ```bash
