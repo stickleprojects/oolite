@@ -14,12 +14,22 @@
 wait=60 settle=5 shot=
 while [ $# -gt 0 ]; do
     case $1 in
-        --wait) wait=$2; shift 2 ;;
-        --settle) settle=$2; shift 2 ;;
-        --screenshot) shot=$2; shift 2 ;;
-        *) die "unknown option $1" ;;
+        --wait) [ $# -ge 2 ] || die "--wait needs a value: seconds"; wait=$2; shift 2 ;;
+        --settle) [ $# -ge 2 ] || die "--settle needs a value: seconds"; settle=$2; shift 2 ;;
+        --screenshot) [ $# -ge 2 ] || die "--screenshot needs a value: the PNG path"; shot=$2; shift 2 ;;
+        *) die "unknown option $1. Usage: observe.sh [--wait SECONDS] [--settle SECONDS] [--screenshot PNG]" ;;
     esac
 done
+[[ $wait =~ ^[0-9]+$ ]] || die "--wait must be a whole number of seconds, not '$wait'"
+[[ $settle =~ ^[0-9]+$ ]] || die "--settle must be a whole number of seconds, not '$settle'"
+if [ -n "$shot" ]; then
+    [ -d "$(dirname "$shot")" ] || die "cannot save the screenshot: folder $(dirname "$shot") does not exist; create it, or give another --screenshot path"
+    [ -w "$(dirname "$shot")" ] || die "cannot save the screenshot: folder $(dirname "$shot") is not writable; give another --screenshot path, e.g. /tmp/shot.png"
+fi
+need_cmd gdbus python3
+need_desktop WAYLAND_DISPLAY
+[ -n "${GAME_PID:-}" ] || die "no game launched (GAME_PID not set in $UITEST_STATE): run \`stage.sh launch-linux\` first"
+kill -0 "$GAME_PID" 2>/dev/null || echo "observe.sh: the game (pid $GAME_PID) has exited; see ${GAME_OUT:-$UITEST_LOGS/game.out}. Run \`stage.sh tidyup\` and \`stage.sh launch-linux\` to start it again" >&2
 js='(() => {
   const r = x => [x.x, x.y, x.width, x.height];
   const all = global.display.list_all_windows().map(w => ({title: w.get_title() || "", client: w.get_client_type() == 0 ? "wayland" : "x11",
@@ -29,9 +39,9 @@ js='(() => {
   const [sw, sh] = global.display.get_size();
   return JSON.stringify({screen: [sw, sh], windows: game.length ? game : all, game: game.length > 0});
 })()'
-game_up() { shell_js "$js" | grep -q '"game":true'; }
+game_up() { local out; out=$(shell_js "$js") && [[ $out == *'"game":true'* ]]; }
 found=1
 if wait_for "$wait" game_up; then sleep "$settle"; else found=0; fi
-shell_js "$js" || die "GNOME Shell is not answering"
+shell_js "$js" || die "GNOME Shell is not answering (see $UITEST_LOGS/gnome-shell.log): run \`stage.sh tidyup --all\`, then \`stage.sh start\`"
 [ -n "$shot" ] && { shell_screenshot "$shot" || echo "observe.sh: screenshot failed" >&2; }
-[ $found = 1 ] || { echo "observe.sh: no game window after ${wait} s (all windows listed)" >&2; exit 1; }
+[ $found = 1 ] || { echo "observe.sh: no game window after ${wait} s (all windows listed). Is the game running? See ${GAME_OUT:-$UITEST_LOGS/game.out}; \`stage.sh tidyup\` then \`stage.sh launch-linux\` starts it again" >&2; exit 1; }

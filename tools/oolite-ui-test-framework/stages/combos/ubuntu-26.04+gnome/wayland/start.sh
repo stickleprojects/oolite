@@ -4,10 +4,11 @@
 # Whether GNOME on other distros needs the same is checked when they are added (#80 step 4); if so, the fake logind moves to
 # desktops/gnome/wayland/ (or a helper shared by the containers) and this combo shrinks to the XDG_CURRENT_DESKTOP line.
 . "$UITEST_STAGES/common/lib.sh"
-[ -S /run/dbus/system_bus_socket ] || { sudo mkdir -p /run/dbus && sudo dbus-daemon --system --fork; } || die "no system bus"
+need_cmd sudo dbus-daemon gdbus python3
+[ -S /run/dbus/system_bus_socket ] || { sudo mkdir -p /run/dbus && sudo dbus-daemon --system --fork; } || die "cannot start the system bus: the user needs passwordless sudo (the stages image sets that up for player)"
 if ! gdbus introspect --system -d org.freedesktop.login1 -o /org/freedesktop/login1 >/dev/null 2>&1; then
     sudo python3 -m dbusmock --system --template logind >"$UITEST_LOGS/logind-mock.log" 2>&1 &
     wait_for 15 gdbus introspect --system -d org.freedesktop.login1 -o /org/freedesktop/login1 ||
-        die "fake logind did not start: $(tail -3 "$UITEST_LOGS/logind-mock.log")"
+        die "fake logind did not start (log $UITEST_LOGS/logind-mock.log: $(tail -3 "$UITEST_LOGS/logind-mock.log" | tr '\n' ' ')): is python3-dbusmock installed? Run \`stage.sh tidyup --all\`, then \`stage.sh start\`"
 fi
 UITEST_XDG_CURRENT_DESKTOP=ubuntu:GNOME exec bash "$UITEST_STAGES/desktops/gnome/wayland/start.sh" "$@"
