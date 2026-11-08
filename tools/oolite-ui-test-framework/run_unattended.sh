@@ -45,7 +45,7 @@ log "   framework $(git describe --always --dirty 2>/dev/null)"
 cell() {
     local dir=$1 name=$2 build=$3; shift 3
     local t0=$SECONDS rc
-    timeout --kill-after=2m "$((CELL_TIMEOUT + 10))m" ./uitest run "$build" --out "$dir" --name "$name" --no-prompt \
+    timeout --kill-after=2m "$((CELL_TIMEOUT + 10))m" ./uitest.py run "$build" --out "$dir" --name "$name" --no-prompt \
         --cell-timeout "$CELL_TIMEOUT" --desc "$DESC" "$@" >> "$LOG" 2>&1
     rc=$?
     [ $rc -eq 124 ] || [ $rc -eq 137 ] && log "   uitest itself TIMED OUT ($rc): $name"
@@ -88,13 +88,13 @@ for b in $BUILDS; do
     { python3 -c 'import json,sys; print("PURPOSE " + json.dumps(sys.argv[1]))' "$DESC"
       cat "$OUT"/cells/"$l"-*.raw 2>/dev/null | grep -v '^PURPOSE '; } > "$set.raw"
     for f in "$OUT"/cells/"$l"-*-env.txt; do [ -f "$f" ] && { echo "== $(basename "$f")"; cat "$f"; echo; }; done > "$set-env.txt"
-    ./uitest --report-only "$set.raw" --control "$l" --minruns "$RUNS" >> "$LOG" 2>&1 || true
+    ./uitest.py --report-only "$set.raw" --control "$l" --minruns "$RUNS" >> "$LOG" 2>&1 || true
     log "   $l: $set.md"
     sets+=("$set")
 done
 if [ ${#sets[@]} -ge 2 ]; then
     cands=(); for s in "${sets[@]:1}"; do cands+=(--candidate "$s"); done
-    ./uitest compare --control "${sets[0]}" "${cands[@]}" --minruns "$RUNS" --desc "$DESC" --report "$OUT/compare.md" >> "$LOG" 2>&1
+    ./uitest.py compare --control "${sets[0]}" "${cands[@]}" --minruns "$RUNS" --desc "$DESC" --report "$OUT/compare.md" >> "$LOG" 2>&1
     log "   compare rc=$?: $OUT/compare.md"
 fi
 log "== finished. Cells: $TSV. Any rc other than 0/1 or a TIMED OUT above is worth a look."

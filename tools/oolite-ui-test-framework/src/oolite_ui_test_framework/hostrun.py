@@ -350,7 +350,7 @@ class Runner:
 
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="uitest", description="Window frame / focus / centring tests for Oolite builds. `uitest run LABEL:APPIMAGE` tests one build; "
+    p = argparse.ArgumentParser(prog="uitest.py", description="Window frame / focus / centring tests for Oolite builds. `uitest run LABEL:APPIMAGE` tests one build; "
                                 "`uitest compare --control SET --candidate SET` compares saved result sets; with several builds the FIRST label is the control.")
     p.add_argument("builds", nargs="*", help="label:path/to/Oolite.AppImage (`uitest run` takes exactly one)")
     p.add_argument("--env", "--wm", dest="env", default=DEFAULT_ENVS, help="environment names from environments.toml (default: the X11 window managers)")
@@ -437,7 +437,7 @@ def failed_tests(raw):
 
 
 def compare_parser():
-    p = argparse.ArgumentParser(prog="uitest compare", description="Verdicts (FIXED / REGRESSED / ...) from result sets written by separate `uitest run`s.")
+    p = argparse.ArgumentParser(prog="uitest.py compare", description="Verdicts (FIXED / REGRESSED / ...) from result sets written by separate `uitest run`s.")
     p.add_argument("--control", required=True, metavar="SET", help="the control's result set: results/<name> or results/<name>.raw")
     p.add_argument("--candidate", action="append", required=True, metavar="SET", help="a candidate's result set (repeatable)")
     p.add_argument("--report", metavar="PATH", help="markdown report path; default results/compare-<date>-<candidates>.md")

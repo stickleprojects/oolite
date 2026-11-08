@@ -144,7 +144,7 @@ jobs:
         run: |
           APP=$(find "$GITHUB_WORKSPACE/appimage" -name '*.AppImage' | head -1)
           chmod +x "$APP"
-          ./uitest "${{ steps.build.outputs.label }}:$APP" --env "${{ matrix.envs }}" --runs "$RUNS" --toggle --name "ci-${{ matrix.image }}" \
+          ./uitest.py "${{ steps.build.outputs.label }}:$APP" --env "${{ matrix.envs }}" --runs "$RUNS" --toggle --name "ci-${{ matrix.image }}" \
               --desc "CI: ${{ matrix.image }} environments, $SOURCE AppImage (${{ steps.build.outputs.artifact }}) from run ${{ steps.build.outputs.id }}, $RUNS run(s)"
 
       - name: Report in the job summary
