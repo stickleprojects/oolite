@@ -23,3 +23,9 @@ shell_screenshot() {
     gdbus call --session -d org.gnome.Shell.Screenshot -o /org/gnome/Shell/Screenshot \
         -m org.gnome.Shell.Screenshot.Screenshot false false "$1" >/dev/null
 }
+
+# shell_screenshot_area X Y W H PATH: a screenshot of that part of the screen (screen coordinates), through the same API
+shell_screenshot_area() {
+    gdbus call --session -d org.gnome.Shell.Screenshot -o /org/gnome/Shell/Screenshot \
+        -m org.gnome.Shell.Screenshot.ScreenshotArea "$1" "$2" "$3" "$4" false "$5" >/dev/null
+}

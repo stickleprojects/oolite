@@ -4,10 +4,12 @@
 # kind      x11      an X server (Xvfb, or Xorg+dummy for --screen 2head) is started, then `start` commands (the window manager)
 #           wayland  a headless compositor from `start`; session XWayland = the game uses its XWayland, Wayland native = SDL wayland
 #           host     the live desktop: nothing is started (see README, host mode)
+#           stages   the desktop from stages/ (`stage.sh start`), in the image stages/distros/<distro>/Dockerfile; no image or start keys.
+#                    cell = [distro, desktop, session] (folders in stages/), game = native | x11 (#80; stages/README.md)
 # session   X11 | XWayland | Wayland native | live desktop (what the report's "session" column shows)
 # start     shell commands, started in order, kept running ({w} {h} are replaced by the screen size)
 # probes    how the game window is observed; first probe giving a field wins. "name:fields" restricts a probe to some fields
-#           (e.g. "kwin:framed,focused" = take frame and focus from KWin, geometry from the next probe). Probes: x11 kwin sway ask none
+#           (e.g. "kwin:framed,focused" = take frame and focus from KWin, geometry from the next probe). Probes: x11 kwin sway gnome ask none
 # optional  version_cmd/version_re (shown in the report), settle (s before readiness polling, default 4), settle_after (default 3),
 #           ready_timeout (default 20), ready_socket (wayland socket to wait for, default wl0), files {path = text} (~ expands, folders are made), env {VAR = value},
 #           post_start (commands run once the socket is up), focus_na (true if no keyboard focus can exist, e.g. headless weston), keys (how keys and the mouse are injected: xtest, fakeinput = KWin fake-input protocol, needed on headless kwin, or virtual = the virtual-keyboard and virtual-pointer protocols, sway native), keys_na (true if no way to inject keys exists),
@@ -251,3 +253,29 @@ image = "arch"
 kind = "host"
 where = "host"
 probes = ["kwin", "sway", "ask"]
+
+# ---------------------------------------------------------------- stages (#80): the desktop from stages/, observed through observe.sh
+# kind stages: `stage.sh start` starts the desktop in the image built from stages/distros/<distro>/Dockerfile; the game is started by
+# the framework as for every other environment. cell = [distro, desktop, session] (folders in stages/), game = native | x11.
+# RESULT lines add distro= desktop= session= game=. keys_na until GNOME Wayland input is proven (#80 step 2b).
+[env.gnome-wayland-native]
+family = "gnome"
+session = "Wayland native"
+kind = "stages"
+cell = ["ubuntu-26.04", "gnome", "wayland"]
+game = "native"
+probes = ["gnome"]
+version_cmd = "gnome-shell --version"
+distro = "Ubuntu 26.04"
+keys_na = true
+
+[env.gnome-wayland-x11]
+family = "gnome"
+session = "XWayland"
+kind = "stages"
+cell = ["ubuntu-26.04", "gnome", "wayland"]
+game = "x11"
+probes = ["gnome"]
+version_cmd = "gnome-shell --version"
+distro = "Ubuntu 26.04"
+keys_na = true

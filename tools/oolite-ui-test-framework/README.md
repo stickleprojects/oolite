@@ -156,9 +156,15 @@ NOT TESTED and NOT MEASURABLE are never failures.
 - **wayland**: a compositor; with session `XWayland` the game uses its Xwayland, with `Wayland native` it uses SDL's Wayland driver.
   `headed = true` runs it as a window on your desktop.
 - **host**: your own desktop; nothing is started.
+- **stages** (#80): the desktop comes from the [stage scripts](stages/README.md). `cell = [distro, desktop, session]` names the
+  folders in `stages/`, and `game = "native"` or `"x11"` says how the game picks its video driver. The container is built from
+  `stages/distros/<distro>/Dockerfile`; `stage.sh start` starts the desktop and `stage.sh tidyup --all` stops it. The game is
+  started by the framework, as in every other environment. RESULT lines add `distro= desktop= session= game=`. So far:
+  `gnome-wayland-native` and `gnome-wayland-x11` (Ubuntu 26.04, GNOME 50), only when named with `--env`.
 
 How each environment is observed is set by `probes`: `x11` (python-xlib, or xwininfo/xprop/xdotool), `kwin` (KWin scripting over
-D-Bus), `sway` (IPC), `ask` (yes/no questions), `none`. How keys are sent is set by `keys`: X11 key events (default), or `fakeinput`
+D-Bus), `sway` (IPC), `gnome` (the stages' `observe.sh`, i.e. GNOME Shell's own view; it also takes the window screenshots), `ask`
+(yes/no questions), `none`. How keys are sent is set by `keys`: X11 key events (default), or `fakeinput`
 (KWin's fake-input protocol, needed under KWin on Wayland, where X11 key events never reach the game). `devices` lists host devices
 passed into the container: the headless KWin environments need `/dev/udmabuf`, a render device without a GPU (KWin refuses to run
 without one, [KDE 527906](https://bugs.kde.org/show_bug.cgi?id=527906)); if the host lacks it, the `render_device` precondition test

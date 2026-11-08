@@ -37,6 +37,20 @@ EndSection
 """
 
 
+STATE_FILE = "/tmp/uitest/state.env"   # where the stage scripts hand over their variables (stages/common/lib.sh)
+
+
+def read_state(path=STATE_FILE, run=subprocess.run):
+    """{name: value} of the `export NAME=value` lines in a stages state file, with bash's own reading of the quoting."""
+    try: names = re.findall(r"^export ([A-Za-z_][A-Za-z0-9_]*)=", open(path).read(), re.M)
+    except OSError as e: raise SessionError("cannot read the stages state file %s (%s): `stage.sh start` writes it" % (path, e.strerror))
+    if not names: return {}
+    r = run(["bash", "-c", 'set +u; . "$1" || exit 1; shift; for n; do printf "%s\\0" "${!n}"; done', "bash", path] + names, capture_output=True)
+    if r.returncode != 0: raise SessionError("bash cannot read the stages state file %s: %s" % (path, r.stderr.decode(errors="replace").strip()[-200:]))
+    vals = r.stdout.decode(errors="replace").split("\0")[:len(names)]
+    return dict(zip(names, vals))
+
+
 class Session:
     def __init__(self, env, screen="3840x1080", sleep=time.sleep, log_dir="/tmp", probe_kw=None, helper=None):
         self.env = env; self.screen = screen; self.sleep = sleep; self.log_dir = log_dir; self.probe_kw = probe_kw or {}; self.helper = helper
@@ -126,6 +140,8 @@ class Session:
             else:
                 os.environ.pop("DISPLAY", None)
                 self.game_env = {"SDL_VIDEODRIVER": "wayland"}
+        elif e.kind == "stages":
+            self._start_stages()
         else:   # host: the live desktop, nothing is started
             self.game_env = {"SDL_VIDEODRIVER": "wayland" if e.session == "Wayland native" else "x11"}
             if os.environ.get("DISPLAY") and e.session != "Wayland native":
@@ -147,12 +163,40 @@ class Session:
         # the same for sway: the window from its tree, screenshots with grim (wlroots screencopy)
         if self.backend is None and e.kind == "wayland" and e.session == "Wayland native" and sway is not None:
             self.backend = window_probes.SwayBackend(sway, dict(os.environ))
-        if e.session == "XWayland" and self.backend is not None:
+        gnome = next((p for p, _ in self.probes if p.name == "gnome"), None)
+        if self.backend is None and gnome is not None: self.backend = window_probes.GnomeBackend(gnome)
+        if e.session == "XWayland" and self.backend is not None and e.kind != "stages":
             # XWayland generates the key repeat itself (from KWin's fake-input keys too), as release + press pairs: off, as in the X11 sessions
             self.backend.autorepeat_off()
         if e.headed and self.backend is not None:   # the host window manager may resize KWin's window: the output is what XWayland reports
             self.primary = window_probes.primary_monitor(self.backend.monitors()) or self.primary
         return self
+
+    def _stage(self, *args, log=None, timeout=180):
+        """Run `stage.sh ARGS` (stages/bin/stage.sh) -> CompletedProcess; its output also goes to <log_dir>/stage-<log>.log."""
+        cmd = [os.path.join(os.environ.get("UITEST_STAGES", "/stages"), "bin", "stage.sh")] + list(args)
+        try: r = subprocess.run(cmd, capture_output=True, text=True, env=dict(os.environ), timeout=timeout)
+        except subprocess.TimeoutExpired: raise SessionError("`stage.sh %s` did not finish in %d s" % (" ".join(args), timeout))
+        except OSError as e: raise SessionError("cannot run %s (%s): UITEST_STAGES must be the stages/ folder" % (cmd[0], e.strerror))
+        if log:
+            with open(os.path.join(self.log_dir, "stage-%s.log" % log), "w") as f: f.write(r.stdout + r.stderr)
+        return r
+
+    def _start_stages(self):
+        """kind stages: the desktop from `stage.sh start` (stages/), its variables from the state file it writes. The game is started by
+        the framework (scenarios.Game), with SDL's video driver from the environment's `game`."""
+        e = self.env
+        for v in ("UITEST_STAGES", "UITEST_DISTRO", "UITEST_DESKTOP", "UITEST_SESSION"):
+            if not os.environ.get(v): raise SessionError("%s is not set: kind stages runs in the container uitest starts for it, which sets it" % v)
+        os.environ["UITEST_SCREEN"] = "%dx%d" % (self.w, self.h)
+        os.environ["UITEST_GAME_EXTERNAL"] = "1"   # observe.sh: the game is ours, not one `stage.sh launch-linux` started
+        r = self._stage("start", log="start")
+        if r.returncode != 0:
+            raise SessionError("`stage.sh start` failed (exit %d): %s" % (r.returncode, (r.stderr.strip() or r.stdout.strip())[-400:]))
+        os.environ.update(read_state(os.environ.get("UITEST_STATE", STATE_FILE)))
+        os.environ.pop("SDL_VIDEODRIVER", None)
+        self.game_env = {"SDL_VIDEODRIVER": "x11"} if e.game == "x11" else {}
+        self.primary = (0, 0, self.w, self.h)
 
     def grab_screen(self):
         """(w, h, rgb) of the whole compositor output including its decorations: KWin's window on the host display (headed only), else None."""
@@ -261,6 +305,9 @@ class Session:
         if hasattr(self.backend, "close"): self.backend.close()
         if self._injected(): fakeinput.close()
         for p, _ in self.probes: p.close()
+        if self.env.kind == "stages":
+            try: self._stage("tidyup", "--all", log="tidyup", timeout=60)
+            except SessionError: pass   # stopping: the container goes away next anyway
         for p in reversed(self.procs):
             try: os.killpg(p.pid, 15)
             except (OSError, ProcessLookupError): pass

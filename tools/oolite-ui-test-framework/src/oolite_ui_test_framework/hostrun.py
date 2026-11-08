@@ -171,6 +171,26 @@ class Runner:
             if not ok: say("  image build FAILED (see log)")
         self.img_ok[image] = ok; return ok
 
+    def stages_problem(self, e):
+        """kind stages: why the cell cannot run (its stages/ folders, or its image), else ''. Builds the image if needed."""
+        from . import stages
+        try: stages.check_distro(e.cell[0]); stages.check_cell(*e.cell)
+        except stages.StagesError as err: return "%s (environments.toml, env.%s)" % (err, e.name)
+        key = "stages:" + e.cell[0]
+        if key not in self.img_ok: self.img_ok[key] = stages.ensure_image(e.cell[0], say)
+        return "" if self.img_ok[key] else "Docker image %s could not be built" % stages.image_tag(e.cell[0])
+
+    def stages_command(self, e, cname, mounts, extra, pytest_cmd):
+        """docker run for a kind stages cell. Its image runs as `player`, which cannot write to /out on a host filesystem that ignores
+        permissions (NTFS): pytest writes to /tmp/out, and root copies that to /out every 2 s (so <name>.raw still grows during the run)
+        and once more at the end, giving the files to the host user."""
+        from . import stages
+        sync = "sudo cp -r --no-preserve=all /tmp/out/. /out/ 2>/dev/null; sudo chown -R %d:%d /out/%s.* 2>/dev/null" % (os.getuid(), os.getgid(), shlex.quote(self.name))
+        script = ('mkdir -p /tmp/out/%s.parts; ( while sleep 2; do %s; done ) & loop=$!; "$@"; rc=$?; kill $loop 2>/dev/null; %s; exit $rc' % (shlex.quote(self.name), sync, sync))
+        cell = ["-e", "UITEST_STAGES=/uitest/stages", "-e", "UITEST_DISTRO=" + e.cell[0], "-e", "UITEST_DESKTOP=" + e.cell[1], "-e", "UITEST_SESSION=" + e.cell[2]]
+        return (["docker", "run", "--rm", "--init", "--name", cname] + mounts + cell + list(extra) + [stages.image_tag(e.cell[0])]
+                + ["bash", "-c", script, "stages"] + pytest_cmd)
+
     def pytest_args(self, env, screen, part, app, python="python3", tests="/gametests", reg="/uitest/environments.toml", out="/out"):
         """The pytest command; the defaults are the paths inside the containers, host mode passes the host's own."""
         o = "%s/%s" % (out, self.name)
@@ -193,7 +213,8 @@ class Runner:
         app = "/app/" + os.path.basename(self.path)
         # --init: the container's first process passes signals on, so stopping uitest stops the container (a shell as PID 1 ignored them)
         cname = re.sub(r"[^A-Za-z0-9_.-]", "_", "uitest-%d-%s-%s" % (os.getpid(), self.name, part[:-4]))   # Docker's name rules
-        cmd = ["docker", "run", "--rm", "--init", "--name", cname] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, app)
+        if e.kind == "stages": cmd = self.stages_command(e, cname, mounts, extra, self.pytest_args(env, screen, part, app, out="/tmp/out"))
+        else: cmd = ["docker", "run", "--rm", "--init", "--name", cname] + mounts + list(extra) + [self.images[e.image]["tag"]] + give_back_output(self.name) + self.pytest_args(env, screen, part, app)
         limit = (self.a.cell_timeout or 0) * 60
         r, done = self.follow(cmd, part, timeout=limit, stop=lambda: subprocess.run(["docker", "kill", cname], capture_output=True, timeout=60))
         if r.returncode == TIMED_OUT:
@@ -257,9 +278,12 @@ class Runner:
             if env not in self.envs: say("unknown environment '%s' (see environments.toml)" % env); continue
             e = self.envs[env]
             for sc in screens:
-                if e.kind == "wayland" and not sc[0].isdigit(): sc = "3840x1080"
+                if e.kind in ("wayland", "stages") and not sc[0].isdigit(): sc = "3840x1080"
                 if not self.docker_ok: self.skip(env, sc, "not available: " + self.docker_why); continue
-                if not self.ensure_image(e.image): self.skip(env, sc, "not available: Docker image %s could not be built" % self.images[e.image]["tag"]); continue
+                if e.kind == "stages":
+                    why = self.stages_problem(e)
+                    if why: self.skip(env, sc, "not available: " + why); continue
+                elif not self.ensure_image(e.image): self.skip(env, sc, "not available: Docker image %s could not be built" % self.images[e.image]["tag"]); continue
                 extra = device_args(e)   # a missing device is not passed; the render_device precondition test then fails inside
                 if e.headed:
                     h, why = headed_args(); extra = list(h) + extra
@@ -549,7 +573,7 @@ def main(argv=None):
                             "--host-minruns", str(a.host_runs), "--tol", str(a.tol), "--registry", a.registry or registry.DEFAULT_PATH])
     if a.list:
         envs, _ = registry.load(a.registry or None)
-        for n, e in envs.items(): say("%-18s %-8s %-15s %-8s image=%s" % (n, e.family, e.session, e.kind, e.image))
+        for n, e in envs.items(): say("%-20s %-8s %-15s %-8s image=%s" % (n, e.family, e.session, e.kind, e.image or "oolite-stages-" + e.cell[0]))
         return 0
     if not a.builds: build_parser().print_usage(file=sys.stderr); return EXIT_ERROR
     if single and len(a.builds) != 1: print("uitest: error: `uitest run` takes exactly one LABEL:APPIMAGE (compare runs with `uitest compare`)", file=sys.stderr); return EXIT_ERROR

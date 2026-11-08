@@ -248,7 +248,8 @@ def test_launch_option_errors(box, tmp_path, args, msg):
 
 @pytest.mark.parametrize("args, msg", [
     (["--wait", "soon"], "--wait must be a whole number"), (["--settle", "-1"], "--settle must be a whole number"), (["--wait"], "--wait needs a value"),
-    (["--screenshot", "/no/such/dir/x.png"], "folder /no/such/dir does not exist"), (["--nope"], "unknown option --nope")])
+    (["--screenshot", "/no/such/dir/x.png"], "folder /no/such/dir does not exist"), (["--nope"], "unknown option --nope"),
+    (["--window-shot"], "--window-shot needs a value"), (["--window-shot", "/no/such/dir/x.png"], "folder /no/such/dir does not exist")])
 def test_observe_option_errors(box, args, msg):
     rc, out = bash(box, stage_script("desktops/gnome/wayland/observe.sh"), *args)
     assert rc == 1 and msg in out
@@ -258,6 +259,22 @@ def test_observe_needs_a_launched_game(box, tmp_path):
     started(tmp_path)
     rc, out = bash(box, stage_script("desktops/gnome/wayland/observe.sh"))
     assert rc == 1 and "no game launched (GAME_PID not set" in out and "stage.sh launch-linux" in out
+
+
+def test_observe_skips_the_game_check_for_a_game_the_framework_started(box, tmp_path):
+    """UITEST_GAME_EXTERNAL=1 (set by the framework's kind stages session): no GAME_PID needed; it goes on to ask GNOME."""
+    started(tmp_path)
+    rc, out = bash({**box, "UITEST_GAME_EXTERNAL": "1"}, stage_script("desktops/gnome/wayland/observe.sh"), "--wait", "0")
+    assert rc == 1 and "no game launched" not in out and ("GNOME Shell is not answering" in out or "is not installed" in out), out
+
+
+@pytest.mark.parametrize("seconds, command, rc, tries", [("0", "true", 0, 1), ("0", "false", 1, 1), ("1", "false", 1, 2)])
+def test_wait_for_tries_at_least_once(box, tmp_path, seconds, command, rc, tries):
+    """wait_for 0 is one check (observe.sh --wait 0, which the GNOME probe uses); before, it gave up without looking."""
+    log = tmp_path / "tries"
+    script = '. "$UITEST_STAGES/common/lib.sh"; try() { echo x >> "%s"; %s; }; wait_for %s try' % (log, command, seconds)
+    r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=box)
+    assert r.returncode == rc and log.read_text().count("x") == tries
 
 
 def stage_sh(env, *args, **over):
