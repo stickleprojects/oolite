@@ -4,6 +4,8 @@ Issue #80. Each step of a run is one bash script: start the desktop, launch the 
 Any stage can be run alone, in a container, for one build. `stages-run.py` (and `uitest stages run`) run the same scripts in order.
 
 Only one cell is covered so far: Ubuntu 26.04, GNOME, Wayland, with the game in `native` or `x11` mode.
+The framework's own tests (`tests/ui`) run on it too, through the environments `gnome-wayland-native` and `gnome-wayland-x11`
+(see [The test framework on the stages](#the-test-framework-on-the-stages)).
 
 ## Stages
 
@@ -11,7 +13,7 @@ Only one cell is covered so far: Ubuntu 26.04, GNOME, Wayland, with the game in 
 |---|---|
 | `start` | Starts the desktop and saves its environment variables (`WAYLAND_DISPLAY`, `DISPLAY`, the D-Bus address ...). |
 | `launch-linux [--game native\|x11] [--window WxH] [APPIMAGE]` | Starts the game in the background. `x11` sets `SDL_VIDEODRIVER=x11`, so the game goes through XWayland. |
-| `observe [--wait S] [--settle S] [--screenshot PNG]` | Prints one JSON line with the game's windows as the desktop sees them (frame, client type, focus). Exit 1 if no game window appears. |
+| `observe [--wait S] [--settle S] [--screenshot PNG] [--window-shot PNG]` | Prints one JSON line with the game's windows as the desktop sees them (see [observe.sh output](#observesh-output)). `--wait 0` looks once. `--window-shot` saves the game window's content as a PNG. Exit 1 if no game window appears. |
 | `collect [DEST]` | Copies whatever exists of the stage logs, the game's output, `Latest.log` and the state file to DEST. Prints one `missing:` line per item that is not there, with the stage that creates it. Exit 0 if it collected anything, 1 if nothing. |
 | `tidyup [--all]` | Stops the game and deletes its folder. `--all` also stops the desktop and clears the state file. With nothing running it says so and exits 0. |
 
@@ -81,6 +83,52 @@ stage.sh tidyup --all
 
 `/out` is `results/stages-shell/` on the host. The shell is `player`, and `uitest stages shell` makes `/out` writable for it. On a host filesystem that ignores permissions (NTFS) that does not work: write to `/tmp` and copy with `sudo cp`. `stage.sh which observe` shows which script a stage resolves to.
 
+## observe.sh output
+
+One JSON line on stdout, the last line of the output. Every desktop's `observe.sh` prints this format, and
+`window_probes.parse_observe` reads it; anything else is an error that names the field.
+
+```
+{"screen": [1920, 1080], "game": true,
+ "windows": [{"title": "Oolite v1.93 ...", "client": "wayland", "decorated": false,
+              "frame": [316, 176, 1288, 760], "buffer": [320, 212, 1280, 720], "content": [320, 212, 1280, 720],
+              "title_bar": 36, "focus": true, "fullscreen": false, "maximized": false}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `screen` | `[w, h]` | the screen size |
+| `game` | true / false | whether a game window was found (a title containing "oolite", any case) |
+| `windows` | list | the game's windows; when `game` is false, every window, for the error message |
+| `title` | string | the window title |
+| `client` | `"wayland"` / `"x11"` | what the game really runs as |
+| `decorated` | true / false | the desktop draws the frame itself (GNOME: only for X11 clients) |
+| `frame` | `[x, y, w, h]` | the window as the desktop places it, including any title bar however it is drawn |
+| `buffer` | `[x, y, w, h]` | what the client drew, including any invisible borders or shadows |
+| `content` | `[x, y, w, h]` | the game's own drawing area, without title bar or border |
+| `title_bar` | whole number >= 0 | how far `content` starts below the top of `frame`: 0 when nothing is drawn above the game |
+| `focus`, `fullscreen`, `maximized` | true / false | the window's state |
+
+Rectangles are whole pixels in screen coordinates. A window GNOME has not placed yet shows as `[0, 0, 0, 0]`; the framework treats
+it as not there yet. Real samples from GNOME 50 are in `tests/test_gnome_stages.py`: title bar 0 (pre-#81 build, native), 36
+(libdecor, #81 build, native) and 37 (mutter's frame, x11).
+
+## The test framework on the stages
+
+`./uitest.py run LABEL:APPIMAGE --env gnome-wayland-native,gnome-wayland-x11` runs `tests/ui` on this cell. These environments are
+`kind = "stages"` in `environments.toml`:
+
+- The container is the stages image (`oolite-stages-ubuntu-26.04`), with the framework mounted at `/uitest` and
+  `UITEST_STAGES=/uitest/stages`. pytest runs as `player` and writes to `/tmp/out`; root copies that to the results folder every
+  2 s (`player` cannot write to an NTFS folder).
+- `stage.sh start` starts the desktop; the session reads the state file, so the game gets the same `WAYLAND_DISPLAY`, `DISPLAY` and
+  D-Bus address. `stage.sh tidyup --all` stops it at the end.
+- The framework starts the game itself (saved window size, key logging), not `launch-linux`. It sets `UITEST_GAME_EXTERNAL=1`, which
+  tells `observe.sh` not to look for the `GAME_PID` that `launch-linux` would have saved.
+- The probe `gnome` runs `stage.sh observe --wait 0 --settle 0` for every look, and `--window-shot` for screenshots.
+- Keys and clicks are not sent yet (`keys_na = true`): the title-menu key and click tests and F12 are NOT MEASURABLE here until
+  #80 step 2b.
+
 ## Run them in order
 
 ```
@@ -116,8 +164,7 @@ observe output that is empty, not JSON or lacks keys gives `found=0` and a `why=
 ## Add a desktop or a distro
 
 A new desktop: make `desktops/<desktop>/<session>/` with `start.sh` and `observe.sh`. `observe.sh` prints the same JSON as the GNOME
-one (`{"screen": [w, h], "windows": [{"title", "client", "frame": [x, y, w, h], "focus", ...}], "game": true|false}`) and exits 1 when
-no game window appears. Source `common/lib.sh`, save variables with `state_set`, write why each step is there.
+one (see [observe.sh output](#observesh-output)) and exits 1 when no game window appears. Source `common/lib.sh`, save variables with `state_set`, write why each step is there.
 If a stage is the same for every desktop of a session type, put it in `sessions/<session>/` instead.
 
 A new distro: make `distros/<distro>/Dockerfile` with that distro's standard desktop packages, plus `sudo` and the user `player`

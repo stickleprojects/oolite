@@ -19,7 +19,7 @@ def _flag(rec, key, what):
 
 def check_frame(rec):
     o, why = _flag(rec, "frame", "the window frame")
-    return (o, why if why is not None else "no frame: the window's X parent is the root window")
+    return (o, why if why is not None else "no frame: nothing is drawn around the game window (no title bar; under X11 its parent is the root window)")
 
 
 def check_focus(rec):

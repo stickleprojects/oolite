@@ -4,6 +4,7 @@ Fields a probe cannot measure stay None (reported as NA, never as a failure).
   X11Probe    X11 / XWayland: python-xlib, or xwininfo/xprop/xdotool subprocesses when python-xlib is missing
   KWinProbe   KWin (X11 or Wayland) through its scripting D-Bus API (read-only scripts: one per observation, plus a watcher kept loaded)
   SwayProbe   sway IPC (swaymsg get_tree)
+  GnomeProbe  GNOME Shell, through the stages' observe.sh (stages/desktops/gnome/wayland/observe.sh): kind "stages" environments
   AskProbe    asks the user y/n questions for whatever is still unknown (interactive, host mode)
   NullProbe   measures nothing (compositors with no outside view)
 """
@@ -572,6 +573,103 @@ class SwayProbe(Probe):
         return (parse_sway_tree(tree, self._msg("get_outputs")) if tree else None) or Obs()
 
 
+class ObserveError(ValueError):
+    """observe.sh printed something that is not its documented JSON (stages/README.md, "observe.sh output")."""
+
+
+OBSERVE_RECTS = ("frame", "buffer", "content")
+OBSERVE_FLAGS = ("decorated", "focus", "fullscreen", "maximized")
+
+
+def _rect(w, key, i):
+    v = w.get(key)
+    if not (isinstance(v, list) and len(v) == 4 and all(isinstance(n, int) and not isinstance(n, bool) for n in v)):
+        raise ObserveError("windows[%d].%s is %r, not [x, y, w, h] in whole pixels" % (i, key, v))
+    return tuple(v)
+
+
+def parse_observe(text):
+    """observe.sh's JSON line -> Obs of the game window, or None when there is no game window ("game": false) or it has no size yet
+    (GNOME lists a new window as 0x0 at 0,0 before it is placed). With several game windows, the focused one, else the first.
+    Raises ObserveError, naming the field, for anything that is not the documented format."""
+    try: d = json.loads(text)
+    except ValueError as e: raise ObserveError("not JSON (%s): %r" % (e, text[:200]))
+    if not isinstance(d, dict): raise ObserveError("not a JSON object: %r" % text[:200])
+    for k in ("screen", "game", "windows"):
+        if k not in d: raise ObserveError("no '%s' field in %r" % (k, text[:200]))
+    sc = d["screen"]
+    if not (isinstance(sc, list) and len(sc) == 2 and all(isinstance(n, int) and not isinstance(n, bool) and n > 0 for n in sc)):
+        raise ObserveError("screen is %r, not [w, h]" % (sc,))
+    if not isinstance(d["game"], bool): raise ObserveError("game is %r, not true or false" % (d["game"],))
+    if not isinstance(d["windows"], list): raise ObserveError("windows is %r, not a list" % (d["windows"],))
+    if not d["game"]: return None
+    if not d["windows"]: raise ObserveError("game is true but windows is empty")
+    wins = []
+    for i, w in enumerate(d["windows"]):
+        if not isinstance(w, dict): raise ObserveError("windows[%d] is %r, not an object" % (i, w))
+        if w.get("client") not in ("wayland", "x11"): raise ObserveError("windows[%d].client is %r, not \"wayland\" or \"x11\"" % (i, w.get("client")))
+        for k in OBSERVE_FLAGS:
+            if not isinstance(w.get(k), bool): raise ObserveError("windows[%d].%s is %r, not true or false" % (i, k, w.get(k)))
+        tb = w.get("title_bar")
+        if not isinstance(tb, int) or isinstance(tb, bool) or tb < 0: raise ObserveError("windows[%d].title_bar is %r, not a whole number >= 0" % (i, tb))
+        wins.append((w, {k: _rect(w, k, i) for k in OBSERVE_RECTS}))
+    w, r = next((x for x in wins if x[0]["focus"]), wins[0])
+    if r["frame"][2] <= 0 or r["frame"][3] <= 0: return None
+    return Obs(framed=int(w["title_bar"] > 0), focused=int(w["focus"]), outer=r["frame"], client=r["content"], mon=(0, 0, sc[0], sc[1]),
+               fullscreen=int(w["fullscreen"]), source="compositor")
+
+
+class GnomeProbe(Probe):
+    """GNOME Shell's own view of the window, from the stages' observe.sh (one look, no waiting). A title bar is anything drawn above
+    the game's content: mutter's frame for an X11 client, libdecor's for a native Wayland one (#75)."""
+    name = "gnome"; cheap = True
+
+    def __init__(self, env=None, run=subprocess.run):
+        self.env = dict(env or os.environ); self.env["UITEST_GAME_EXTERNAL"] = "1"; self.run = run
+        self.cmd = [os.path.join(self.env.get("UITEST_STAGES", "/stages"), "bin", "stage.sh"), "observe", "--wait", "0", "--settle", "0"]
+
+    def _call(self, extra=()):
+        try: r = self.run(self.cmd + list(extra), env=self.env, capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired: raise ObserveError("`stage.sh observe` did not answer in 30 s: GNOME Shell is hung (see /tmp/uitest/logs/gnome-shell.log)")
+        line = r.stdout.strip().splitlines()[-1:] or [""]
+        if not line[0]:
+            raise ObserveError("`stage.sh observe` printed nothing (exit %d): %s" % (r.returncode, r.stderr.strip()[-300:]))
+        return r, parse_observe(line[0])
+
+    def observe(self, missing=None):
+        return self._call()[1]
+
+    def window_shot(self):
+        """(width, height, rgb bytes) of the game window's content, or None when there is no game window."""
+        fd, path = tempfile.mkstemp(suffix=".png"); os.close(fd)
+        try:
+            r, o = self._call(["--window-shot", path])
+            if o is None: return None
+            if r.returncode != 0: raise ObserveError("`stage.sh observe --window-shot` failed: %s" % r.stderr.strip()[-300:])
+            from . import png
+            return png.read_png(path)
+        finally:
+            try: os.unlink(path)
+            except OSError: pass
+
+
+class GnomeBackend:
+    """GNOME (kind stages): the game window found and grabbed through GnomeProbe, i.e. observe.sh. No keys or mouse yet (#80 step 2b)."""
+    def __init__(self, probe):
+        self.probe = probe
+
+    def find_window(self):
+        o = self.probe.observe()
+        return 1 if o is not None else None
+
+    def abs_geom(self, w):
+        o = self.probe.observe()
+        return o.client if o is not None else None
+
+    def grab(self, w):
+        return self.probe.window_shot()
+
+
 QUESTIONS = {"framed": "Does the game window have a title bar / frame?",
              "focused": "Do keys respond (press an arrow key or Space: does the game react)?",
              "centred": "Is the window centred on the screen?"}
@@ -702,5 +800,6 @@ def make_probe(name, env=None, backend=None, **kw):
     if name == "x11": return HelperX11Probe(backend) if isinstance(backend, HelperBackend) else X11Probe(backend or x_backend(env))
     if name == "kwin": return KWinProbe(env)
     if name == "sway": return SwayProbe(env)
+    if name == "gnome": return GnomeProbe(env)
     if name == "ask": return AskProbe(**kw)
     return NullProbe()

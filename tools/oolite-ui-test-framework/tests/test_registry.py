@@ -13,7 +13,10 @@ def test_shipped_registry_parses_and_is_consistent():
     envs, images = registry.load(TOML)
     assert {"marco", "xfwm4", "openbox", "muffin", "kwin", "mutter", "kwin-xwayland", "sway-native", "host-native"} <= set(envs)
     for e in envs.values():
-        assert e.image in images and os.path.exists(os.path.join(os.path.dirname(TOML), images[e.image]["dockerfile"]))
+        if e.kind == "stages":   # its image is stages/distros/<distro>/Dockerfile
+            assert os.path.exists(os.path.join(os.path.dirname(TOML), "stages", "distros", e.cell[0], "Dockerfile")) and e.image == ""
+        else:
+            assert e.image in images and os.path.exists(os.path.join(os.path.dirname(TOML), images[e.image]["dockerfile"]))
         assert e.session in registry.SESSIONS
 
 

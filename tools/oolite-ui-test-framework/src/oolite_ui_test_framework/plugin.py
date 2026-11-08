@@ -24,6 +24,7 @@ class State:
         self.timing = {}   # (env, build, run, test) -> [start, seconds over setup + call + teardown]
         self.raw = ""; self.left = collections.Counter()   # --ui-raw; tests still to finish per (env, build, run)
         self.written = set(); self.n_wmver = self.n_hard = self.n_warn = 0   # what is already in the raw file
+        self.cell = {}   # kind stages: distro, desktop, session, game, added to every RESULT line (#80)
 
 
 STATE = State()
@@ -69,7 +70,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "needs_toggle: run only with --ui-toggle (reason recorded as NOT TESTED)")
     config.addinivalue_line("markers", "needs_keys: needs injected keys to reach the game (else NOT MEASURABLE where the environment cannot deliver them)")
     config.addinivalue_line("markers", "needs_mouse: needs injected mouse clicks to reach the game (else NOT MEASURABLE where the environment cannot deliver them)")
-    config.addinivalue_line("markers", "needs_window_probe: needs a probe that sees the window's full-screen state, X11, KWin or sway (else NOT MEASURABLE)")
+    config.addinivalue_line("markers", "needs_window_probe: needs a probe that sees the window's full-screen state, X11, KWin, sway or GNOME (else NOT MEASURABLE)")
     config.addinivalue_line("markers", "saved_window_larger_than_screen: start the game (fresh_game) with a saved window size larger than the screen")
     config.addinivalue_line("markers", "once_per_build: run for run 1 only (environment / AppImage sanity checks)")
     try: envs = registry.load(config.getoption("--ui-registry"))[0]
@@ -79,6 +80,13 @@ def pytest_configure(config):
             config.addinivalue_line("markers", "%s: select with -m" % m)
     shared_launch.check_no_xdist(config)
     STATE.__init__(); STATE.screen = config.getoption("--ui-screen")
+    e = envs.get(config.getoption("--ui-env") or "")
+    if e is not None and e.kind == "stages": STATE.cell = cell_fields(e)
+
+
+def cell_fields(env):
+    """The RESULT fields of a kind stages environment: which distro, desktop, session and game mode it is (#80 plan, option B)."""
+    return {"distro": env.cell[0], "desktop": env.cell[1], "session": env.cell[2], "game": env.game}
 
 
 def _env(config):
@@ -424,9 +432,10 @@ def _case_lines(key):
     if key in STATE.launches or key in STATE.toggles:
         rec = dict(STATE.launches.get(key) or STATE.toggles[key])
         if key in STATE.toggles: rec.update({k: v for k, v in STATE.toggles[key].items() if k.startswith("t_")})
+        rec.update(STATE.cell)
         lines.append(raw_results.format_result(pass_fail.apply_outcomes(rec, STATE.outcomes.get(key, {}))))
     else:   # only `app` tests ran for this case: a RESULT line with just their criteria, so the report counts them
-        rec = dict(wm=key[0], build=key[1], screen=STATE.screen, run=key[2], exited=None, dx=None, dy=None)
+        rec = dict(wm=key[0], build=key[1], screen=STATE.screen, run=key[2], exited=None, dx=None, dy=None, **STATE.cell)
         lines.append(raw_results.format_result(pass_fail.apply_outcomes(rec, STATE.outcomes[key])))
     for test, (o, why) in sorted(STATE.outcomes.get(key, {}).items()):
         start, secs = STATE.timing.get(key + (test,), (None, None))

@@ -5,9 +5,9 @@ from dataclasses import dataclass, field
 
 DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "environments.toml")
 SESSIONS = ("X11", "XWayland", "Wayland native", "live desktop")
-KINDS = ("x11", "wayland", "host")
-PROBES = ("x11", "kwin", "sway", "ask", "none")
-WINDOW_PROBES = ("x11", "kwin", "sway")   # probes that see the window's size and full-screen state, which F12 is judged by
+KINDS = ("x11", "wayland", "host", "stages")
+PROBES = ("x11", "kwin", "sway", "gnome", "ask", "none")
+WINDOW_PROBES = ("x11", "kwin", "sway", "gnome")   # probes that see the window's size and full-screen state, which F12 is judged by
 
 
 class RegistryError(ValueError):
@@ -41,6 +41,8 @@ class Environment:
     headed: bool = False           # the compositor runs as a window on the host X display (GPU passed in); $UITEST_HOST_DISPLAY names it
     where: str = "docker"
     distro: str = ""               # the host distribution, when an image exists to test one (Fedora, Ubuntu): shown in report rows (#74)
+    cell: list = field(default_factory=list)   # kind stages: [distro folder, desktop, session] in stages/, e.g. ["ubuntu-26.04", "gnome", "wayland"]
+    game: str = ""                 # kind stages: native (SDL picks the video driver) | x11 (SDL_VIDEODRIVER=x11)
 
     @property
     def probe_specs(self):
@@ -67,12 +69,20 @@ def parse(data):
     images = data.get("images", {})
     envs = {}
     for name, e in data.get("env", {}).items():
-        for req in ("family", "session", "image", "kind"):
+        for req in ("family", "session", "kind") + (() if e.get("kind") == "stages" else ("image",)):
             if req not in e: raise RegistryError("env.%s: missing '%s'" % (name, req))
         if e["session"] not in SESSIONS: raise RegistryError("env.%s: session must be one of %s" % (name, ", ".join(SESSIONS)))
         if e["kind"] not in KINDS: raise RegistryError("env.%s: kind must be one of %s" % (name, ", ".join(KINDS)))
-        if e["image"] not in images: raise RegistryError("env.%s: unknown image '%s'" % (name, e["image"]))
-        if e["kind"] != "host" and not e.get("start"): raise RegistryError("env.%s: needs a start command" % name)
+        if e["kind"] == "stages":
+            if "image" in e or "start" in e:
+                raise RegistryError("env.%s: kind stages takes no image or start: the image is stages/distros/<distro>/Dockerfile and `stage.sh start` starts the desktop" % name)
+            c = e.get("cell")
+            if not (isinstance(c, list) and len(c) == 3 and all(isinstance(x, str) and x for x in c)):
+                raise RegistryError("env.%s: kind stages needs cell = [distro, desktop, session], e.g. [\"ubuntu-26.04\", \"gnome\", \"wayland\"]" % name)
+            if e.get("game") not in ("native", "x11"): raise RegistryError("env.%s: kind stages needs game = \"native\" or \"x11\"" % name)
+            e = dict(e, image="")
+        elif e["image"] not in images: raise RegistryError("env.%s: unknown image '%s'" % (name, e["image"]))
+        if e["kind"] not in ("host", "stages") and not e.get("start"): raise RegistryError("env.%s: needs a start command" % name)
         known = {f for f in Environment.__dataclass_fields__}
         extra = set(e) - known
         if extra: raise RegistryError("env.%s: unknown key(s) %s" % (name, ", ".join(sorted(extra))))

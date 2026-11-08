@@ -50,11 +50,15 @@ state_set() {
 # state_unset NAME: remove it now and for later stages
 state_unset() { unset "$1"; sed -i "/^export $1=/d" "$UITEST_STATE"; }
 
-# wait_for SECONDS COMMAND...: run COMMAND every 0.5 s until it succeeds; fail after SECONDS
+# wait_for SECONDS COMMAND...: run COMMAND every 0.5 s until it succeeds; fail after SECONDS. It always tries at least once,
+# so `wait_for 0` is a single check.
 wait_for() {
     local n=$(( $1 * 2 )); shift
-    while (( n-- > 0 )); do "$@" >/dev/null 2>&1 && return 0; sleep 0.5; done
-    return 1
+    while :; do
+        "$@" >/dev/null 2>&1 && return 0
+        (( --n > 0 )) || return 1
+        sleep 0.5
+    done
 }
 
 # need_cmd NAME...: every tool must be installed (a stage run on the host instead of in the container lacks them)
