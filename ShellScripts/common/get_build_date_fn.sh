@@ -1,7 +1,4 @@
 #!/bin/bash
-#
-# Calculates the Oolite build date
-#
 
 SUITE_PARENT=$(basename "${BASH_SOURCE[1]}")  # Get the name of the script that is sourcing this file
 ALLOWED_SCRIPT="get_version.sh"  # Define the ONLY script allowed to source this
@@ -13,23 +10,29 @@ fi
 unset SUITE_PARENT ALLOWED_SCRIPT
 
 get_build_date() {
+    # Calculate the Oolite build date in various formats. Called via get_version.sh.
+
     local -n _cpp_date="$1"
     local -n _app_date="$2"
     local -n _buildtime="$3"
     local -n _builder="$4"
     local buildtime="$5"
+    local date_cmd="date"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        date_cmd="gdate"  # GNU date from Homebrew coreutils; BSD date has no -d
+    fi
 
 
     if [[ -z "$buildtime" ]]; then
         local getversion_timestamp=$(git log -1 --format=%ct)
-        _buildtime=$(date -u -d "@$getversion_timestamp" "+%Y.%m.%d %H:%M")
+        _buildtime=$($date_cmd -u -d "@$getversion_timestamp" "+%Y.%m.%d %H:%M")
     else
         _buildtime="$buildtime"
     fi
 
     local clean_date="${_buildtime//./-}"
-    _cpp_date=$(date -u -d "$clean_date" +"%b%e %Y")
-    _app_date=$(date -u -d "$clean_date" +"%Y-%m-%d")
+    _cpp_date=$($date_cmd -u -d "$clean_date" +"%b%e %Y")
+    _app_date=$($date_cmd -u -d "$clean_date" +"%Y-%m-%d")
 
     if [[ "$GITHUB_REPOSITORY" == "OoliteProject/oolite" ]]; then
         _builder="OoliteProject"

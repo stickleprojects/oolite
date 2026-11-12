@@ -72,10 +72,10 @@ MA 02110-1301, USA.
 
     gui_screen = GUI_SCREEN_STICKMAPPER;
     [gui clear];
-    [gui setTitle:[NSString stringWithFormat:@"Configure Joysticks"]];
+    [gui setTitle:[NSString stringWithFormat:@"%@", DESC(@"stickmapper-header")]];
 
     for (i = 0; i < stickCount; i++) {
-        NSString* stickNameForThisRow = [NSString stringWithFormat:@"Stick %d %@", i + 1, [stickList objectAtIndex:i]];
+        NSString* stickNameForThisRow = [NSString stringWithFormat:@"%@ %d %@", DESC(@"stickmapper-stick"), i + 1, [stickList objectAtIndex:i]];
         // for more than 2 sticks, the stick name rows are populated by more than one name if needed
         NSString* stickNameAdditional = nil;
         if (stickCount > 2 && OOStringWidthInEm(stickNameForThisRow) > 18.0) {
@@ -87,7 +87,7 @@ MA 02110-1301, USA.
         }
         unsigned j = i + 2;
         if (j < stickCount) {
-            stickNameAdditional = [NSString stringWithFormat:@"Stick %d %@", j + 1, [stickList objectAtIndex:j]];
+            stickNameAdditional = [NSString stringWithFormat:@"%@ %d %@", DESC(@"stickmapper-stick"), j + 1, [stickList objectAtIndex:j]];
             if (OOStringWidthInEm(stickNameAdditional) > 11.0) {
                 // string is too long, truncate it until its length gets below threshold
                 do {
@@ -108,10 +108,10 @@ MA 02110-1301, USA.
     [gui setKey:GUI_KEY_OK forRow:GUI_ROW_STICKPROFILE];
     [self displayFunctionList:gui skip:skip];
 
-    [gui setArray:[NSArray arrayWithObject:@"Select a function and press Enter to modify or 'u' to unset."]
+    [gui setArray:[NSArray arrayWithObject:DESC(@"stickmapper-help-text-1")]
            forRow:GUI_ROW_INSTRUCT];
 
-    [gui setText:@"Space to return to previous screen." forRow:GUI_ROW_INSTRUCT + 1 align:GUI_ALIGN_CENTER];
+    [gui setText:DESC(@"stickmapper-help-text-2") forRow:GUI_ROW_INSTRUCT + 1 align:GUI_ALIGN_CENTER];
 
     if (resetCurrentRow) {
         [gui setSelectedRow:GUI_ROW_STICKPROFILE];
@@ -125,14 +125,13 @@ MA 02110-1301, USA.
                            view:(MyOpenGLView*)gameView
 {
     OOJoystickManager* stickHandler = [OOJoystickManager sharedStickHandler];
-
     // Don't do anything if the user is supposed to be selecting
     // a function - other than look for Escape.
     if (waitingForStickCallback) {
         if ([gameView isDown:27]) {
             [stickHandler clearCallback];
             [gui setArray:[NSArray arrayWithObjects:
-                                  @"Function setting aborted.", nil]
+                                  DESC(@"stickmapper-set-aborted"), nil]
                    forRow:GUI_ROW_INSTRUCT];
             waitingForStickCallback = NO;
         }
@@ -140,10 +139,11 @@ MA 02110-1301, USA.
         // Break out now.
         return;
     }
-
+    const BOOL* joyButtonState = [stickHandler getAllButtonStates];
     [self handleGUIUpDownArrowKeys];
+    BOOL selectKeyPress = ([self checkKeyPress:n_key_gui_select] || joyButtonState[BUTTON_GUISELECT] || [gameView isDown:gvMouseDoubleClick]);
 
-    if ([gui selectedRow] == GUI_ROW_STICKPROFILE && [gameView isDown:13]) {
+    if ([gui selectedRow] == GUI_ROW_STICKPROFILE && selectKeyPress) {
         [self setGuiToStickProfileScreen:gui];
         return;
     }
@@ -154,7 +154,7 @@ MA 02110-1301, USA.
     else
         selFunctionIdx = -1;
 
-    if ([gameView isDown:13]) {
+    if (selectKeyPress) {
         if ([key hasPrefix:@"More:"]) {
             int from_function = [[[key componentsSeparatedByString:@":"] objectAtIndex:1] intValue];
             if (from_function < 0)
@@ -178,13 +178,13 @@ MA 02110-1301, USA.
         NSString* instructions;
         switch (hw) {
         case HW_AXIS:
-            instructions = @"Fully deflect the axis you want to use for this function. Esc aborts.";
+            instructions = DESC(@"stickmapper-set-help-text-axis");
             break;
         case HW_BUTTON:
-            instructions = @"Press the button you want to use for this function. Esc aborts.";
+            instructions = DESC(@"stickmapper-set-help-text-button");
             break;
         default:
-            instructions = @"Press the button or deflect the axis you want to use for this function.";
+            instructions = DESC(@"stickmapper-set-help-text-either");
         }
         [gui setArray:[NSArray arrayWithObjects:instructions, nil] forRow:GUI_ROW_INSTRUCT];
         waitingForStickCallback = YES;
@@ -264,8 +264,12 @@ MA 02110-1301, USA.
         NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
         [defaults setObject:customEquipActivation forKey:KEYCONFIG_CUSTOMEQUIP];
     } else {
-        [stickHandler setFunction:function withDict:hwDict];
-        [self checkCustomEquipButtons:hwDict ignore:-1];
+        if (function >= BUTTON_GUILEFT && function <= BUTTON_GUISELECT) {
+            [stickHandler setFunction:function withDict:hwDict];
+        } else {
+            [stickHandler setFunction:function withDict:hwDict];
+            [self checkCustomEquipButtons:hwDict ignore:-1];
+        }
         [stickHandler saveStickSettings];
     }
 
@@ -362,7 +366,7 @@ MA 02110-1301, USA.
 
     [gui setColor:[OOColor greenColor] forRow:GUI_ROW_HEADING];
     [gui setArray:[NSArray arrayWithObjects:
-                          @"Function", @"Assigned to", @"Type", nil]
+                          DESC(@"stickmapper-column-function"), DESC(@"stickmapper-column-assigned-to"), DESC(@"stickmapper-column-type"), nil]
            forRow:GUI_ROW_HEADING];
 
     if (!stickFunctions) {
@@ -370,6 +374,7 @@ MA 02110-1301, USA.
     }
     NSDictionary* assignedAxes = [stickHandler axisFunctions];
     NSDictionary* assignedButs = [stickHandler buttonFunctions];
+    NSDictionary* assignedGuiButs = [stickHandler guiButtonFunctions];
 
     NSUInteger i, n_functions = [stickFunctions count];
     NSInteger n_rows, start_row, previous = 0;
@@ -416,16 +421,21 @@ MA 02110-1301, USA.
                 int allowable = [entry oo_intForKey:KEY_ALLOWABLE];
                 switch (allowable) {
                 case HW_AXIS:
-                    allowedThings = @"Axis";
+                    allowedThings = DESC(@"stickmapper-allowed-axis");
                     assignment = [self describeStickDict:
                             [assignedAxes objectForKey:axFuncKey]];
                     break;
                 case HW_BUTTON:
-                    allowedThings = @"Button";
+                    allowedThings = DESC(@"stickmapper-allowed-button");
                     int bf = [butFuncKey integerValue];
                     if (bf < 10000) {
-                        assignment = [self describeStickDict:
+                        if (bf >= BUTTON_GUILEFT && bf <= BUTTON_GUISELECT) {
+                            assignment = [self describeStickDict:
+                                [assignedGuiButs objectForKey:butFuncKey]];
+                        } else {
+                            assignment = [self describeStickDict:
                                 [assignedButs objectForKey:butFuncKey]];
+                        }
                     } else {
                         NSString* key = CUSTOMEQUIP_BUTTONACTIVATE;
                         bf -= 10000;
@@ -438,14 +448,21 @@ MA 02110-1301, USA.
                     }
                     break;
                 default:
-                    allowedThings = @"Axis/Button";
+                    allowedThings = DESC(@"stickmapper-allowed-both");
 
                     // axis has priority
                     assignment = [self describeStickDict:
                             [assignedAxes objectForKey:axFuncKey]];
-                    if (!assignment)
-                        assignment = [self describeStickDict:
+                    if (!assignment) {
+                        int bf = [butFuncKey integerValue];
+                        if (bf >= BUTTON_GUILEFT && bf <= BUTTON_GUISELECT) {
+                            assignment = [self describeStickDict:
+                                [assignedGuiButs objectForKey:butFuncKey]];
+                        } else {
+                            assignment = [self describeStickDict:
                                 [assignedButs objectForKey:butFuncKey]];
+                        }
+                    }
                 }
 
                 // Find out what's assigned for this function currently.
@@ -481,16 +498,16 @@ MA 02110-1301, USA.
             intValue];
         // Button or axis?
         if ([(NSNumber*)[stickDict objectForKey:STICK_ISAXIS] boolValue]) {
-            desc = [NSString stringWithFormat:@"Stick %d axis %d",
-                stickNumber + 1, thingNumber + 1];
+            desc = [NSString stringWithFormat:@"%@ %d %@ %d", 
+                DESC(@"stickmapper-stick"), stickNumber + 1, DESC(@"stickmapper-axis"), thingNumber + 1];
         } else if (thingNumber >= MAX_REAL_BUTTONS) {
-            static const char dir[][6] = { "up", "right", "down", "left" };
-            desc = [NSString stringWithFormat:@"Stick %d hat %d %s",
-                stickNumber + 1, (thingNumber - MAX_REAL_BUTTONS) / 4 + 1,
+            NSString* dir[] = { DESC(@"stickmapper-hat-up"), DESC(@"stickmapper-hat-right"), DESC(@"stickmapper-hat-down"), DESC(@"stickmapper-hat-left") };
+            desc = [NSString stringWithFormat:@"%@ %d %@ %d %@", 
+                DESC(@"stickmapper-stick"), stickNumber + 1, DESC(@"stickmapper-hat"), (thingNumber - MAX_REAL_BUTTONS) / 4 + 1,
                 dir[thingNumber & 3]];
         } else {
-            desc = [NSString stringWithFormat:@"Stick %d button %d",
-                stickNumber + 1, thingNumber + 1];
+            desc = [NSString stringWithFormat:@"%@ %d %@ %d",
+                DESC(@"stickmapper-stick"), stickNumber + 1, DESC(@"stickmapper-button"), thingNumber + 1];
         }
     }
     return desc;
@@ -501,13 +518,13 @@ MA 02110-1301, USA.
     NSString* hwString;
     switch (hwFlags) {
     case HW_AXIS:
-        hwString = @"axis";
+        hwString = DESC(@"stickmapper-axis");
         break;
     case HW_BUTTON:
-        hwString = @"button";
+        hwString = DESC(@"stickmapper-button");
         break;
     default:
-        hwString = @"axis/button";
+        hwString = DESC(@"stickmapper-axis-button");
     }
     return hwString;
 }
@@ -769,6 +786,43 @@ MA 02110-1301, USA.
                             axisfn:STICK_NOFUNCTION
                              butfn:BUTTON_ENERGYBOMB]];
 
+    [funcList addObject:[self makeStickGuiDictHeader:DESC(@"stickmapper-header-gui")]];
+    [funcList addObject:
+        [self makeStickGuiDict:DESC(@"stickmapper-gui-left")
+                         allowable:HW_BUTTON
+                            axisfn:STICK_NOFUNCTION
+                             butfn:BUTTON_GUILEFT]];
+    [funcList addObject:
+        [self makeStickGuiDict:DESC(@"stickmapper-gui-right")
+                         allowable:HW_BUTTON
+                            axisfn:STICK_NOFUNCTION
+                             butfn:BUTTON_GUIRIGHT]];
+    [funcList addObject:
+        [self makeStickGuiDict:DESC(@"stickmapper-gui-up")
+                         allowable:HW_BUTTON
+                            axisfn:STICK_NOFUNCTION
+                             butfn:BUTTON_GUIUP]];
+    [funcList addObject:
+        [self makeStickGuiDict:DESC(@"stickmapper-gui-down")
+                         allowable:HW_BUTTON
+                            axisfn:STICK_NOFUNCTION
+                             butfn:BUTTON_GUIDOWN]];
+    [funcList addObject:
+        [self makeStickGuiDict:DESC(@"stickmapper-gui-page-up")
+                         allowable:HW_BUTTON
+                            axisfn:STICK_NOFUNCTION
+                             butfn:BUTTON_GUIPAGEUP]];
+    [funcList addObject:
+        [self makeStickGuiDict:DESC(@"stickmapper-gui-page-down")
+                         allowable:HW_BUTTON
+                            axisfn:STICK_NOFUNCTION
+                             butfn:BUTTON_GUIPAGEDOWN]];
+    [funcList addObject:
+        [self makeStickGuiDict:DESC(@"stickmapper-gui-select")
+                         allowable:HW_BUTTON
+                            axisfn:STICK_NOFUNCTION
+                             butfn:BUTTON_GUISELECT]];
+
     // misc
     [funcList addObject:[self makeStickGuiDictHeader:DESC(@"stickmapper-header-misc")]];
     [funcList addObject:
@@ -808,12 +862,12 @@ MA 02110-1301, USA.
         int i;
         for (i = 0; i < [customEquipActivation count]; i++) {
             [funcList addObject:
-                    [self makeStickGuiDict:[NSString stringWithFormat:@"Activate '%@'", [[customEquipActivation objectAtIndex:i] oo_stringForKey:CUSTOMEQUIP_EQUIPNAME]]
+                    [self makeStickGuiDict:[NSString stringWithFormat:@"%@ '%@'", DESC(@"stickmapper-cust-activate"), [[customEquipActivation objectAtIndex:i] oo_stringForKey:CUSTOMEQUIP_EQUIPNAME]]
                                  allowable:HW_BUTTON
                                     axisfn:STICK_NOFUNCTION
                                      butfn:(i + 10000)]];
             [funcList addObject:
-                    [self makeStickGuiDict:[NSString stringWithFormat:@"Mode '%@'", [[customEquipActivation objectAtIndex:i] oo_stringForKey:CUSTOMEQUIP_EQUIPNAME]]
+                    [self makeStickGuiDict:[NSString stringWithFormat:@"%@ '%@'", DESC(@"stickmapper-cust-mode"), [[customEquipActivation objectAtIndex:i] oo_stringForKey:CUSTOMEQUIP_EQUIPNAME]]
                                  allowable:HW_BUTTON
                                     axisfn:STICK_NOFUNCTION
                                      butfn:(i + 20000)]];

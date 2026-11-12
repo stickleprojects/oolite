@@ -1,6 +1,2 @@
-mkdocs
-mkdocs-material
+zensical
 mdx-include
-mkdocs-pdf
-mkdocs-page-pdf
-playwright

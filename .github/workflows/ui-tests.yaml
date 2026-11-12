@@ -1,8 +1,8 @@
 # UI tests (tests/ui, tools/oolite-ui-test-framework). Separate from the main build pipeline on purpose: it never blocks a build.
 # - framework-tests: the framework's offline tests, when the framework or the UI tests change.
 # - ui-tests: the game's UI tests, headless in Docker, against the Linux AppImage built by "Build Oolite package for various
-#   platforms" (built on Arch), and the AppImage that "Test Oolite package on various platforms" builds on Ubuntu (#73): each
-#   automatically after a successful run of its workflow on master, or by hand (Actions > UI tests > Run workflow) for any run.
+#   platforms" (built on Arch): automatically after a successful run of that workflow on master, or by hand (Actions > UI tests
+#   > Run workflow) for any run. That workflow only uploads the deployment AppImage; its Ubuntu AppImage is not kept.
 #   Headed KWin and host mode need a desktop and a GPU, so they cannot run here.
 name: UI tests
 on:
@@ -18,27 +18,21 @@ on:
       - 'tests/ui/**'
       - '.github/workflows/ui-tests.yaml'
   workflow_run:
-    workflows: ["Build Oolite package for various platforms", "Test Oolite package on various platforms"]
+    workflows: ["Build Oolite package for various platforms"]
     types: [completed]
     branches: [master, stickleprojects]   # stickleprojects: this fork's default branch, where its builds run (#78)
   workflow_dispatch:
     inputs:
-      source:
-        description: 'Which AppImage: release (built on Arch by "Build Oolite package") or ubuntu (built by "Test Oolite package")'
-        required: false
-        default: 'release'
-        type: choice
-        options: [release, ubuntu]
       build_run_id:
         description: 'Run ID of that workflow to test (empty = its latest successful run on this branch)'
         required: false
         default: ''
       flavour:
-        description: 'AppImage flavour'
+        description: 'AppImage flavour (build-all.yaml only uploads deployment since upstream #788)'
         required: false
         default: 'deployment'
         type: choice
-        options: [deployment, test, dev]
+        options: [deployment]
       runs:
         description: 'Runs per environment (1 = smoke; 10 = enough for the statistics)'
         required: false
@@ -49,7 +43,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ github.event.workflow_run.name || inputs.source }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -92,8 +86,8 @@ jobs:
             envs: openbox-ubuntu
     env:
       FLAVOUR: ${{ inputs.flavour || 'deployment' }}
-      # the triggering workflow decides which AppImage; the Ubuntu job builds deployment only
-      SOURCE: ${{ github.event.workflow_run.name == 'Test Oolite package on various platforms' && 'ubuntu' || inputs.source || 'release' }}
+      # the AppImage built on Arch by "Build Oolite package for various platforms"
+      SOURCE: release
       RUNS: ${{ inputs.runs || '1' }}
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -109,8 +103,7 @@ jobs:
         id: build
         run: |
           ID="${{ github.event.workflow_run.id || inputs.build_run_id }}"
-          if [ "$SOURCE" = ubuntu ]; then WF=test_builds.yaml; ART=oolite-linux-appimage-ubuntu; LABEL=ubuntu-deployment
-          else WF=build-all.yaml; ART=oolite-linux-appimage-$FLAVOUR; LABEL=release-$FLAVOUR; fi
+          WF=build-all.yaml; ART=oolite-linux-appimage-$FLAVOUR; LABEL=release-$FLAVOUR
           if [ -z "$ID" ]; then
             ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$WF" --branch "$GITHUB_REF_NAME" --status success -L 1 --json databaseId --jq '.[0].databaseId')
           fi
