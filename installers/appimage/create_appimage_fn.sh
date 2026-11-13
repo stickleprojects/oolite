@@ -1,11 +1,11 @@
 #!/bin/bash
 
+#
+# Creates the appimage.
+
 create_appimage() {
-    # Creates an appimage. Called via mk.sh.
-    # Parameter one: build type - typically one of "deployment", "test", "dev"
-    # Parameter two: build folder
-    local build_type="$1"
-    local build_folder="$2"
+    local build_type="$1"  # Typically one of "deployment", "test", "dev"
+    local build_folder="$2"  # Build folder
 
     local script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
     pushd "$script_dir"
@@ -43,6 +43,14 @@ create_appimage() {
     export DEPLOY_LOCALE
     local STRACE_MODE=0
     export STRACE_MODE
+
+    # quick-sharun.sh only looks for libc in /usr/lib/<arch>-linux-gnu and /usr/lib, so it stops with
+    # "no library directory found" on distributions that keep 64-bit libraries in /usr/lib64 (Fedora, openSUSE)
+    if [[ -z "${LIB_DIR:-}" ]] && ! compgen -G "/usr/lib/$arch-linux-gnu/libc.so*" > /dev/null \
+        && ! compgen -G "/usr/lib/libc.so*" > /dev/null && compgen -G "/usr/lib64/libc.so*" > /dev/null; then
+        LIB_DIR=/usr/lib64
+        export LIB_DIR
+    fi
 
     # install_metadatainfo_fn already put the files in the parameters below in the right place,
     # but no harm putting again here

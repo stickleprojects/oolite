@@ -2119,7 +2119,7 @@
         [[self getAI] message:@"NOTHING_FOUND"];
     }
 
-    OOJSReportPendingException(context);
+    JS_ReportPendingException(context);
     OOJSRelinquishContext(context);
 }
 

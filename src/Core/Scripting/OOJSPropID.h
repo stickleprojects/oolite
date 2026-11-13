@@ -26,10 +26,6 @@ MA 02110-1301, USA.
 #import "OOFunctionAttributes.h"
 #include <jsapi.h>
 
-/*	Engine-neutral name for a property ID (JSAtom with QuickJS).
- */
-typedef jsid OOJSPropID;
-
 /*
         OOJSID(const char * [literal])
         Macro to create a string-based jsid. The string is interned and converted

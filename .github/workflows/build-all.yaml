@@ -23,48 +23,7 @@ jobs:
           clang-format-version: '22'
           check-path: 'src'
 
-  build-github-pages:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-    steps:
-      - name: Checkout Oolite
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Install packages
-        run: |
-          sudo apt update
-          sudo apt install -y doxygen graphviz jq zip
-      - name: Build site documentation
-        run: |
-          Documentation/build_sitedocs.sh
-      - name: Zip pdfs
-        run: |
-          zip -j ./build/oolite-documentation.zip ./build/documentation/docs/assets/pdfs/*.pdf
-      - name: Archive documentation
-        uses: actions/upload-artifact@v6
-        with:
-          name: oolite-documentation
-          path: |
-            build/oolite-documentation.zip
-          retention-days: 5
-      - name: Setup GitHub Pages
-        # GitHub Pages is only enabled in OoliteProject/oolite; in a fork this step fails.
-        if: github.repository == 'OoliteProject/oolite'
-        uses: actions/configure-pages@v6
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: './build/documentation/site'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        if: github.ref == 'refs/heads/master'
-        uses: actions/deploy-pages@v5
-
-  build-appimage:
+  build-linux:
     needs: clang-format-check
     runs-on: ubuntu-latest
     container:
@@ -73,6 +32,9 @@ jobs:
         --cap-add SYS_ADMIN
         --device /dev/fuse
         --security-opt apparmor:unconfined
+    strategy:
+      matrix:
+        flavour: [deployment, test, dev]
     steps:
       ## This is for debugging only and helps developing the workflow.
       # - name: Environment Variables
@@ -113,120 +75,17 @@ jobs:
           ldconfig
       - name: Build Oolite
         run: |
-          ./mk.sh build deployment --setup-flags="-Ddocs=enabled" --github-repository="$GITHUB_REPOSITORY"
-      - name: Test Oolite
-        if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
-        run: |
-          ./mk.sh test deployment
+          ./mk.sh build ${{matrix.flavour}} --github-repository="$GITHUB_REPOSITORY"
       - name: Package Oolite
         run: |
-          ./mk.sh pkg-appimage deployment
+          ./mk.sh pkg-appimage ${{matrix.flavour}}
       - name: Archive installer
         uses: actions/upload-artifact@v6
         with:
-          name: oolite-linux-appimage-deployment
+          name: oolite-linux-appimage-${{matrix.flavour}}
           path: |
             build/Oolite*.AppImage
           retention-days: 5
-
-  build-ubuntu:
-    needs: clang-format-check
-    runs-on: ubuntu-latest
-    container:
-      image: ubuntu:26.04
-      options: >-
-        --cap-add SYS_ADMIN
-        --device /dev/fuse
-        --security-opt apparmor:unconfined
-    steps:
-      - name: Update Ubuntu
-        run: |
-          apt update          
-          apt install -y git curl ca-certificates zip
-      - name: Pre-setup ownership & curl token
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # This must run before the checkout action if the action tries to do git commands
-          mkdir -p "$GITHUB_WORKSPACE"
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          echo 'header = "Authorization: Bearer '$GITHUB_TOKEN'"' >> ~/.curlrc
-          echo 'header = "Accept: application/vnd.github+json"' >> ~/.curlrc
-      - name: Checkout Oolite
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Install packages
-        env:
-          # throwaway container: lets install_libdecor_fn.sh replace the system libdecor with libdecor-mini (#75).
-          # Our own flag rather than CI=true, which is also set on machines that are kept (see install_libdecor_fn.sh).
-          OOLITE_DISPOSABLE_BUILD_MACHINE: true
-        run: |
-          ShellScripts/Linux/install_packages_root.sh --core+appimage
-      - name: Build GNUstep
-        run: |
-          ShellScripts/Linux/build_gnustep.sh system
-          echo "/usr/local/lib" | tee -a /etc/ld.so.conf
-          ldconfig
-      - name: Install Mozilla static library
-        run: |
-          ShellScripts/Linux/install_mozilla_js.sh system
-      - name: Build Oolite
-        run: |
-          ./mk.sh build dev --setup-flags="-Ddocs=enabled"
-      - name: Test Oolite
-        if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
-        run: |
-          ./mk.sh test dev
-      - name: Build AppImage
-        run: |
-          ./mk.sh pkg-appimage dev
-
-  build-fedora:
-    needs: clang-format-check
-    runs-on: ubuntu-latest
-    container:
-      image: fedora:latest
-      options: >-
-        --cap-add SYS_ADMIN
-        --device /dev/fuse
-        --security-opt apparmor:unconfined
-    steps:
-      - name: Update Fedora
-        run: |
-          dnf -y update
-          dnf -y install git
-      - name: Pre-setup ownership & curl token
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # This must run before the checkout action if the action tries to do git commands
-          mkdir -p "$GITHUB_WORKSPACE"
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          echo 'header = "Authorization: Bearer '$GITHUB_TOKEN'"' >> ~/.curlrc
-          echo 'header = "Accept: application/vnd.github+json"' >> ~/.curlrc
-      - name: Checkout Oolite
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Install packages
-        run: |
-          ShellScripts/Linux/install_packages_root.sh --core
-      - name: Build GNUstep
-        run: |
-          ShellScripts/Linux/build_gnustep.sh system
-      - name: Install Mozilla static library
-        run: |
-          ShellScripts/Linux/install_mozilla_js.sh system
-          echo "/usr/local/lib64" | tee -a /etc/ld.so.conf
-          ldconfig
-      - name: Build Oolite
-        run: |
-          ./mk.sh build test --setup-flags="-Ddocs=enabled"
-      - name: Test Oolite
-        if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
-        run: |
-          ./mk.sh test test
 
   build-flatpak:
     needs: clang-format-check
@@ -255,7 +114,7 @@ jobs:
           echo "Installing gitversion..."
           source ShellScripts/Linux/install_gitversion_fn.sh
           mkdir -p /usr/local/bin
-          install_gitversion /usr/local/bin "."
+          install_gitversion "."
           ./mk.sh pkg-flatpak deployment --github-repository="$GITHUB_REPOSITORY"
       - name: Archive installer
         uses: actions/upload-artifact@v6
@@ -268,6 +127,9 @@ jobs:
   build-windows:
     needs: clang-format-check
     runs-on: windows-latest
+    strategy:
+      matrix:
+        flavour: [deployment, test, dev]
     steps:
       ## This is for debugging only and helps developing the workflow.
       # - name: Environment Variables
@@ -304,89 +166,25 @@ jobs:
           MSYSTEM: UCRT64
           PYTHONUTF8: "1"
         run: |
-          ./mk.sh build deployment --setup-flags="-Ddocs=enabled" --github-repository="$GITHUB_REPOSITORY"
-      - name: Test Oolite
-        if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
-        shell: msys2 {0}
-        env:
-          MSYSTEM: UCRT64
-          PYTHONUTF8: "1"
-        run: |
-          if ./mk.sh test deployment; then
-            echo "✅ Oolite test completed successfully"
-          else
-            echo "❌ Oolite test failed" >&2
-            cd build/meson_deployment/oolite.app
-            ntldd -R oolite.exe
-            exit 1
-          fi
+          ./mk.sh build ${{matrix.flavour}} --github-repository="$GITHUB_REPOSITORY"
       - name: Package Oolite
         shell: msys2 {0}
         env:
           MSYSTEM: UCRT64
           PYTHONUTF8: "1"
         run: |
-          ./mk.sh pkg-win deployment
+          ./mk.sh pkg-win ${{matrix.flavour}}
       - name: Archive installer
         uses: actions/upload-artifact@v6
         with:
-          name: oolite-windows-nsis-deployment
+          name: oolite-windows-nsis-${{matrix.flavour}}
           path: |
             build/OoliteInstall*.exe
           retention-days: 5
 
-  build-macos:
-    needs: clang-format-check
-    runs-on: macos-latest
-    env:
-      HOMEBREW_NO_AUTO_UPDATE: 1
-      HOMEBREW_NO_INSTALL_CLEANUP: 1
-    steps:
-      - name: Checkout Oolite
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Install packages
-        run: |
-          ShellScripts/macOS/install_packages.sh
-      - name: Restore Mozilla static library
-        id: mozilla-js-cache
-        uses: actions/cache@v4
-        with:
-          path: build/mozilla_js
-          key: mozilla-js-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('ShellScripts/macOS/build_mozilla_js.sh', 'ShellScripts/macOS/mozilla_js_arm64.patch') }}
-      - name: Build Mozilla static library
-        if: steps.mozilla-js-cache.outputs.cache-hit != 'true'
-        run: |
-          ShellScripts/macOS/build_mozilla_js.sh
-      - name: Build Oolite
-        run: |
-          ./mk.sh build deployment --setup-flags="-Ddocs=enabled" --github-repository="$GITHUB_REPOSITORY"
-      - name: Test Oolite
-        if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
-        run: |
-          ./mk.sh test deployment
-      # The app is only ad-hoc signed, so Gatekeeper blocks the downloaded DMG's app until the
-      # user allows it in System Settings (issue #779). Fixing that needs Developer ID signing
-      # and notarisation, i.e. signing keys and Apple credentials added as repository secrets.
-      # See sign_app_bundle in ShellScripts/macOS/create_app_bundle_fn.sh.
-      - name: Package Oolite
-        run: |
-          ./mk.sh pkg-dmg deployment
-      - name: Archive installer
-        uses: actions/upload-artifact@v6
-        with:
-          name: oolite-macos-dmg-deployment
-          path: |
-            build/Oolite*.dmg
-          retention-days: 5
-
   release:
-    needs: [build-appimage, build-flatpak, build-windows, build-macos, build-github-pages]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write  # create the release; also needed in forks, where the token is read-only by default
-      actions: write   # remove old workflow runs
+    needs: [build-linux, build-flatpak, build-windows]
+    runs-on: ubuntu-22.04
     # Only run for internal requests (so not for PRs from forks), and only in the main repository
     if: github.repository == 'OoliteProject/oolite' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     steps:
@@ -403,21 +201,19 @@ jobs:
         id: version
         run: |
           set -x          
-          # 1. Check that there are exactly 7 files recursively in the artifacts directory
-          # (includes artifact.tar produced by GitHub pages and 2 Flatpak files)
+          # 1. Check that there are exactly 8 files recursively in the artifacts directory
           FILE_COUNT=$(find artifacts -type f | wc -l)
           echo "Total files found: $FILE_COUNT"          
-          if [[ "$FILE_COUNT" -ne 7 ]]; then
-            FILE_LIST=$(find artifacts -type f | tr '\n' ',' | sed 's/,$//')
-            echo "❌ Expected exactly 7 files, but found $FILE_COUNT: ($FILE_LIST)." >&2
+          if [[ "$FILE_COUNT" -ne 8 ]]; then
+            echo "❌ Expected exactly 8 files, but found $FILE_COUNT." >&2
             exit 1
-          fi
+          fi                    
           # 2. Get the path of the first available AppImage
           APPIMAGE_PATH=$(find artifacts -type f -name "*.AppImage" | head -n 1)          
           if [[ -z "$APPIMAGE_PATH" ]]; then
             echo "❌ No AppImages found in the downloaded artifacts!" >&2
             exit 1
-          fi
+          fi          
           echo "Found AppImage: $APPIMAGE_PATH"                    
           # 3. Run with packageinfo and extract the string inside quotes
           chmod +x "$APPIMAGE_PATH"
@@ -425,7 +221,7 @@ jobs:
           if [[ -z "$VER_FULL" ]]; then
             echo "❌ Failed to extract version string from packageinfo output!" >&2
             exit 1
-          fi
+          fi                     
           echo "Extracted Version: $VER_FULL"          
           # 4. Output the extracted version for subsequent steps
           echo "VER_FULL=$VER_FULL" >> "$GITHUB_OUTPUT"
@@ -450,10 +246,12 @@ jobs:
           target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
           files: |
             artifacts/oolite-windows-nsis-deployment/OoliteInstall-*.exe
+            artifacts/oolite-windows-nsis-test/OoliteInstall-*.exe
+            artifacts/oolite-windows-nsis-dev/OoliteInstall-*.exe
             artifacts/oolite-linux-appimage-deployment/*.AppImage
-            artifacts/oolite-linux-flatpak-deployment/space.oolite.Oolite-[0-9]*.flatpak
-            artifacts/oolite-macos-dmg-deployment/*.dmg
-            artifacts/oolite-documentation/*.zip
+            artifacts/oolite-linux-appimage-test/*.AppImage
+            artifacts/oolite-linux-appimage-dev/*.AppImage
+            artifacts/oolite-linux-flatpak-deployment/*.flatpak
 
       - name: Remove old workflow runs
         if: github.ref == 'refs/heads/master' || endsWith(github.ref, 'maintenance')

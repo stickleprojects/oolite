@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-# Installs all required packages and dependencies. This script must be run as root (for example with sudo).
+# This script must be run as root (for example with sudo).
 
 run_script() {
     # If current user ID is NOT 0 (root)
@@ -69,24 +69,24 @@ run_script() {
 
     source ./install_package_fn.sh
     source ../common/download_fn.sh
+    source ./install_gitversion_fn.sh
 
     local outputdir="../../build"
     mkdir -p "$outputdir"
 
     if [[ "$INSTALL_CORE" == true ]]; then  # Core dependencies
         echo "📦 Installing Core Build Dependencies..."
-        if ! python3 --version >/dev/null 2>&1; then  # Check Python
-            install_package python
-        fi
         pkgs=(
             procps base-devel clang cmake jq meson gnutls-dev icu-dev ffi-dev xslt-dev png-dev zlib-dev nspr-dev
             espeak-ng-dev vorbis-dev openal-dev opengl-dev glu-dev sdl3 x11-dev
-            doxygen
         )
         for pkg in "${pkgs[@]}"; do
             install_package "$pkg"
         done
-        source ./install_gitversion_fn.sh && install_gitversion /usr/local/bin "$outputdir"
+        if ! python3 --version >/dev/null 2>&1; then  # Check Python
+            install_package python
+        fi
+        install_gitversion "$outputdir"
         local espeak_folder="$(uname -m 2>/dev/null || echo x86_64)-linux-gnu"
         if [[ ! -d "/usr/share/espeak-ng-data" &&
               ! -d "/usr/local/share/espeak-ng-data" &&
@@ -94,7 +94,6 @@ run_script() {
             echo "❌ espeak-ng-data not in /usr/share, /usr/local/share or /usr/lib/$espeak_folder!"
             return 1
         fi
-        source ./install_typst_fn.sh && install_typst /usr/local/bin "$outputdir"
     fi
 
     if [[ "$INSTALL_APPIMAGE" == true ]]; then  # For building AppImage

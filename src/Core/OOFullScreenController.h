@@ -31,7 +31,7 @@ MA 02110-1301, USA.
 
 @class MyOpenGLView;
 
-#if OOLITE_MAC_COCOA_UI
+#if OOLITE_MAC_OS_X
 #define kOODisplayWidth ((NSString*)kCGDisplayWidth)
 #define kOODisplayHeight ((NSString*)kCGDisplayHeight)
 #define kOODisplayRefreshRate ((NSString*)kCGDisplayRefreshRate)

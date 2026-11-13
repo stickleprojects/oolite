@@ -1,9 +1,10 @@
 #!/bin/bash -x
+#
+# Prepares the app directory for the flatpak builder
+#
 
 flatpak_postbuild() {
-    # Prepares the app directory for the flatpak builder
-    # Parameter one: build folder
-    local build_folder="$1"
+    local build_folder="$1"  # Build folder
 
     local script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
     pushd "$script_dir"

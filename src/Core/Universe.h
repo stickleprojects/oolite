@@ -319,7 +319,7 @@ enum {
     NSUInteger drawCounter;
 
 #if OOLITE_SPEECH_SYNTH
-#if OOLITE_MAC_COCOA_UI
+#if OOLITE_MAC_OS_X
     NSSpeechSynthesizer* speechSynthesizer;
 #elif OOLITE_ESPEAK
     const espeak_VOICE** espeak_voices;
@@ -731,7 +731,7 @@ enum {
 
 - (NSArray*)listBeaconsWithCode:(NSString*)code;
 
-- (void)allShipsDoScriptEvent:(OOJSPropID)event andReactToAIMessage:(NSString*)message;
+- (void)allShipsDoScriptEvent:(jsid)event andReactToAIMessage:(NSString*)message;
 
 ///////////////////////////////////////
 

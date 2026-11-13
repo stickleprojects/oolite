@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Downloads a release of a package from GitHub
-
 download_github_release() {
     local -n _downloaded_file="$1"
     local owner="$2"

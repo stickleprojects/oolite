@@ -193,7 +193,7 @@ static NSMutableDictionary* sStringCache;
 {
     NSFileManager* fileManager = [NSFileManager defaultManager];
 
-#if OOLITE_MAC_COCOA_UI
+#if OOLITE_MAC_OS_X
     return [[NSBundle mainBundle] resourcePath]; // Use resourcePath directly
 #else
     NSString* startingDir = [fileManager currentDirectoryPath]; // Start from cwd
