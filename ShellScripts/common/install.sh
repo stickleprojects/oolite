@@ -1,5 +1,6 @@
 #!/bin/bash
-# Processes Oolite data files after compilation
+
+# Installs Oolite to given folders
 
 run_script() {
     local stageprogpath="$1"
@@ -17,6 +18,18 @@ run_script() {
     local appname=$(basename "$stageprogpath")
     local progdir=$(dirname "$stageprogpath")
     local installdir="$MESON_INSTALL_DESTDIR_PREFIX"
+    if [[ "$host_os" == "darwin" ]]; then
+        # macOS: install the self-contained app bundle into /Applications
+        local app_dst="${DESTDIR:-}/Applications/Oolite.app"
+        rm -rf "$app_dst"
+        if ! mkdir -p "$(dirname "$app_dst")" || ! ditto "$progdir" "$app_dst"; then
+            echo "❌ Failed to copy '$progdir' to '$app_dst'!" >&2
+            return 1
+        fi
+        echo "✅ Oolite install completed successfully: $app_dst"
+        popd > /dev/null
+        return 0
+    fi
     local fullbindir="$installdir/$bindir"
     rm -f "$fullbindir/oolite"
     if [[ "$host_os" == "linux" ]]; then
@@ -52,6 +65,13 @@ run_script() {
                 echo "❌ Failed to copy '$oolite_debug_src' to '$oolite_debug_dst'!" >&2
                 return 1
             fi
+        fi
+    fi
+    # No PDFs when the documentation was not built (-Ddocs=disabled, or typst not found)
+    if compgen -G "$progdir/*.pdf" > /dev/null; then
+        if ! cp -rfu "$progdir/"*.pdf "$fulldatadir"; then
+            echo "❌ Failed to copy pdfs to '$fulldatadir'!" >&2
+            return 1
         fi
     fi
     local resources_src="$progdir/Resources/."

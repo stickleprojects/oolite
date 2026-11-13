@@ -68,7 +68,7 @@ static OODebugMonitor* sSingleton = nil;
 @end
 
 @implementation OODebugMonitor
-#if OOLITE_GNUSTEP
+#if OOLITE_SDL
 NSString* NSApplicationWillTerminateNotification = @"ApplicationWillTerminate";
 #endif
 
@@ -181,10 +181,11 @@ NSString* NSApplicationWillTerminateNotification = @"ApplicationWillTerminate";
 - (oneway void)performJSConsoleCommand:(in NSString*)command
 {
     JSContext* context = OOJSAcquireContext();
-    jsval commandVal = OOJSValueFromNativeObject(context, command);
+    OOJSVal commandVal = OOJSValueFromNativeObject(context, command);
     OOJSStartTimeLimiterWithTimeLimit(kOOJSLongTimeLimit);
     [_script callMethod:OOJSID("consolePerformJSCommand") inContext:context withArguments:&commandVal count:1 result:NULL];
     OOJSStopTimeLimiter();
+    OOJSFreeValue(context, commandVal);
     OOJSRelinquishContext(context);
 }
 
@@ -636,7 +637,7 @@ typedef struct
     }
 }
 
-#if OOLITE_GNUSTEP
+#if OOLITE_SDL
 - (void)applicationWillTerminate
 {
     [[NSNotificationCenter defaultCenter] postNotificationName:NSApplicationWillTerminateNotification object:nil];

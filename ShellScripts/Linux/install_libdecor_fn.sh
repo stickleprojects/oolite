@@ -17,8 +17,8 @@
 # developers export CI=true in their shells to make tools non-interactive. Replacing a system library has to be
 # asked for explicitly, by the one workflow step that knows its machine is disposable.
 #
-# libdecor-mini is only published under a rolling "continuous" release, so its sha256 is checked: when the package
-# changes, the build stops until the new package has been tested and the hash updated here.
+# libdecor-mini is only published under a rolling "continuous" release, and it is not pinned: each build takes the
+# current package, as upstream prefers (OoliteProject/oolite#793). The log shows the package version installed.
 install_libdecor() {
     local script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
     source "$script_dir/os_detection.sh"
@@ -35,7 +35,6 @@ install_libdecor() {
 
     local arch=$(uname -m)
     local url="https://github.com/pkgforge-dev/archlinux-pkgs-debloated/releases/download/continuous/libdecor-mini-$arch.pkg.tar.zst"
-    local sha256="435e1e65f4227069f207d562ae83eb493e1cc14b9f36bcd0e90cf1a124a32e0f"
     local tmp=$(mktemp -d)
     local pkg="$tmp/libdecor-mini-$arch.pkg.tar.zst"
 
@@ -47,10 +46,7 @@ install_libdecor() {
         echo "❌ Error downloading libdecor-mini from $url!" >&2
         return 1
     fi
-    if ! echo "$sha256  $pkg" | sha256sum -c -; then
-        echo "❌ The libdecor-mini package has changed. Test the new one, then update its sha256 in ${BASH_SOURCE[0]}" >&2
-        return 1
-    fi
+    echo "ℹ️ libdecor-mini package: $(tar --zstd -xOf "$pkg" .PKGINFO | grep '^pkgver' | cut -d' ' -f3), sha256 $(sha256sum "$pkg" | cut -d' ' -f1)"
 
     case "$CURRENT_DISTRO" in
         arch)
