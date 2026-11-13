@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Processes Oolite data files after compilation
 
 run_script() {
@@ -14,18 +15,35 @@ run_script() {
     local buildtime="${10}"
     local gnustep_folder="${11}"
     local stamp_file="${12}"
+    local build_docs="${13:-yes}"
 
     local script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
     pushd "$script_dir" > /dev/null
 
     source "generate_manifest_fn.sh"
     cd ../..
+    source Documentation/build_documentation_fn.sh
+
+    if [[ "$host_os" == "darwin" ]]; then
+        cp() { gcp "$@"; }  # GNU cp from Homebrew coreutils; BSD cp has no -u
+    fi
 
     set -x
     local appname=$(basename "$origprogpath")
     local appdir=$(dirname "$origprogpath")
     local progpath="$progdir/$appname"
     local resourcesdir="$progdir/Resources"
+    local addonsdir="$progdir/AddOns"
+    if [[ "$host_os" == "darwin" ]]; then
+        # macOS application bundle layout
+        source ShellScripts/macOS/create_app_bundle_fn.sh
+        rm -rf "$progdir/$appname" "$progdir/Resources" "$progdir/AddOns" "$progdir/$appname.dSYM"  # old flat layout
+        progpath="$progdir/Contents/MacOS/$appname"
+        resourcesdir="$progdir/Contents/Resources"
+        addonsdir="$progdir/Contents/AddOns"
+        mkdir -p "$progdir/Contents/MacOS"
+        rm -f "$progpath"  # always start from the linked binary, as bundling rewrites it
+    fi
     mkdir -p "$resourcesdir"
 
     if [[ ! -f "$origprogpath" ]]; then
@@ -37,7 +55,6 @@ run_script() {
         return 1
     fi
     generate_manifest "$resourcesdir/manifest.plist" "$debug_monitor" "$ver_full" "$ver_quad" "$ver_githash" "$buildtime"
-    local addonsdir="$progdir/AddOns"
     mkdir -p "$addonsdir"
     rm -rf "$addonsdir/Basic-debug.oxp"
     cp -rf DebugOXP/Debug.oxp "$addonsdir/Basic-debug.oxp"
@@ -55,6 +72,9 @@ run_script() {
                 "/usr/share/espeak-ng-data"
                 "/app/share/espeak-ng-data"
             )
+            if [[ "$host_os" == "darwin" ]]; then
+                SEARCH_PATHS=("$(realpath "$(brew --prefix)/share/espeak-ng-data")")  # Homebrew links it from the Cellar
+            fi
             local found_data=false
             local path
             for path in "${SEARCH_PATHS[@]}"; do
@@ -83,7 +103,11 @@ run_script() {
     if [[ "$strip_bin" == "yes" ]]; then
         if [[ "$host_os" == "windows" ]]; then
             # Windows: Standard GNU strip is safest for PE/COFF
-            strip "$progpath"
+            strip "$progpath.exe"
+        elif [[ "$host_os" == "darwin" ]]; then
+            # macOS: keep symbols in a dSYM bundle next to the app
+            dsymutil "$progpath" -o "$progdir.dSYM"
+            strip -S "$progpath"
         else
             # Linux
             local debugpath="$progdir/$appname.debug"
@@ -105,6 +129,22 @@ run_script() {
         # Determine and copy DLL dependencies
         local unix_prefix=$(cygpath -u "$MINGW_PREFIX")
         ldd "$progpath" | grep "$unix_prefix" | awk '{print $3}' | xargs -I {} cp -rfu {} "$progdir"
+    elif [[ "$host_os" == "darwin" ]]; then
+        # Apple Foundation is used, so there is no GNUstep runtime to bundle, but the Homebrew
+        # libraries are copied in so the app runs on Macs without Homebrew.
+        if ! create_info_plist Resources/Info-gnustep.plist "$progdir/Contents/Info.plist" "$appname" "$ver_full" "$ver_quad"; then
+            echo "❌ Failed to create Info.plist!" >&2
+            return 1
+        fi
+        rm -f "$resourcesdir/Info-gnustep.plist"
+        if ! bundle_dylibs "$progpath" "$progdir/Contents/Frameworks"; then
+            echo "❌ Failed to bundle libraries!" >&2
+            return 1
+        fi
+        if ! sign_app_bundle "$progdir"; then
+            echo "❌ Failed to sign app bundle!" >&2
+            return 1
+        fi
     else
         # Copy Linux-specific wrapper script
         cp -fu ShellScripts/Linux/run_oolite.sh "$progdir"
@@ -120,6 +160,23 @@ run_script() {
             grep -vE "^[[:space:]]*.*=>[[:space:]]*/(usr/(local/)?|lib(64)?/)" | \
             awk '{print $3}' | \
             xargs -I {} cp -Lrfu {} "$progdir/"
+    fi
+
+    if [[ "$build_docs" == "yes" ]]; then
+        if ! build_documentation "NO"; then
+            echo "❌ Documentation build failed! Configure with -Ddocs=disabled to build without it." >&2
+            popd
+            return 1
+        fi
+        local docdir="$progdir"
+        if [[ "$host_os" == "darwin" ]]; then
+            # Files in the bundle root break its signature, so the PDFs go next to the app instead
+            # and create_dmg_fn.sh puts them in a Documentation folder on the disk image
+            rm -f "$progdir"/*.pdf
+            docdir="$(dirname "$progdir")/Documentation"
+            mkdir -p "$docdir"
+        fi
+        cp -fu build/documentation/docs/assets/pdfs/* "$docdir"
     fi
 
     echo "✅ Oolite post-build completed successfully"

@@ -105,10 +105,6 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
 
 - (void)createWindowWithSize:(NSSize)size
 {
-    Uint32 colorkey;
-    SDL_Surface* icon = NULL;
-    NSString* imagesDir;
-
     NSUserDefaults* prefs = [NSUserDefaults standardUserDefaults];
 
     OOLog(@"display.initGL", @"Trying %d-bpcc, 24-bit depth buffer", bitsPerColorComponent);
@@ -124,6 +120,10 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
     }
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    // Oolite does not use an sRGB framebuffer. SDL 3.4.0 and 3.4.2 default this attribute to -1 (fixed in 3.4.4,
+    // libsdl-org/SDL c5bc4576f), so on X11 they accept only sRGB-capable GLX visuals; where the X server has none,
+    // every attempt below fails with "Couldn't find matching GLX visual". Ubuntu 26.04 ships SDL 3.4.2.
+    SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 0);
 
     /* Multisampling significantly improves graphics quality with
      * basically no extra programming effort on our part, especially
@@ -140,6 +140,11 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
 
     NSString* windowCaption = [self getWindowCaption];
     Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    if (glContext) {
+        // Game window replacing the splash window: create it hidden with its final
+        // decorations so it is mapped only once (see endSplashScreen).
+        windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    }
 
     // Define modern SDL3 properties for window configuration
     SDL_PropertiesID props = SDL_CreateProperties();
@@ -185,15 +190,34 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
         OOLogERR(@"display.mode.error", @"Could not create window: %s", errStr);
         exit(1);
     }
-    glContext = SDL_GL_CreateContext(window);
+    if (glContext) {
+        // Keep the splash screen's context (and its textures); the GL attributes are unchanged,
+        // so the new window's pixel format matches.
+        if (!SDL_GL_MakeCurrent(window, glContext)) {
+            OOLog(@"sdl.create_context", @"Could not make OpenGL context current: %s", SDL_GetError());
+            exit(1);
+        }
+    } else {
+        glContext = SDL_GL_CreateContext(window);
+    }
     if (!glContext) {
         OOLog(@"sdl.create_context", @"%@", @"Could not create OpenGL context");
         exit(1);
     }
+#if !OOLITE_MAC_OS_X
+    // On macOS a window surface replaces the OpenGL drawable, so it must not be created there.
     SDL_Surface* surface = SDL_GetWindowSurface(window);
     if (!SDL_SetSurfaceColorspace(surface, SDL_COLORSPACE_SRGB_LINEAR)) {
         OOLogWARN(@"sdl.use_edr_surface", @"%@ %s", @"Failed to set SDR linear surface - falling back to SDR. Error was:", SDL_GetError());
         SDL_SetSurfaceColorspace(surface, SDL_COLORSPACE_SRGB);
+    }
+#endif
+    // Every window shares the single glContext, which owns Universe's GL objects (VAOs, FBOs,
+    // shaders). SDL_GetWindowSurface() may create an internal GL renderer context for the window
+    // and leave it current, so make glContext current again before any GL call.
+    if (!SDL_GL_MakeCurrent(window, glContext)) {
+        OOLog(@"sdl.create_context", @"Could not make OpenGL context current: %s", SDL_GetError());
+        exit(1);
     }
 
 #if OOLITE_WINDOWS
@@ -210,17 +234,21 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
 
 #endif // OOLITE_WINDOWS
 
-    imagesDir = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"Images"];
-    icon = SDL_LoadBMP([[imagesDir stringByAppendingPathComponent:@"WMicon.bmp"] UTF8String]);
+#if !OOLITE_MAC_OS_X
+    // On macOS SDL would set this 32x32 image as the Dock icon, replacing the bundle's
+    // high-resolution oolite-icon.icns.
+    NSString* imagesDir = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"Images"];
+    SDL_Surface* icon = SDL_LoadBMP([[imagesDir stringByAppendingPathComponent:@"WMicon.bmp"] UTF8String]);
 
     if (icon != NULL) {
         const SDL_PixelFormatDetails* pixelFormat = SDL_GetPixelFormatDetails(icon->format);
         const SDL_Palette* palette = SDL_GetSurfacePalette(icon);
-        colorkey = SDL_MapRGB(pixelFormat, palette, 128, 0, 128);
+        Uint32 colorkey = SDL_MapRGB(pixelFormat, palette, 128, 0, 128);
         SDL_SetSurfaceColorKey(icon, YES, colorkey);
         SDL_SetWindowIcon(window, icon);
     }
     SDL_DestroySurface(icon);
+#endif
 
     _colorSaturation = 1.0f;
 
@@ -232,7 +260,11 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
 
     _sdrToneMapper = OOSDRToneMapperFromString([prefs oo_stringForKey:@"sdr-tone-mapper" defaultValue:@"OOSDR_TONEMAPPER_ACES"]);
 
+#if OOLITE_MAC_OS_X
+    SDL_GL_SetSwapInterval(vSyncPreference ? 1 : 0);
+#else
     SDL_SetWindowSurfaceVSync(window, vSyncPreference);
+#endif
     OOLog(@"display.initGL", @"V-Sync %@requested.", vSyncPreference ? @"" : @"not ");
 
     int testAttrib = -1;
@@ -257,7 +289,11 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
     // Verify V-sync successfully set - report it if not
 
     int hasVsync;
+#if OOLITE_MAC_OS_X
+    if (vSyncPreference && (!SDL_GL_GetSwapInterval(&hasVsync) || !hasVsync)) {
+#else
     if (vSyncPreference && (!SDL_GetWindowSurfaceVSync(window, &hasVsync) || !hasVsync)) {
+#endif
         OOLogWARN(@"display.initGL", @"Could not enable V-Sync. Please check that your graphics driver supports the %@_swap_control extension.",
             OOLITE_WINDOWS ? @"WGL_EXT" : @"[GLX_SGI/GLX_MESA]");
     } else {
@@ -407,18 +443,34 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
     }
 
 #endif
-    SDL_SetWindowResizable(window, true);
-    SDL_SetWindowBordered(window, true);
+    BOOL replaceSplashWindow = showSplashScreen && !fullScreen && window && glContext;
+    if (!replaceSplashWindow) {
+        SDL_SetWindowResizable(window, true);
+        SDL_SetWindowBordered(window, true);
+    }
     if (!showSplashScreen)
         return;
 
     if (fullScreen) {
         SDL_SetWindowFullscreen(window, true);
     } else {
-        SDL_HideWindow(window);
-        SDL_SetWindowFullscreen(window, false);
-        SDL_SetWindowSize(window, firstScreen.width, firstScreen.height);
-        SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+        // Some window managers (e.g. Marco) leave the borderless splash window unframed
+        // after it gains a border, and some (e.g. Mutter under XWayland) drop its focus.
+        // Replace it with a new window that has its final size, border and centred
+        // position before it is mapped. The splash window is destroyed before the new one
+        // is shown, so no other Oolite window holds focus when the new one is mapped.
+        SDL_Window* previousWindow = window; // the window in use so far, which showed the splash
+        window = NULL;
+        [self createWindowWithSize:firstScreen];
+        SDL_DestroyWindow(previousWindow);
+        // createWindowWithSize: left glContext current, and SDL_DestroyWindow does not destroy
+        // it. But destroying the old window frees the GL context of its SDL framebuffer renderer,
+        // which SDL makes current and then releases, so no context is current afterwards.
+        // Rebind glContext before anything draws.
+        if (!SDL_GL_MakeCurrent(window, glContext)) {
+            OOLog(@"sdl.create_context", @"Could not make OpenGL context current: %s", SDL_GetError());
+            exit(1);
+        }
         SDL_ShowWindow(window);
     }
 
@@ -626,7 +678,7 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
     return fullScreen;
 }
 
-#ifdef GNUSTEP_BASE_LIBRARY
+#if OOLITE_SDL
 - (void)setFullScreenMode:(BOOL)fsm
 {
     fullScreen = fsm;
@@ -968,6 +1020,11 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
     BOOL snapShotOK = YES;
     SDL_Surface* tmpSurface;
 
+#if OOLITE_MAC_OS_X
+    // The back buffer is undefined after a swap on macOS, so read the frame currently on screen.
+    OOGL(glReadBuffer(GL_FRONT));
+#endif
+
     // backup the previous directory
     NSString* originalDirectory = [[NSFileManager defaultManager] currentDirectoryPath];
     // use the snapshots directory
@@ -1008,7 +1065,17 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
         imageNo = tmpImageNo;
     }
 
+#if OOLITE_MAC_OS_X
+    // No window surface on macOS (see createWindowWithSize:); describe the GL drawable instead.
+    SDL_Surface* surface = NULL;
+    {
+        int pixelWidth, pixelHeight;
+        SDL_GetWindowSizeInPixels(window, &pixelWidth, &pixelHeight);
+        surface = SDL_CreateSurface(pixelWidth, pixelHeight, SDL_PIXELFORMAT_ARGB8888);
+    }
+#else
     SDL_Surface* surface = SDL_GetWindowSurface(window);
+#endif
     OOLog(@"screenshot", @"Saving screen shot \"%@\" (%u x %u pixels).", pathToPic, surface->w, surface->h);
 
     int pitch = surface->pitch;
@@ -1052,7 +1119,7 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
             fileExtension = SNAPSHOTHDR_EXTENSION_DEFAULT;
         }
 
-        NSString* pathToPicHDR = [pathToPic stringByReplacingString:@".png" withString:fileExtension];
+        NSString* pathToPicHDR = [pathToPic stringByReplacingOccurrencesOfString:@".png" withString:fileExtension];
         OOLog(@"screenshot", @"Saving screen shot \"%@\" (%u x %u pixels).", pathToPicHDR, surface->w, surface->h);
         GLfloat* pixlsf = (GLfloat*)malloc(pitch * surface->h * sizeof(GLfloat));
         for (y = surface->h - 1, off = 0; y >= 0; y--, off += pitch) {
@@ -1067,6 +1134,11 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
 
         free(pixlsf);
     }
+
+#if OOLITE_MAC_OS_X
+    SDL_DestroySurface(surface);
+    OOGL(glReadBuffer(GL_BACK));
+#endif
 
     // return to the previous directory
     [[NSFileManager defaultManager] changeCurrentDirectoryPath:originalDirectory];

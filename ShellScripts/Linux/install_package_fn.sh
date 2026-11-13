@@ -1,6 +1,9 @@
 #!/bin/bash
 
 install_package() {
+    # Installs a package or group of packages. Supports Debian, Redhat and Arch package managers.
+    # Called via install_packages_root.sh
+    # Parameter one: name of package or package group to install
     local script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
     source $script_dir/os_detection.sh
 
@@ -46,7 +49,7 @@ install_package() {
 
         "python")
             case "$CURRENT_DISTRO" in
-                debian) pkg_name="python3-pip" ;;
+                debian) pkg_name="python3-pip python3-venv" ;;
                 redhat) pkg_name="python3-pip" ;;
                 arch) pkg_name="python-pip" ;;
             esac ;;
@@ -159,6 +162,8 @@ install_package() {
         "zstd") pkg_name="zstd" ;;
 
         "flatpak") pkg_name="flatpak flatpak-builder" ;;
+
+        "doxygen") pkg_name="doxygen graphviz" ;;
 
         *)
             echo "❌ Could not translate '$generic_name' for $CURRENT_DISTRO!" >&2
