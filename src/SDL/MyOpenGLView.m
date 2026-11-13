@@ -120,6 +120,10 @@ extern int SaveEXRSnapshot(const char* outfilename, int width, int height, const
     }
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    // Oolite does not use an sRGB framebuffer. SDL 3.4.0 and 3.4.2 default this attribute to -1 (fixed in 3.4.4,
+    // libsdl-org/SDL c5bc4576f), so on X11 they accept only sRGB-capable GLX visuals; where the X server has none,
+    // every attempt below fails with "Couldn't find matching GLX visual". Ubuntu 26.04 ships SDL 3.4.2.
+    SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 0);
 
     /* Multisampling significantly improves graphics quality with
      * basically no extra programming effort on our part, especially
