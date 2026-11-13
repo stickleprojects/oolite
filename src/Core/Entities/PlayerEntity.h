@@ -174,7 +174,7 @@ enum {
     GUI_ROW_GAMEOPTIONS_VOLUME,
 #if OOLITE_SPEECH_SYNTH
     GUI_ROW_GAMEOPTIONS_SPEECH,
-#if !OOLITE_MAC_COCOA_UI
+#if !OOLITE_MAC_OS_X
     // FIXME: should have voice option for OS X
     GUI_ROW_GAMEOPTIONS_SPEECH_LANGUAGE,
     GUI_ROW_GAMEOPTIONS_SPEECH_GENDER,
@@ -1227,9 +1227,8 @@ typedef enum {
 // *** World script events.
 // In general, script events should be sent through doScriptEvent:..., which
 // will forward to the world scripts.
-- (BOOL)doWorldEventUntilMissionScreen:(OOJSPropID)message;
-// argv is borrowed: with QuickJS, the caller remains responsible for freeing the values.
-- (void)doWorldScriptEvent:(OOJSPropID)message inContext:(JSContext*)context withArguments:(jsval*)argv count:(int)argc timeLimit:(OOTimeDelta)limit;
+- (BOOL)doWorldEventUntilMissionScreen:(jsid)message;
+- (void)doWorldScriptEvent:(jsid)message inContext:(JSContext*)context withArguments:(jsval*)argv count:(uintN)argc timeLimit:(OOTimeDelta)limit;
 
 - (BOOL)showInfoFlag;
 

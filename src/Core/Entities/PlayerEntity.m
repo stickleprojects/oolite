@@ -629,7 +629,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
         OOSystemID old = info_system_id;
         info_system_id = sid;
         JSContext* context = OOJSAcquireContext();
-        ShipScriptEvent(context, self, "infoSystemWillChange", OOJSValueFromDouble(context, info_system_id), OOJSValueFromDouble(context, old));
+        ShipScriptEvent(context, self, "infoSystemWillChange", INT_TO_JSVAL(info_system_id), INT_TO_JSVAL(old));
         if (gui_screen == GUI_SCREEN_LONG_RANGE_CHART || gui_screen == GUI_SCREEN_SHORT_RANGE_CHART) {
             if (moveChart) {
                 target_chart_focus = [[UNIVERSE systemManager] getCoordinatesForSystem:info_system_id inGalaxy:galaxy_number];
@@ -645,7 +645,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
                 target_chart_focus = chart_focus_coordinates;
             }
         }
-        ShipScriptEvent(context, self, "infoSystemChanged", OOJSValueFromDouble(context, info_system_id), OOJSValueFromDouble(context, old));
+        ShipScriptEvent(context, self, "infoSystemChanged", INT_TO_JSVAL(info_system_id), INT_TO_JSVAL(old));
         OOJSRelinquishContext(context);
     }
 }
@@ -3075,7 +3075,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
     OOAlertCondition cond = [self alertCondition];
     OOTimeAbsolute t = [UNIVERSE getTime];
     if (cond != lastScriptAlertCondition) {
-        [self doScriptEvent:OOJSID("alertConditionChanged") withArgument:[NSNumber numberWithInt:cond] andArgument:[NSNumber numberWithInt:lastScriptAlertCondition]];
+        ShipScriptEventNoCx(self, "alertConditionChanged", INT_TO_JSVAL(cond), INT_TO_JSVAL(lastScriptAlertCondition));
         lastScriptAlertCondition = cond;
     }
     /* Update heuristic assessment of whether player is fleeing */
@@ -3437,7 +3437,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
         galactic_witchjump = NO;
         [self setStatus:STATUS_IN_FLIGHT];
         [self playHyperspaceAborted];
-        [self doScriptEvent:OOJSID("playerJumpFailed") withArgument:@"malfunction"];
+        ShipScriptEventNoCx(self, "playerJumpFailed", OOJSSTR("malfunction"));
         return;
     }
 
@@ -4938,8 +4938,8 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
         }
     }
     JSContext* context = OOJSAcquireContext();
-    OOJSVal keyVal = OOJSValueFromNativeObject(context, key);
-    ShipScriptEvent(context, self, "mfdKeyChanged", OOJSValueFromDouble(context, activeMFD), keyVal);
+    jsval keyVal = OOJSValueFromNativeObject(context, key);
+    ShipScriptEvent(context, self, "mfdKeyChanged", INT_TO_JSVAL(activeMFD), keyVal);
     OOJSRelinquishContext(context);
 }
 
@@ -4968,8 +4968,8 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
         }
     }
     JSContext* context = OOJSAcquireContext();
-    OOJSVal keyVal = OOJSValueFromNativeObject(context, key);
-    ShipScriptEvent(context, self, "mfdKeyChanged", OOJSValueFromDouble(context, activeMFD), keyVal);
+    jsval keyVal = OOJSValueFromNativeObject(context, key);
+    ShipScriptEvent(context, self, "mfdKeyChanged", INT_TO_JSVAL(activeMFD), keyVal);
     OOJSRelinquishContext(context);
 }
 
@@ -4981,7 +4981,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
     NSUInteger mfdID = activeMFD + 1;
     [UNIVERSE addMessage:OOExpandKey(@"mfd-N-selected", mfdID) forCount:3.0];
     JSContext* context = OOJSAcquireContext();
-    ShipScriptEvent(context, self, "selectedMFDChanged", OOJSValueFromDouble(context, activeMFD));
+    ShipScriptEvent(context, self, "selectedMFDChanged", INT_TO_JSVAL(activeMFD));
     OOJSRelinquishContext(context);
 }
 
@@ -4997,7 +4997,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
     NSUInteger mfdID = activeMFD + 1;
     [UNIVERSE addMessage:OOExpandKey(@"mfd-N-selected", mfdID) forCount:3.0];
     JSContext* context = OOJSAcquireContext();
-    ShipScriptEvent(context, self, "selectedMFDChanged", OOJSValueFromDouble(context, activeMFD));
+    ShipScriptEvent(context, self, "selectedMFDChanged", INT_TO_JSVAL(activeMFD));
     OOJSRelinquishContext(context);
 }
 
@@ -5994,12 +5994,13 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
 {
     JSContext* context = OOJSAcquireContext();
 
+    jsval amountVal = JSVAL_VOID;
     int amountVal2 = (int)amount - (int)legalStatus;
-    OOJSVal amountVal = OOJSValueFromDouble(context, amountVal2);
+    JS_NewNumberValue(context, amountVal2, &amountVal);
 
     legalStatus = (int)amount; // can't set the new bounty until the size of the change is known
 
-    OOJSVal reasonVal = OOJSValueFromNativeObject(context, reason);
+    jsval reasonVal = OOJSValueFromNativeObject(context, reason);
 
     ShipScriptEvent(context, self, "shipBountyChanged", amountVal, reasonVal);
 
@@ -6026,12 +6027,13 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
     if (![self isCloaked]) {
         JSContext* context = OOJSAcquireContext();
 
+        jsval amountVal = JSVAL_VOID;
         int amountVal2 = (legalStatus | offence_value) - legalStatus;
-        OOJSVal amountVal = OOJSValueFromDouble(context, amountVal2);
+        JS_NewNumberValue(context, amountVal2, &amountVal);
 
         legalStatus |= offence_value; // can't set the new bounty until the size of the change is known
 
-        OOJSVal reasonVal = OOJSValueFromLegalStatusReason(context, reason);
+        jsval reasonVal = OOJSValueFromLegalStatusReason(context, reason);
 
         ShipScriptEvent(context, self, "shipBountyChanged", amountVal, reasonVal);
 
@@ -6554,7 +6556,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
             [UNIVERSE addMessage:OOExpandKey(@"witch-blocked", blockerName) forCount:4.5];
             [self playWitchjumpBlocked];
             [self setStatus:STATUS_IN_FLIGHT];
-            [self doScriptEvent:OOJSID("playerJumpFailed") withArgument:@"blocked"];
+            ShipScriptEventNoCx(self, "playerJumpFailed", OOJSSTR("blocked"));
             return NO;
         }
     }
@@ -6573,7 +6575,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
         if ([self status] == STATUS_WITCHSPACE_COUNTDOWN) {
             [self playWitchjumpInsufficientFuel];
             [self setStatus:STATUS_IN_FLIGHT];
-            [self doScriptEvent:OOJSID("playerJumpFailed") withArgument:@"no target"];
+            ShipScriptEventNoCx(self, "playerJumpFailed", OOJSSTR("no target"));
         } else
             [self playHyperspaceNoTarget];
 
@@ -6587,7 +6589,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
         if ([self status] == STATUS_WITCHSPACE_COUNTDOWN) {
             [self playWitchjumpDistanceTooGreat];
             [self setStatus:STATUS_IN_FLIGHT];
-            [self doScriptEvent:OOJSID("playerJumpFailed") withArgument:@"too far"];
+            ShipScriptEventNoCx(self, "playerJumpFailed", OOJSSTR("too far"));
         } else
             [self playHyperspaceDistanceTooGreat];
 
@@ -6601,7 +6603,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
         if ([self status] == STATUS_WITCHSPACE_COUNTDOWN) {
             [self playWitchjumpInsufficientFuel];
             [self setStatus:STATUS_IN_FLIGHT];
-            [self doScriptEvent:OOJSID("playerJumpFailed") withArgument:@"insufficient fuel"];
+            ShipScriptEventNoCx(self, "playerJumpFailed", OOJSSTR("insufficient fuel"));
         } else
             [self playHyperspaceNoFuel];
 
@@ -6642,8 +6644,8 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
     if ([[self hud] isCompassActive]) {
         // "the compass, it says we're lost!" :)
         JSContext* context = OOJSAcquireContext();
-        OOJSVal jsmode = OOJSValueFromCompassMode(context, [self compassMode]);
-        ShipScriptEvent(context, self, "compassTargetChanged", OOJSUndefinedValue(), jsmode);
+        jsval jsmode = OOJSValueFromCompassMode(context, [self compassMode]);
+        ShipScriptEvent(context, self, "compassTargetChanged", JSVAL_VOID, jsmode);
         OOJSRelinquishContext(context);
 
         [[self hud] setCompassActive:NO]; // ensure a target change when returning to normal space.
@@ -6664,7 +6666,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
     JSContext* context = OOJSAcquireContext();
     [self setJumpCause:@"galactic jump"];
     [self setPreviousSystemID:[self currentSystemID]];
-    ShipScriptEvent(context, self, "shipWillEnterWitchspace", OOJSValueFromNativeObject(context, [self jumpCause]), OOJSValueFromDouble(context, destGalaxy));
+    ShipScriptEvent(context, self, "shipWillEnterWitchspace", STRING_TO_JSVAL(JS_InternString(context, [[self jumpCause] UTF8String])), INT_TO_JSVAL(destGalaxy));
     OOJSRelinquishContext(context);
 
     [self noteCompassLostTarget];
@@ -6755,7 +6757,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
     JSContext* context = OOJSAcquireContext();
     [self setJumpCause:@"wormhole"];
     [self setPreviousSystemID:[self currentSystemID]];
-    ShipScriptEvent(context, self, "shipWillEnterWitchspace", OOJSValueFromNativeObject(context, [self jumpCause]), OOJSValueFromDouble(context, [w_hole destination]));
+    ShipScriptEvent(context, self, "shipWillEnterWitchspace", STRING_TO_JSVAL(JS_InternString(context, [[self jumpCause] UTF8String])), INT_TO_JSVAL([w_hole destination]));
     OOJSRelinquishContext(context);
     if ([self scriptedMisjump]) {
         misjump = YES; // a script could just have changed this to true;
@@ -6797,7 +6799,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
         {
             [self playWitchjumpFailure];
             [self setStatus:STATUS_IN_FLIGHT];
-            [self doScriptEvent:OOJSID("playerJumpFailed") withArgument:@"malfunction"];
+            ShipScriptEventNoCx(self, "playerJumpFailed", OOJSSTR("malfunction"));
             return;
         } else {
             [self setFuelLeak:[NSString stringWithFormat:@"%f", (randf() + randf()) * 5.0]];
@@ -6819,7 +6821,7 @@ NSComparisonResult marketSorterByMassUnit(id a, id b, void* market);
     JSContext* context = OOJSAcquireContext();
     [self setJumpCause:@"standard jump"];
     [self setPreviousSystemID:[self currentSystemID]];
-    ShipScriptEvent(context, self, "shipWillEnterWitchspace", OOJSValueFromNativeObject(context, [self jumpCause]), OOJSValueFromDouble(context, jumpTarget));
+    ShipScriptEvent(context, self, "shipWillEnterWitchspace", STRING_TO_JSVAL(JS_InternString(context, [[self jumpCause] UTF8String])), INT_TO_JSVAL(jumpTarget));
     OOJSRelinquishContext(context);
 
     [self updateSystemMemory];
@@ -7974,7 +7976,7 @@ static NSString* SliderString(NSInteger amountIn20ths)
         }
 #endif
 #endif
-#if !OOLITE_MAC_COCOA_UI
+#if !OOLITE_MAC_OS_X
         // window/fullscreen
         if ([gameView inFullScreenMode]) {
             [gui setText:DESC(@"gameoptions-play-in-window") forRow:GUI_ROW(GAME, DISPLAYSTYLE) align:GUI_ALIGN_CENTER];
@@ -9074,27 +9076,25 @@ static NSString* last_outfitting_key = nil;
         {
             JSContext* JScontext = OOJSAcquireContext();
             BOOL OK;
-            OOJSVal result = OOJSUndefinedValue();
-            int32_t newPrice;
-            OOJSVal args[] = { OOJSValueFromNativeObject(JScontext, eqKey), OOJSValueFromDouble(JScontext, price) };
-
-            OK = [condScript callMethod:OOJSID("updateEquipmentPrice")
-                              inContext:JScontext
-                          withArguments:args
-                                  count:sizeof args / sizeof *args
-                                 result:&result];
+            jsval result;
+            int32 newPrice;
+            jsval args[] = { OOJSValueFromNativeObject(JScontext, eqKey), JSVAL_NULL };
+            OK = JS_NewNumberValue(JScontext, price, &args[1]);
 
             if (OK) {
-                OK = OOJSValueToInt32(JScontext, result, &newPrice);
+                OK = [condScript callMethod:OOJSID("updateEquipmentPrice")
+                                  inContext:JScontext
+                              withArguments:args
+                                      count:sizeof args / sizeof *args
+                                     result:&result];
+            }
+
+            if (OK) {
+                OK = JS_ValueToInt32(JScontext, result, &newPrice);
                 if (OK && newPrice >= 0) {
                     price = (OOCreditsQuantity)newPrice;
                 }
-                if (!OK)
-                    OOJSReportPendingException(JScontext);
             }
-            OOJSFreeValue(JScontext, result);
-            OOJSFreeValue(JScontext, args[0]);
-            OOJSFreeValue(JScontext, args[1]);
             OOJSRelinquishContext(JScontext);
         }
     }
@@ -11308,13 +11308,13 @@ static NSString* last_outfitting_key = nil;
     return cscript;
 }
 
-- (void)doScriptEvent:(OOJSPropID)message inContext:(JSContext*)context withArguments:(OOJSVal*)argv count:(int)argc
+- (void)doScriptEvent:(jsid)message inContext:(JSContext*)context withArguments:(jsval*)argv count:(uintN)argc
 {
     [super doScriptEvent:message inContext:context withArguments:argv count:argc];
     [self doWorldScriptEvent:message inContext:context withArguments:argv count:argc timeLimit:0.0];
 }
 
-- (BOOL)doWorldEventUntilMissionScreen:(OOJSPropID)message
+- (BOOL)doWorldEventUntilMissionScreen:(jsid)message
 {
     NSEnumerator* scriptEnum = [worldScripts objectEnumerator];
     OOScript* theScript;
@@ -11341,7 +11341,7 @@ static NSString* last_outfitting_key = nil;
     return NO;
 }
 
-- (void)doWorldScriptEvent:(OOJSPropID)message inContext:(JSContext*)context withArguments:(OOJSVal*)argv count:(int)argc timeLimit:(OOTimeDelta)limit
+- (void)doWorldScriptEvent:(jsid)message inContext:(JSContext*)context withArguments:(jsval*)argv count:(uintN)argc timeLimit:(OOTimeDelta)limit
 {
     NSParameterAssert(context != NULL && JS_IsInRequest(context));
 

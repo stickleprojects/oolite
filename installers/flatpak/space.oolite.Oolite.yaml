@@ -1,6 +1,6 @@
 app-id: space.oolite.Oolite
 runtime: org.freedesktop.Platform
-runtime-version: "26.08"
+runtime-version: "25.08"
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.llvm22
@@ -23,15 +23,6 @@ cleanup:
   - "*.a"
   - "*.la"
 modules:
-  - name: typst
-    buildsystem: simple
-    build-commands:
-      - install -Dm755 typst /app/bin/typst
-    sources:
-      - type: archive
-        url: https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-unknown-linux-musl.tar.xz
-        sha256: "a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389ded33118c"
-        strip-components: 1
   - shared-modules/glu/glu-9.json
   - name: pcaudiolib
     sources:
@@ -69,7 +60,7 @@ modules:
     sources:
       - type: git
         url: https://github.com/gnustep/libobjc2.git
-        commit: a21ae931e4c186312701d7a4a8e85204955965a6
+        commit: aca3916553665f01550832d02462bcf137c94c39
   - name: gnustep-make
     build-options:
       env:
@@ -90,7 +81,7 @@ modules:
     sources:
       - type: git
         url: https://github.com/gnustep/libs-base.git
-        commit: 85dedc64bd65492a5c0f0f80516688e2db59d57f
+        commit: 68f3d75694f0a7edf9fb1c6c7f19582e8cff1b5f
   - name: mozilla-js-static
     buildsystem: simple
     build-commands:
@@ -122,7 +113,7 @@ modules:
     build-commands:
       # Update --ver-full for FlatHub release. For CI and local builds, create_flatpak.sh replaces
       # --ver-full and --github-repository values
-      - ./mk.sh flatpak deployment --setup-flags="-Ddocs=enabled" --ver-full="1.92.1" --buildtime="2026.03.19 07:13" --github-repository="OoliteProject/oolite"
+      - ./mk.sh flatpak deployment --ver-full="1.92.1" --buildtime="2026.03.19 07:13" --github-repository="OoliteProject/oolite"
     sources:
       # Update tag and commit for FlatHub release. For CI and local builds, create_flatpak.sh replaces git source with:
       # - type: dir

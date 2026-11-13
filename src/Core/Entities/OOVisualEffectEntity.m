@@ -654,7 +654,7 @@ static GLfloat scripted_color[4] = { 0.0, 0.0, 0.0, 0.0 };
 }
 
 // unlikely to need events with arguments
-- (void)doScriptEvent:(OOJSPropID)message
+- (void)doScriptEvent:(jsid)message
 {
     JSContext* context = OOJSAcquireContext();
     [script callMethod:message inContext:context withArguments:NULL count:0 result:NULL];

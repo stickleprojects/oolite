@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Wrapper script that sets up variabels before calling Oolite binary
-
 HERE="$(dirname "$(readlink -f "$0")")"
 
 HELP=false

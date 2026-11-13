@@ -1,11 +1,8 @@
 #!/bin/bash -x
 
 create_flatpak() {
-    # Creates a flatpak. Called via mk.sh.
-    # Parameter one: build type
-    # Parameter two: # GitHub repository (set by GitHub Actions)
     local build_type="$1"
-    local github_repository="$2"
+    local github_repository="$2" # GitHub repository (set by GitHub Actions)
 
     local script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
     pushd "$script_dir"
@@ -27,7 +24,7 @@ create_flatpak() {
     fi
 
     local manifest="space.oolite.Oolite.yaml"
-    if ! sed -i "s|^[[:space:]]*- \./mk.sh.*|      - ./mk.sh flatpak-internal $build_type --setup-flags=\"-Ddocs=enabled\" --ver-full=\"$ver_full\" --buildtime=\"$buildtime\" --github-repository=\"$github_repository\"|" "$manifest"; then
+    if ! sed -i "s|^[[:space:]]*- \./mk.sh.*|      - ./mk.sh flatpak-internal $build_type --ver-full=\"$ver_full\" --buildtime=\"$buildtime\" --github-repository=\"$github_repository\"|" "$manifest"; then
         echo "❌ Replacement of ./mk.sh line in $manifest failed!" >&2
         return 1
     fi

@@ -35,7 +35,6 @@
 #import "OOColor.h"
 #import "OOConstToString.h"
 #import "OOJavaScriptEngine.h"
-#import "OOJoystickManager.h"
 #import "OOPListParsing.h"
 #import "OOShipRegistry.h"
 #import "OOSound.h"
@@ -99,7 +98,7 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
     tmp_name = [self lastsaveName];
     tmp_path = save_path;
 
-    [self doScriptEvent:OOJSID("playerWillSaveGame") withArgument:@"AUTO_SAVE"];
+    ShipScriptEventNoCx(self, "playerWillSaveGame", OOJSSTR("AUTO_SAVE"));
 
     NSString* saveName = [self lastsaveName];
     NSString* autosaveSuffix = DESC(@"autosave-commander-suffix");
@@ -139,7 +138,7 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
                     format:@"ERROR no file name returned by [[gameView gameController] playerFileToLoad]"];
     }
 
-    [self doScriptEvent:OOJSID("playerWillSaveGame") withArgument:@"QUICK_SAVE"];
+    ShipScriptEventNoCx(self, "playerWillSaveGame", OOJSSTR("QUICK_SAVE"));
 
     [self writePlayerToPath:path];
     [[UNIVERSE gameView] suppressKeysUntilKeyUp];
@@ -284,7 +283,6 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
     MyOpenGLView* gameView = [UNIVERSE gameView];
     GuiDisplayGen* gui = [UNIVERSE gui];
     NSString* dir = [[UNIVERSE gameController] playerFileDirectory];
-    const BOOL* joyButtonState = [[OOJoystickManager sharedStickHandler] getAllButtonStates];
 
     int idx;
     if ([self handleGUIUpDownArrowKeys]) {
@@ -304,13 +302,13 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
     }
 
     // handle page <-- and page --> keys
-    if (([self checkKeyPress:n_key_gui_arrow_left] || [self checkKeyPress:n_key_gui_page_up] || joyButtonState[BUTTON_GUILEFT] || joyButtonState[BUTTON_GUIPAGEUP]) && [[gui keyForRow:BACKROW] isEqual:GUI_KEY_OK]) {
+    if (([self checkKeyPress:n_key_gui_arrow_left] || [self checkKeyPress:n_key_gui_page_up]) && [[gui keyForRow:BACKROW] isEqual:GUI_KEY_OK]) {
         currentPage--;
         [self playMenuPagePrevious];
         [self lsCommanders:gui directory:dir pageNumber:currentPage highlightName:nil];
         [gameView suppressKeysUntilKeyUp];
     }
-    if (([self checkKeyPress:n_key_gui_arrow_right] || [self checkKeyPress:n_key_gui_page_down] || joyButtonState[BUTTON_GUIRIGHT] || joyButtonState[BUTTON_GUIPAGEDOWN]) && [[gui keyForRow:MOREROW] isEqual:GUI_KEY_OK]) {
+    if (([self checkKeyPress:n_key_gui_arrow_right] || [self checkKeyPress:n_key_gui_page_down]) && [[gui keyForRow:MOREROW] isEqual:GUI_KEY_OK]) {
         currentPage++;
         [self playMenuPageNext];
         [self lsCommanders:gui directory:dir pageNumber:currentPage highlightName:nil];
@@ -319,7 +317,7 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
 
     // Enter pressed - find the commander name underneath.
     // ignore Ctrl for the moment - we check for it explicitly later
-    if ([self checkKeyPress:n_key_gui_select ignore_ctrl:YES] || [gameView isDown:gvMouseDoubleClick] || joyButtonState[BUTTON_GUISELECT]) {
+    if ([self checkKeyPress:n_key_gui_select ignore_ctrl:YES] || [gameView isDown:gvMouseDoubleClick]) {
         NSDictionary* cdr;
         switch ([gui selectedRow]) {
         case EXITROW:
@@ -368,7 +366,6 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
     MyOpenGLView* gameView = [UNIVERSE gameView];
     GuiDisplayGen* gui = [UNIVERSE gui];
     NSString* dir = [[UNIVERSE gameController] playerFileDirectory];
-    const BOOL* joyButtonState = [[OOJoystickManager sharedStickHandler] getAllButtonStates];
 
     if ([self handleGUIUpDownArrowKeys]) {
         int guiSelectedRow = [gui selectedRow];
@@ -397,14 +394,14 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
     [gui setColor:[OOColor cyanColor] forRow:INPUTROW];
 
     // handle page <-- and page --> keys, and on-screen buttons
-    if (((([gameView isDown:gvMouseDoubleClick] || [self checkKeyPress:n_key_gui_select] || joyButtonState[BUTTON_GUISELECT]) && [gui selectedRow] == BACKROW) || ([self checkKeyPress:n_key_gui_arrow_left] || [self checkKeyPress:n_key_gui_page_up]))
+    if (((([gameView isDown:gvMouseDoubleClick] || [self checkKeyPress:n_key_gui_select]) && [gui selectedRow] == BACKROW) || ([self checkKeyPress:n_key_gui_arrow_left] || [self checkKeyPress:n_key_gui_page_up]))
         && [[gui keyForRow:BACKROW] isEqual:GUI_KEY_OK]) {
         currentPage--;
         [self lsCommanders:gui directory:dir pageNumber:currentPage highlightName:nil];
         [gameView suppressKeysUntilKeyUp];
     }
     //
-    if (((([gameView isDown:gvMouseDoubleClick] || [self checkKeyPress:n_key_gui_select] || joyButtonState[BUTTON_GUISELECT]) && [gui selectedRow] == MOREROW) || ([self checkKeyPress:n_key_gui_arrow_right] || [self checkKeyPress:n_key_gui_page_down]))
+    if (((([gameView isDown:gvMouseDoubleClick] || [self checkKeyPress:n_key_gui_select]) && [gui selectedRow] == MOREROW) || ([self checkKeyPress:n_key_gui_arrow_right] || [self checkKeyPress:n_key_gui_page_down]))
         && [[gui keyForRow:MOREROW] isEqual:GUI_KEY_OK]) {
         currentPage++;
         [self lsCommanders:gui directory:dir pageNumber:currentPage highlightName:nil];
@@ -412,7 +409,7 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
     }
 
     // ignore Ctrl if pressed together with Enter for the moment - we check for it explicitly immediately after
-    if (([self checkKeyPress:n_key_gui_select ignore_ctrl:YES] || [gameView isDown:gvMouseDoubleClick] || joyButtonState[BUTTON_GUISELECT]) && [commanderNameString length]) {
+    if (([self checkKeyPress:n_key_gui_select ignore_ctrl:YES] || [gameView isDown:gvMouseDoubleClick]) && [commanderNameString length]) {
         if ([gameView isCommandModifierKeyDown] || [gameView isDown:gvMouseDoubleClick]) {
             int guiSelectedRow = [gui selectedRow];
             int idx = (guiSelectedRow - STARTROW) + (currentPage * NUMROWS);
@@ -454,7 +451,6 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
 {
     MyOpenGLView* gameView = [UNIVERSE gameView];
     GuiDisplayGen* gui = [UNIVERSE gui];
-    const BOOL* joyButtonState = [[OOJoystickManager sharedStickHandler] getAllButtonStates];
 
     [self handleGUIUpDownArrowKeys];
 
@@ -466,7 +462,7 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
     cYes = [valueYes characterAtIndex:0] & 0x00ff; // Use lower byte of unichar.
     cNo = [valueNo characterAtIndex:0] & 0x00ff; // Use lower byte of unichar.
 
-    if ((([self checkKeyPress:n_key_gui_select] || joyButtonState[BUTTON_GUISELECT]) && ([gui selectedRow] == SAVE_OVERWRITE_YES_ROW)) || [gameView isDown:cYes] || [gameView isDown:cYes - 32]) {
+    if (([self checkKeyPress:n_key_gui_select] && ([gui selectedRow] == SAVE_OVERWRITE_YES_ROW)) || [gameView isDown:cYes] || [gameView isDown:cYes - 32]) {
         pollControls = YES;
         [self nativeSavePlayer:commanderNameString];
         [self playSaveOverwriteYes];
@@ -474,7 +470,7 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
         [self setGuiToStatusScreen];
     }
 
-    if ((([self checkKeyPress:n_key_gui_select] || joyButtonState[BUTTON_GUISELECT]) && ([gui selectedRow] == SAVE_OVERWRITE_NO_ROW)) || [gameView isDown:27] || [gameView isDown:cNo] || [gameView isDown:cNo - 32]) {
+    if (([self checkKeyPress:n_key_gui_select] && ([gui selectedRow] == SAVE_OVERWRITE_NO_ROW)) || [gameView isDown:27] || [gameView isDown:cNo] || [gameView isDown:cNo - 32]) {
         // esc or NO was pressed - get out of here
         pollControls = YES;
         [self playSaveOverwriteNo];
@@ -720,7 +716,7 @@ static uint16_t PersonalityForCommanderDict(NSDictionary* dict);
     NSString* dir = [[UNIVERSE gameController] playerFileDirectory];
     NSString* savePath = [dir stringByAppendingPathComponent:[cdrName stringByAppendingPathExtension:@"oolite-save"]];
 
-    [self doScriptEvent:OOJSID("playerWillSaveGame") withArgument:@"STANDARD_SAVE"];
+    ShipScriptEventNoCx(self, "playerWillSaveGame", OOJSSTR("STANDARD_SAVE"));
 
     [self setLastsaveName:cdrName];
 

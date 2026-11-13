@@ -109,7 +109,7 @@ SOFTWARE.
 - (void)setUsingPlugInController:(BOOL)flag;
 - (BOOL)usingPlugInController;
 
-#if OOLITE_SDL
+#if OOLITE_GNUSTEP
 - (void)applicationWillTerminate;
 #endif
 

@@ -439,9 +439,9 @@ static NSString* const kVisualEffectDataCacheKey = @"visual effect data";
                     {
                         JSContext* context = OOJSAcquireContext();
                         BOOL OK;
-                        BOOL allow_use = NO;
-                        OOJSVal result = OOJSUndefinedValue();
-                        OOJSVal args[] = { OOJSValueFromNativeObject(context, shipKey) };
+                        JSBool allow_use;
+                        jsval result;
+                        jsval args[] = { OOJSValueFromNativeObject(context, shipKey) };
 
                         OK = [condScript callMethod:OOJSID("allowShowLibraryShip")
                                           inContext:context
@@ -450,10 +450,8 @@ static NSString* const kVisualEffectDataCacheKey = @"visual effect data";
                                              result:&result];
 
                         if (OK)
-                            allow_use = OOJSValueToBOOL(context, result);
+                            OK = JS_ValueToBoolean(context, result, &allow_use);
 
-                        OOJSFreeValue(context, result);
-                        OOJSFreeValue(context, args[0]);
                         OOJSRelinquishContext(context);
                         if (OK && !allow_use) {
                             /* if the script exists, the function exists, the function

@@ -1,20 +1,26 @@
 #!/bin/bash
 
 build_doxygen() {
-    # Builds Doxygen html documentation. Called via build_documentation.
-    pkg_ok=$(command -v doxygen)
-    if [[ -z "$pkg_ok" ]]; then
+    local script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+    pushd "$script_dir"
+
+    PKG_OK=$(command -v doxygen)
+    if [ "" = "$PKG_OK" ]; then
       echo "❌ Doxygen executable not found!" >&2
       return 1
     fi
 
-    mkdir -p docs/api
+    cd ..
+    mkdir -p build/documentation/docs/api
+    cd build/documentation/
     curl -L https://github.com/jothepro/doxygen-awesome-css/archive/refs/tags/v2.4.1.tar.gz -o doxygen-awesome-css.tar.gz
-    mkdir -p doxygen-awesome
-    tar -xvzf doxygen-awesome-css.tar.gz --strip-components=1 -C doxygen-awesome
+    tar -xvzf doxygen-awesome-css.tar.gz --strip-components=1
+
+    cp -r ../../Documentation/* ./
     if ! doxygen; then
         echo "❌ Doxygen build failed!" >&2
         return 1
     fi
     echo "✅ Doxygen build completed successfully"
+    popd
 }
