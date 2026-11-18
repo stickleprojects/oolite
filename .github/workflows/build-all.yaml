@@ -2,6 +2,8 @@ name: Build Oolite package for various platforms
 on:
   workflow_dispatch:
   push:
+    # Feature branches are built by their pull_request run; building them on push as well ran everything twice.
+    branches: [master, '**maintenance', stickleprojects]
   pull_request:
 
 concurrency:
@@ -50,6 +52,8 @@ jobs:
             build/oolite-documentation.zip
           retention-days: 5
       - name: Setup GitHub Pages
+        # GitHub Pages is only enabled in OoliteProject/oolite; in a fork this step fails.
+        if: github.repository == 'OoliteProject/oolite'
         uses: actions/configure-pages@v6
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
@@ -221,6 +225,8 @@ jobs:
 
   build-flatpak:
     needs: clang-format-check
+    # Only the release job uses the Flatpak, and that runs only in OoliteProject/oolite; forks can still build it by hand.
+    if: github.repository == 'OoliteProject/oolite' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
@@ -376,8 +382,8 @@ jobs:
     permissions:
       contents: write  # create the release; also needed in forks, where the token is read-only by default
       actions: write   # remove old workflow runs
-    # Only run for internal requests (so not for PRs from forks)
-    if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
+    # Only run for internal requests (so not for PRs from forks), and only in the main repository
+    if: github.repository == 'OoliteProject/oolite' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     steps:
       ## This is for debugging only and helps developing the workflow.
       # - name: Environment Variables
