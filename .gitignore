@@ -41,3 +41,6 @@ tools-make/
 /tools/oolite-ui-test-framework/wmtest-share/
 /tools/oolite-ui-test-framework/results/
 /tools/oolite-ui-test-framework/.venv-host/
+
+# VS Code C/C++ settings hold paths on the developer's machine, so each keeps their own
+.vscode/c_cpp_properties.json
